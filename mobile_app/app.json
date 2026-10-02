@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "PreCare",
+    "slug": "precare-mobile",
+    "version": "2.4.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "vn.precare.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "vn.precare.mobile"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
