@@ -183,7 +183,7 @@ export default function LoginScreen({ navigation }: Props) {
 
           <PrimaryButton
             title="Đăng nhập"
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.navigate('Main')}
           />
 
 
