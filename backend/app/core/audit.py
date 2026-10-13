@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from fastapi import Request
 from sqlalchemy.orm import Session
-from app.models.models import AuditLog
+from app.models.audit_log import AuditLog
 
 def log_audit_event(
     db: Session,
