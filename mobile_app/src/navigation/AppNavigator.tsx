@@ -4,11 +4,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import HomeScreen from '../screens/HomeScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Register: undefined;
+  Home: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -19,6 +21,7 @@ export default function AppNavigator() {
       <Stack.Navigator initialRouteName="Onboarding">
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Đăng nhập' }} />
+        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Đăng ký' }} />
       </Stack.Navigator>
     </NavigationContainer>
