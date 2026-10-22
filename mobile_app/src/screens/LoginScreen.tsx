@@ -179,13 +179,8 @@ export default function LoginScreen({ navigation }: Props) {
             </Pressable>
 
             <Pressable
+              onPress={() => navigation.navigate('ForgotPassword')}
               disabled={loading}
-              onPress={() =>
-                Alert.alert(
-                  'Quên mật khẩu',
-                  'Chức năng này chưa được kết nối với API.',
-                )
-              }
             >
               <Text style={styles.forgotPassword}>
                 Quên mật khẩu?
