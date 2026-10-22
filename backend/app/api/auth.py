@@ -18,6 +18,21 @@ from app.schemas.auth import SendOTPRequest, SendOTPResponse, VerifyOTPRequest, 
 from app.services.otp_service import OTPService
 from app.services.email_service import send_otp_email
 
+# refresh token
+from datetime import datetime, timezone
+import secrets
+# Import thêm 2 models mới (đã có sẵn trong backend/app/models)
+from app.models.refresh_token import RefreshToken
+from app.models.password_reset import PasswordReset
+# Import thêm schemas mới vừa tạo ở Bước 1
+from app.schemas.auth import (
+    RefreshTokenRequest, TokenRefreshResponse,
+    ForgotPasswordRequest, ResetPasswordRequest,
+    StandardResponse, LogoutRequest
+)
+
+  
+
 router = APIRouter()
 
 @router.post("/register", response_model=UserResponse)
@@ -182,3 +197,200 @@ async def verify_otp(
         "verification_token": verification_token
     }
 
+@router.post("/refresh", response_model=TokenRefreshResponse)
+def refresh_access_token(
+    request: Request,
+    payload: RefreshTokenRequest,
+    db: Session = Depends(get_db)
+) -> Any:
+    # 1. Băm token gửi lên để tìm trong CSDL
+    incoming_hash = security.hash_token(payload.refresh_token)
+    token_record = db.query(RefreshToken).filter(
+        RefreshToken.token_hash == incoming_hash,
+        RefreshToken.is_revoked == False
+    ).first()
+    now_utc = datetime.now(timezone.utc)
+    # 2. Kiểm tra tính hợp lệ và hạn dùng của Refresh Token
+    if not token_record or token_record.expires_at <= now_utc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token không hợp lệ hoặc đã hết hạn"
+        )
+    user = token_record.user
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Người dùng không tồn tại hoặc đã bị khóa"
+        )
+    # 3. Token Rotation: Thu hồi (Revoke) token cũ
+    token_record.is_revoked = True
+    # 4. Sinh cặp token mới
+    new_raw_refresh = security.generate_secure_token()
+    new_refresh_hash = security.hash_token(new_raw_refresh)
+    refresh_expires_at = now_utc + timedelta(days=7) # Refresh token có hạn 7 ngày
+    # Lưu token mới vào DB
+    new_token_record = RefreshToken(
+        user_id=user.id,
+        token_hash=new_refresh_hash,
+        device_info=request.headers.get("user-agent", "Unknown"),
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        expires_at=refresh_expires_at,
+        is_revoked=False
+    )
+    db.add(new_token_record)
+    # Cấp access token mới có hạn 30 phút (1800 giây) theo đúng Contract
+    access_token_expires = timedelta(seconds=1800)
+    new_access_token = security.create_access_token(
+        data={"sub": str(user.id), "role": user.role},
+        expires_delta=access_token_expires
+    )
+    db.commit()
+    return {
+        "success": True,
+        "data": {
+            "access_token": new_access_token,
+            "refresh_token": new_raw_refresh,
+            "token_type": "Bearer",
+            "expires_in": 1800
+        }
+    }
+# ==============================================================================
+# 2. API YÊU CẦU OTP QUÊN MẬT KHẨU (POST /api/v1/auth/forgot-password)
+# Sinh OTP 6 chữ số, lưu hash vào bảng password_resets và gửi email
+# ==============================================================================
+@router.post("/forgot-password", response_model=StandardResponse)
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+) -> Any:
+    email_clean = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email_clean).first()
+    # Chuẩn bảo mật: Nếu không tìm thấy email, vẫn báo gửi thành công để chống dò email
+    if not user:
+        return {
+            "success": True,
+            "message": "Mã OTP đã được gửi đến email của bạn nếu tài khoản tồn tại"
+        }
+    # 1. Sinh mã OTP 6 chữ số ngẫu nhiên
+    otp_code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    otp_hash = security.hash_token(otp_code)
+    # 2. Vô hiệu hóa các mã OTP khôi phục cũ chưa dùng của tài khoản này
+    db.query(PasswordReset).filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.is_used == False
+    ).update({"is_used": True})
+    # 3. Tạo bản ghi khôi phục mới với thời hạn 15 phút (900 giây)
+    now_utc = datetime.now(timezone.utc)
+    reset_entry = PasswordReset(
+        user_id=user.id,
+        reset_code_hash=otp_hash,
+        expires_at=now_utc + timedelta(minutes=15),
+        is_used=False
+    )
+    db.add(reset_entry)
+    db.commit()
+    # 4. Gửi email chứa OTP ngầm qua BackgroundTasks
+    background_tasks.add_task(
+        send_otp_email,
+        to_email=user.email,
+        otp_code=otp_code,
+        expire_seconds=900
+    )
+    log_audit_event(
+        db=db,
+        action="FORGOT_PASSWORD_REQUEST",
+        target_table="users",
+        target_id=user.id,
+        user_id=user.id,
+        request=request
+    )
+    return {
+        "success": True,
+        "message": "Mã OTP đã được gửi đến email của bạn"
+    }
+# ==============================================================================
+# 3. API ĐẶT LẠI MẬT KHẨU BẰNG OTP (POST /api/v1/auth/reset-password)
+# Xác thực OTP, cập nhật mật khẩu mới và thu hồi toàn bộ Refresh Tokens cũ
+# ==============================================================================
+@router.post("/reset-password", response_model=StandardResponse)
+def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+) -> Any:
+    email_clean = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email_clean).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Thông tin email hoặc mã xác minh không chính xác"
+        )
+    # 1. Băm OTP gửi lên để so khớp với DB
+    otp_hash = security.hash_token(payload.otp_code)
+    now_utc = datetime.now(timezone.utc)
+    reset_record = db.query(PasswordReset).filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.reset_code_hash == otp_hash,
+        PasswordReset.is_used == False,
+        PasswordReset.expires_at > now_utc
+    ).order_by(PasswordReset.created_at.desc()).first()
+    if not reset_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mã OTP không hợp lệ hoặc đã hết hạn (chỉ có hiệu lực trong 15 phút)"
+        )
+    # 2. Cập nhật mật khẩu mới đã băm bcrypt
+    user.password_hash = security.get_password_hash(payload.new_password)
+    reset_record.is_used = True
+    # 3. Thu hồi toàn bộ Refresh Token đang hoạt động (đăng xuất khỏi tất cả các thiết bị)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.is_revoked == False
+    ).update({"is_revoked": True})
+    db.commit()
+    log_audit_event(
+        db=db,
+        action="RESET_PASSWORD_SUCCESS",
+        target_table="users",
+        target_id=user.id,
+        user_id=user.id,
+        request=request
+    )
+    return {
+        "success": True,
+        "message": "Đặt lại mật khẩu thành công"
+    }
+# ==============================================================================
+# 4. API ĐĂNG XUẤT (POST /api/v1/auth/logout)
+# Thu hồi Refresh Token để kết thúc phiên đăng nhập an toàn
+# ==============================================================================
+@router.post("/logout", response_model=StandardResponse)
+def logout(
+    request: Request,
+    payload: LogoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    token_hash = security.hash_token(payload.refresh_token)
+    
+    # Tìm và đánh dấu thu hồi refresh token của user hiện tại
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == current_user.id,
+        RefreshToken.token_hash == token_hash
+    ).update({"is_revoked": True})
+    
+    db.commit()
+    log_audit_event(
+        db=db,
+        action="LOGOUT",
+        target_table="users",
+        target_id=current_user.id,
+        user_id=current_user.id,
+        request=request
+    )
+    return {
+        "success": True,
+        "message": "Đăng xuất thành công"
+    }

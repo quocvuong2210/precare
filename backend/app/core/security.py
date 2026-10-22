@@ -9,6 +9,9 @@ from app.core.config import settings
 from app.api.deps import get_db
 from app.models.user import User
 
+import hashlib
+import secrets
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -52,3 +55,17 @@ def require_roles(allowed_roles: List[str]):
             )
         return current_user
     return role_checker
+
+def hash_token(raw_token: str) -> str:
+    """
+    Băm chuỗi token hoặc mã OTP bằng SHA-256 trước khi lưu vào CSDL
+    (Áp dụng cho cột token_hash và reset_code_hash).
+    """
+    return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
+def generate_secure_token() -> str:
+    """
+    Sinh chuỗi ngẫu nhiên chuẩn an toàn mật mã CSPRNG làm Refresh Token
+    """
+    return secrets.token_hex(32)
+
+  
