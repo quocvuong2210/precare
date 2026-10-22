@@ -5,12 +5,14 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Register: undefined;
   Home: undefined;
+  ForgotPassword: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -23,6 +25,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Đăng nhập' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Đăng ký' }} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Quên mật khẩu' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
