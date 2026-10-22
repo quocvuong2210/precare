@@ -55,7 +55,7 @@ export default function LoginScreen({ navigation }: Props) {
       console.log('Đăng nhập thành công!');
 
       // Chuyển thẳng vào Home
-      navigation.replace('Home');
+      navigation.replace('Main');
 
       // Chưa chuyển màn hình vì cần xác định tên màn hình chính
       // trong AppNavigator trước.
