@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
+    # Cấu hình OTP & Email
+    OTP_EXPIRE_SECONDS: int = 300          # 5 phút (theo đúng UI)
+    OTP_COOLDOWN_SECONDS: int = 60         # 60 giây đếm ngược để gửi lại
+    OTP_MAX_ATTEMPTS: int = 5              # Tối đa 5 lần thử sai chống brute-force
+    
+    # Cấu hình SMTP gửi mail
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+    EMAILS_FROM_EMAIL: str = "no-reply@precare.vn"
+    EMAILS_FROM_NAME: str = "PreCare - Hệ Thống Y Tế Thai Sản"
+
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "precare_minio"
     MINIO_SECRET_KEY: str = "precare_minio_secret"
