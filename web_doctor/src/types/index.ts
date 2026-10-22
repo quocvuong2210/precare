@@ -77,8 +77,8 @@ export interface AnalysisResult {
   pregnancy_profile_id: string;
   checkup_id: string;
   biometric_data_id: string;
-  model_version: str;
-  rules_version: str;
+  model_version: string;
+  rules_version: string;
   bpd_zscore?: number;
   bpd_percentile?: number;
   hc_zscore?: number;
