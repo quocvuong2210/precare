@@ -9,6 +9,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/register/RegisterScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import MainTabs from './MainTabs';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   OtpVerification: {
     email: string;
   };
+  ForgotPassword: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -77,6 +79,7 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
 
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Quên mật khẩu' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
