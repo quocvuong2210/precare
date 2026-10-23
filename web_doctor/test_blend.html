@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <script src='https://cdn.tailwindcss.com'></script>
+  <style>
+    body { margin: 0; background: #0f172a; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  </style>
+</head>
+<body class='p-8'>
+  <div class='flex gap-6 max-w-7xl'>
+    <!-- Option 1: mix-blend-luminosity + opacity 30 + gradient -->
+    <div class='relative w-[460px] h-[650px] bg-[#507D75] p-10 flex flex-col justify-between overflow-hidden rounded-3xl shadow-2xl'>
+      <div class='absolute inset-0 pointer-events-none overflow-hidden'>
+        <img src='src/assets/image.png' class='w-full h-full object-cover object-center scale-105 opacity-30 mix-blend-luminosity' />
+        <div class='absolute inset-0 bg-gradient-to-b from-[#507D75]/85 via-[#507D75]/55 to-[#507D75]/95'></div>
+        <div class='absolute inset-0 bg-gradient-to-r from-[#507D75]/85 via-transparent to-[#507D75]/85'></div>
+      </div>
+      <div class='relative z-10 text-white font-bold text-2xl flex items-center gap-3'>
+        <div class='w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#507D75]'>❤</div>
+        PreCare
+      </div>
+      <div class='relative z-10 space-y-4 my-auto'>
+        <h1 class='text-3xl font-bold text-white tracking-tight leading-tight drop-shadow-sm'>Số hóa hồ sơ thai kỳ chuyên nghiệp</h1>
+        <p class='text-teal-50 text-sm leading-relaxed drop-shadow-xs'>Giải pháp trích xuất dữ liệu cận lâm sàng bằng OCR thông minh dành cho Bác sĩ Sản khoa.</p>
+        <div class='flex flex-wrap gap-2 pt-2'>
+          <span class='px-3 py-1 rounded-full text-xs bg-white/15 text-white backdrop-blur-xs border border-white/20'>OCR Thông minh</span>
+          <span class='px-3 py-1 rounded-full text-xs bg-white/15 text-white backdrop-blur-xs border border-white/20'>Bảo mật Y tế</span>
+        </div>
+      </div>
+      <div class='relative z-10 text-xs text-teal-100/80'>© 2026 PreCare Medical Systems.</div>
+    </div>
+  </div>
+</body>
+</html>

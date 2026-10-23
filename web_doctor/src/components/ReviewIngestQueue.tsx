@@ -46,14 +46,14 @@ export const ReviewIngestQueue: React.FC<ReviewIngestQueueProps> = ({ reviewData
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileText color="#3B82F6" size={20} />
-            <h3 style={{ fontSize: '1.2rem', color: '#F8FAFC' }}>Màn Hình Duyệt OCR - Màn Hình Xác Nhận (Confirmation Barrier)</h3>
+            <h3 style={{ fontSize: '1.2rem', color: '#F8FAFC' }}>Màn hình duyệt OCR - Xác nhận kết quả trích xuất (Confirmation Barrier)</h3>
           </div>
           <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '4px' }}>
-            Ràng buộc hệ thống: Kết quả trích xuất OCR bắt buộc phải qua Bác sĩ kiểm tra trước khi ghi vào hồ sơ chính thức (`biometric_data`).
+            Ràng buộc an toàn: Kết quả trích xuất OCR bắt buộc phải được Bác sĩ kiểm tra, đối chiếu trước khi ghi vào hồ sơ chính thức (`biometric_data`).
           </p>
         </div>
         <span className="badge badge-yellow">
-          <AlertTriangle size={14} /> PENDING CONFIRMATION
+          <AlertTriangle size={14} /> CHỜ BÁC SĨ DUYỆT (PENDING)
         </span>
       </div>
 
@@ -61,7 +61,7 @@ export const ReviewIngestQueue: React.FC<ReviewIngestQueueProps> = ({ reviewData
         {/* Left Column: Raw OCR View / Text */}
         <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
           <h4 style={{ color: '#06B6D4', fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Eye size={16} /> Ảnh/Tệp Cận Lâm Sàng & Kết Quả OCR Thô
+            <Eye size={16} /> Ảnh/Phiếu siêu âm cận lâm sàng & Kết quả OCR
           </h4>
           <div style={{ background: '#0F172A', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', fontFamily: 'monospace', color: '#CBD5E1', marginBottom: '12px' }}>
             {reviewData.ocr_raw_payload?.raw_text || 'Đang trích xuất OCR...'}
@@ -74,7 +74,7 @@ export const ReviewIngestQueue: React.FC<ReviewIngestQueueProps> = ({ reviewData
         {/* Right Column: Editable Verification Form */}
         <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
           <h4 style={{ color: '#34D399', fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Edit3 size={16} /> Đối Chiếu & Điền Chỉ Số Lâm Sàng Duyệt
+            <Edit3 size={16} /> Đối chiếu & Xác nhận chỉ số sinh trắc học
           </h4>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -133,7 +133,7 @@ export const ReviewIngestQueue: React.FC<ReviewIngestQueueProps> = ({ reviewData
 
           <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button className="btn btn-primary btn-success" onClick={handleConfirm}>
-              <CheckCircle size={18} /> Xác Nhận & Ghi Vào CSDL Chính Thức
+              <CheckCircle size={18} /> Xác nhận & Ghi vào CSDL chính thức
             </button>
           </div>
         </div>

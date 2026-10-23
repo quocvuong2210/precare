@@ -73,10 +73,10 @@ export const TrajectoryChart: React.FC<TrajectoryChartProps> = ({ biometricType,
     <div className="glass-card" style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC' }}>Biometric Trajectory Curve - {biometricType}</h3>
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Hadlock Growth Standard (5th, 50th, 95th Percentiles)</p>
+          <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC' }}>Đường cong tăng trưởng sinh trắc học thai nhi - {biometricType}</h3>
+          <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Tiêu chuẩn tăng trưởng Hadlock (Bách phân vị thứ 5, 50, 95)</p>
         </div>
-        <span className="badge badge-green">Standard: Hadlock 1984</span>
+        <span className="badge badge-green">Tiêu chuẩn: Hadlock 1984</span>
       </div>
 
       <div style={{ width: '100%', height: 340 }}>
@@ -100,15 +100,15 @@ export const TrajectoryChart: React.FC<TrajectoryChartProps> = ({ biometricType,
             <Legend wrapperStyle={{ paddingTop: '10px' }} />
             
             {/* Centile Band Lines */}
-            <Line type="monotone" dataKey="p95" name="95th Percentile" stroke="#F59E0B" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
-            <Line type="monotone" dataKey="p50" name="50th Percentile (Median)" stroke="#3B82F6" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="p5" name="5th Percentile" stroke="#EF4444" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="p95" name="Bách phân vị 95 (p95)" stroke="#F59E0B" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="p50" name="Bách phân vị 50 (p50 - Trung vị)" stroke="#3B82F6" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="p5" name="Bách phân vị 5 (p5)" stroke="#EF4444" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
 
             {/* Patient Measurements Scatter / Line */}
             <Line
               type="monotone"
               dataKey="patient_val"
-              name="Bệnh Nhân"
+              name="Chỉ số thai nhi"
               stroke="#10B981"
               strokeWidth={3}
               dot={{ r: 6, fill: '#10B981', strokeWidth: 2, stroke: '#FFFFFF' }}
