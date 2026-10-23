@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Alert,
   Pressable,
@@ -7,20 +7,69 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import type { RootStackParamList } from '../../navigation/AppNavigator';
+import type { RootStackParamList } from "../../navigation/AppNavigator";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
+import { sendOtp } from "../../services/api";
 
-const PRIMARY = '#0D9488';
+type Props = NativeStackScreenProps<RootStackParamList, "Register">;
+
+const PRIMARY = "#0D9488";
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleContinue = async () => {
+    const email = identifier.trim().toLowerCase();
+    const role = "doctor";
+
+    // 1. Kiểm tra email
+    if (!email) {
+      Alert.alert("Thông báo", "Vui lòng nhập email.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng địa chỉ email.");
+      return;
+    }
+
+    // 2. Ngăn gọi API nhiều lần
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      // 3. Chỉ gọi API gửi OTP MỘT LẦN
+      const result = await sendOtp(email, role);
+
+      console.log("Gửi OTP thành công:", result.message);
+
+      // 4. Chuyển màn hình nếu API thành công
+      navigation.navigate("OtpVerification", {
+        email: email,
+        role: role,
+        retryAfter: result.retry_after,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Không thể gửi mã OTP. Vui lòng thử lại.";
+
+      console.error("Lỗi gửi OTP:", message);
+
+      Alert.alert("Gửi OTP thất bại", message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -70,26 +119,18 @@ export default function RegisterScreen({ navigation }: Props) {
 
             <Pressable
               accessibilityRole="button"
+              disabled={loading}
+              onPress={handleContinue}
               style={({ pressed }) => [
                 styles.continueButton,
                 pressed && styles.pressed,
+                loading && { opacity: 0.6 },
               ]}
-              onPress={() => {
-                const email = identifier.trim();
-
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                  Alert.alert(
-                    'Email không hợp lệ',
-                    'Vui lòng nhập đúng địa chỉ email.'
-                  );
-                  return;
-                }
-
-                navigation.navigate('OtpVerification', { email });
-              }}
             >
-            <Text style={styles.continueText}>Tiếp tục</Text>
-          </Pressable>
+              <Text style={styles.continueText}>
+                {loading ? "Đang gửi mã OTP..." : "Tiếp tục"}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Divider */}
@@ -156,7 +197,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <Pressable
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => navigation.navigate('Login')}
+              onPress={() => navigation.navigate("Login")}
             >
               <Text style={styles.loginLink}>Đăng nhập</Text>
             </Pressable>
@@ -170,14 +211,14 @@ export default function RegisterScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: "#F7FAFC",
   },
 
   scrollContent: {
     flexGrow: 1,
-    width: '100%',
+    width: "100%",
     maxWidth: 480,
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingHorizontal: 22,
   },
 
@@ -186,7 +227,7 @@ const styles = StyleSheet.create({
   },
 
   brand: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 30,
   },
 
@@ -195,35 +236,35 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   pulse: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   appName: {
     marginTop: 10,
     fontSize: 19,
-    fontWeight: '700',
-    color: '#00847C',
+    fontWeight: "700",
+    color: "#00847C",
   },
 
   title: {
     fontSize: 22,
     lineHeight: 29,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "700",
+    color: "#0F172A",
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 12,
     lineHeight: 19,
-    color: '#64748B',
+    color: "#64748B",
   },
 
   form: {
@@ -234,12 +275,12 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     fontSize: 12,
     lineHeight: 17,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: "600",
+    color: "#1E293B",
   },
 
   required: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
 
   input: {
@@ -247,11 +288,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#DFE8F3',
+    borderColor: "#DFE8F3",
     borderRadius: 7,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     fontSize: 12,
-    color: '#0F172A',
+    color: "#0F172A",
   },
 
   continueButton: {
@@ -260,19 +301,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 7,
     backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   continueText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 20,
     marginBottom: 12,
     gap: 10,
@@ -281,16 +322,16 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E4ECF5',
+    backgroundColor: "#E4ECF5",
   },
 
   dividerText: {
     fontSize: 10,
-    color: '#94A8C3',
+    color: "#94A8C3",
   },
 
   socialRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
 
@@ -299,19 +340,19 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#DFE8F3',
+    borderColor: "#DFE8F3",
     borderRadius: 7,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
 
   socialText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: "600",
+    color: "#0F172A",
   },
 
   pressed: {
@@ -319,32 +360,32 @@ const styles = StyleSheet.create({
   },
 
   footer: {
-    marginTop: 'auto',
+    marginTop: "auto",
     paddingTop: 40,
     paddingBottom: 16,
   },
 
   loginRow: {
     borderTopWidth: 1,
-    borderTopColor: '#E1EAF4',
+    borderTopColor: "#E1EAF4",
     paddingTop: 15,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
   },
 
   loginText: {
     fontSize: 12,
     lineHeight: 20,
-    color: '#64748B',
+    color: "#64748B",
   },
 
   loginLink: {
     fontSize: 12,
     lineHeight: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     color: PRIMARY,
   },
 });

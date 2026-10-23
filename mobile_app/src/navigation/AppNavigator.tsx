@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -10,6 +9,9 @@ import RegisterScreen from '../screens/register/RegisterScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import MainTabs from './MainTabs';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import OtpVerificationScreen from '../screens/register/OtpVerificationScreen';
+import RegisterDetailsScreen from '../screens/register/RegisterDetailScreen';
+
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -17,26 +19,20 @@ export type RootStackParamList = {
   Register: undefined;
   Main: undefined;
   Appointments: undefined;
+  ForgotPassword: undefined;
   OtpVerification: {
     email: string;
+    role: string;
+    retryAfter?: number;
   };
-  ForgotPassword: undefined;
+  RegisterDetails: {
+    email: string;
+    role: string;
+    verificationToken: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
-// Màn hình OTP tạm thời
-function OtpVerificationScreen() {
-  return (
-    <View style={{
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center'
-    }}>
-      <Text>Xác thực OTP</Text>
-    </View>
-  );
-}
 
 export default function AppNavigator() {
   return (
@@ -62,12 +58,6 @@ export default function AppNavigator() {
         />
 
         <Stack.Screen
-          name="OtpVerification"
-          component={OtpVerificationScreen}
-          options={{ title: 'Xác thực OTP' }}
-        />
-
-        <Stack.Screen
           name="Main"
           component={MainTabs}
           options={{ headerShown: false }}
@@ -80,6 +70,18 @@ export default function AppNavigator() {
         />
 
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Quên mật khẩu' }} />
+
+        <Stack.Screen
+          name="OtpVerification"
+          component={OtpVerificationScreen}
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="RegisterDetails"
+          component={RegisterDetailsScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

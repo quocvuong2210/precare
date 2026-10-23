@@ -15,7 +15,7 @@ import { colors } from '../theme/colors';
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
 
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
@@ -163,39 +163,6 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
-
-
-      {/* ================= BOTTOM NAVIGATION ================= */}
-      <View style={styles.bottomNavigation}>
-
-        <BottomItem
-          icon="home-outline"
-          title="Trang chủ"
-          active
-        />
-
-        <BottomItem
-          icon="stats-chart-outline"
-          title="Hồ sơ"
-        />
-
-        <BottomItem
-          icon="add-circle-outline"
-          title="Tải lên"
-        />
-
-        <BottomItem
-          icon="pulse-outline"
-          title="Biểu đồ"
-        />
-
-        <BottomItem
-          icon="settings-outline"
-          title="Cài đặt"
-        />
-
-      </View>
-
     </SafeAreaView>
   );
 }
@@ -227,45 +194,6 @@ function QuickButton({
       </View>
 
       <Text style={styles.quickTitle}>
-        {title}
-      </Text>
-
-    </TouchableOpacity>
-  );
-}
-
-
-/* =====================================================
-   BOTTOM ITEM
-===================================================== */
-
-function BottomItem({
-  icon,
-  title,
-  active = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  active?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.bottomItem}
-      activeOpacity={0.8}
-    >
-
-      <Ionicons
-        name={icon}
-        size={21}
-        color={active ? colors.primary : '#9AA9B8'}
-      />
-
-      <Text
-        style={[
-          styles.bottomText,
-          active && styles.bottomTextActive,
-        ]}
-      >
         {title}
       </Text>
 
@@ -543,36 +471,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 8.5,
     color: '#7B8C99',
-  },
-
-
-  /* ================= BOTTOM NAV ================= */
-
-  bottomNavigation: {
-    height: 66,
-    borderTopWidth: 1,
-    borderTopColor: '#E1EAF0',
-    backgroundColor: colors.white,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-
-  bottomItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  bottomText: {
-    marginTop: 3,
-    fontSize: 8,
-    color: '#9AA9B8',
-  },
-
-  bottomTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
   },
 
 });
