@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,6 +11,7 @@ import MainTabs from './MainTabs';
 import ForgotPasswordScreen from '../screens/forgot-password/ForgotPasswordScreen';
 import OtpVerificationScreen from '../screens/forgot-password/OtpVerificationScreen';
 import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen';
+import RegisterDetailsScreen from '../screens/register/RegisterDetailScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -22,6 +22,11 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   OtpVerification: {
     email: string;
+  };
+  RegisterDetails: {
+    email: string;
+    role: string;
+    verificationToken: string;
   };
   ResetPassword: {
     email: string;
@@ -35,7 +40,6 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Onboarding">
-
         <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
@@ -84,6 +88,11 @@ export default function AppNavigator() {
           options={{ title: 'Đặt lại mật khẩu' }}
         />
 
+        <Stack.Screen
+          name="RegisterDetails"
+          component={RegisterDetailsScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
