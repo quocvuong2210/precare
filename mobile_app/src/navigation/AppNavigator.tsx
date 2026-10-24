@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,7 +7,11 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/register/RegisterScreen';
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import MainTabs from './MainTabs';
-import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+
+import ForgotPasswordScreen from '../screens/forgot-password/ForgotPasswordScreen';
+import OtpVerificationScreen from '../screens/forgot-password/OtpVerificationScreen';
+import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen';
+import RegisterDetailsScreen from '../screens/register/RegisterDetailScreen';
 
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -20,7 +23,15 @@ export type RootStackParamList = {
   OtpVerification: {
     email: string;
   };
-  ForgotPassword: undefined;
+  RegisterDetails: {
+    email: string;
+    role: string;
+    verificationToken: string;
+  };
+  ResetPassword: {
+    email: string;
+    otp_code: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -29,7 +40,6 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Onboarding">
-
         <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
@@ -60,7 +70,29 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
 
-        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Quên mật khẩu' }} />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={{ title: 'Quên mật khẩu' }}
+        />
+
+        <Stack.Screen
+          name="OtpVerification"
+          component={OtpVerificationScreen}
+          options={{ title: 'Xác thực mã OTP' }}
+        />
+
+        <Stack.Screen
+          name="ResetPassword"
+          component={ResetPasswordScreen}
+          options={{ title: 'Đặt lại mật khẩu' }}
+        />
+
+        <Stack.Screen
+          name="RegisterDetails"
+          component={RegisterDetailsScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
