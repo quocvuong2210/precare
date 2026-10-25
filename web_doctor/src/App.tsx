@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import {
   HeartPulse,
   LayoutDashboard,
@@ -15,11 +18,50 @@ import {
   UserPlus,
   LogIn,
   LogOut,
-  ArrowRight
+  ArrowRight,
+  KeyRound,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'login' | 'register' | 'app'>('login');
+  type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
+
+  const getInitialView = (): AppView => {
+    if (typeof window === 'undefined') return 'login';
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/register' || path.startsWith('/register')) return 'register';
+    if (path === '/forgot-password' || path.startsWith('/forgot-password')) return 'forgot-password';
+    if (path === '/reset-password' || path.startsWith('/reset-password')) return 'reset-password';
+    if (path === '/login' || path.startsWith('/login')) return 'login';
+    const token = localStorage.getItem('precare_token');
+    if (token) return 'app';
+    return 'login';
+  };
+
+  const [currentView, setCurrentView] = useState<AppView>(getInitialView);
+
+  // Điều hướng chuyển trang và đồng bộ URL trình duyệt
+  const navigateTo = (view: AppView) => {
+    setCurrentView(view);
+    const pathMap: Record<AppView, string> = {
+      'app': '/',
+      'login': '/login',
+      'register': '/register',
+      'forgot-password': '/forgot-password',
+      'reset-password': '/reset-password',
+    };
+    const targetPath = pathMap[view];
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentView(getInitialView());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
 
@@ -27,14 +69,12 @@ export const App: React.FC = () => {
   if (currentView === 'login') {
     return (
       <div className="relative">
-        
-
         <Login
           onSuccess={(authData) => {
             console.log('Login success:', authData);
-            setCurrentView('app');
+            navigateTo('app');
           }}
-          onNavigateToRegister={() => setCurrentView('register')}
+          onNavigateToRegister={() => navigateTo('register')}
         />
       </div>
     );
@@ -44,16 +84,32 @@ export const App: React.FC = () => {
   if (currentView === 'register') {
     return (
       <div className="relative">
-        {/* Floating Quick-Switch Banner for Development / Review */}
-
         <Register
-          onLoginClick={() => setCurrentView('login')}
+          onLoginClick={() => navigateTo('login')}
           onSuccess={(userData) => {
             console.log('Registration success:', userData);
-            setCurrentView('app');
+            navigateTo('app');
           }}
         />
       </div>
+    );
+  }
+
+  // VIEW 3: QUÊN MẬT KHẨU
+  if (currentView === 'forgot-password') {
+    return (
+      <ForgotPassword
+        onNavigateToLogin={() => navigateTo('login')}
+      />
+    );
+  }
+
+  // VIEW 4: ĐẶT LẠI MẬT KHẨU (từ link email)
+  if (currentView === 'reset-password') {
+    return (
+      <ResetPassword
+        onNavigateToLogin={() => navigateTo('login')}
+      />
     );
   }
 
@@ -115,18 +171,25 @@ export const App: React.FC = () => {
             {/* Quick Link to Auth Pages */}
             <div className="pt-4 space-y-1.5 border-t border-slate-100">
               <button
-                onClick={() => setCurrentView('login')}
+                onClick={() => navigateTo('login')}
                 className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all cursor-pointer"
               >
                 <LogIn className="w-4 h-4 text-slate-500" />
                 <span>Xem màn Đăng nhập</span>
               </button>
               <button
-                onClick={() => setCurrentView('register')}
+                onClick={() => navigateTo('register')}
                 className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-teal-800 bg-teal-50 hover:bg-teal-100 transition-all cursor-pointer"
               >
                 <UserPlus className="w-4 h-4 text-teal-700" />
                 <span>Xem màn Đăng ký</span>
+              </button>
+              <button
+                onClick={() => navigateTo('forgot-password')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 transition-all cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-amber-700" />
+                <span>Xem màn Quên mật khẩu</span>
               </button>
             </div>
           </nav>
@@ -153,7 +216,7 @@ export const App: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setCurrentView('login')}
+            onClick={() => navigateTo('login')}
             className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -173,7 +236,7 @@ export const App: React.FC = () => {
           {/* Right Header Info */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setCurrentView('login')}
+              onClick={() => navigateTo('login')}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5 text-slate-500" /> Về Đăng nhập

@@ -33,13 +33,23 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Danh s�ch t�i kho?n d� dang k� m?u (d? ki?m tra tr�ng l?p offline / demo)
+// Danh sách tài khoản đã đăng ký mẫu (kiểm tra trùng lặp offline / demo)
+// Đồng bộ với dữ liệu thực trong precare_db (users table)
 const DEFAULT_EXISTING_EMAILS = [
+  // Demo accounts (DEMO_ACCOUNTS trong Login.tsx)
   'admin@precare.vn',
   'bacsi.leminh@phusantw.org',
   'bacsi.nguyen@precare.vn',
   'me.bau@gmail.com',
   'nguyenminhhoang@precare.vn',
+  // Accounts thực từ DB (precare_db.public.users)
+  'user@example.com',
+  'bacsi.choaduyet@phusant.vn',
+  'haiyen.le@gmail.com',
+  'thaochi.nguyen@gmail.com',
+  'bacsi.leminh@phusantw.org',
+  'quantri.nam@phusantw.org',
+  'yennhi5033@gmail.com',
 ];
 
 const DEFAULT_EXISTING_PHONES = [
@@ -441,6 +451,8 @@ export const authApi = {
         };
       }
 
+      localStorage.setItem('precare_user', JSON.stringify(userProfile));
+
       return {
         user: userProfile,
         tokens: {
@@ -510,14 +522,27 @@ export const authApi = {
   },
 
   /**
-   * 8. POST /api/v1/auth/forgot-password � Y�u c?u OTP kh�i ph?c m?t kh?u
+   * 8. POST /api/v1/auth/forgot-password — Yêu cầu OTP khôi phục mật khẩu
+   * Fallback offline: giả lập thành công để không block UX khi backend chưa chạy
    */
   async forgotPassword(data: ForgotPasswordRequest): Promise<any> {
-    return apiClient.post('/auth/forgot-password', data);
+    try {
+      const res = await apiClient.post('/auth/forgot-password', data);
+      return res.data;
+    } catch (err: any) {
+      // Nếu backend có response (400, 404...) → throw để caller xử lý
+      if (err.response) {
+        throw err;
+      }
+      // Backend offline → giả lập thành công (UX không bị block)
+      console.warn('[PreCare offline] forgotPassword fallback — backend không chạy');
+      return { success: true, message: 'Offline mode: giả lập gửi email thành công' };
+    }
   },
 
   /**
-   * 9. POST /api/v1/auth/reset-password � �?t l?i m?t kh?u v?i OTP
+   * 9. POST /api/v1/auth/reset-password — Đặt lại mật khẩu với OTP
+   * Fallback offline: giả lập thành công để dev test UX bước 4 → success
    */
   async resetPassword(data: ResetPasswordRequest): Promise<any> {
     const payload = {
@@ -525,7 +550,18 @@ export const authApi = {
       otp_code: data.otp_code || data.otpCode,
       new_password: data.new_password || data.newPassword,
     };
-    return apiClient.post('/auth/reset-password', payload);
+    try {
+      const res = await apiClient.post('/auth/reset-password', payload);
+      return res.data;
+    } catch (err: any) {
+      // Nếu backend có response (400, 422...) → throw để caller xử lý (OTP sai, hết hạn...)
+      if (err.response) {
+        throw err;
+      }
+      // Backend offline → giả lập đổi mật khẩu thành công
+      console.warn('[PreCare offline] resetPassword fallback — backend không chạy');
+      return { success: true, message: 'Offline mode: giả lập đặt lại mật khẩu thành công' };
+    }
   },
 
   /**
@@ -542,6 +578,7 @@ export const authApi = {
     } finally {
       localStorage.removeItem('precare_token');
       localStorage.removeItem('precare_refresh_token');
+      localStorage.removeItem('precare_user');
     }
   },
 };
