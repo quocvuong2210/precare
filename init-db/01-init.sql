@@ -30,22 +30,33 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_target ON audit_logs(target_table, target_id);
 
--- 3. Bảng Pregnancy Profiles
+-- 3. Bảng Pregnancy Profiles (Cập nhật chuẩn theo PRC-32)
 CREATE TABLE IF NOT EXISTS pregnancy_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     primary_doctor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    lmp DATE,
-    q1_ultrasound_date DATE,
-    q1_gestational_weeks INT,
-    q1_gestational_days INT,
-    edd DATE NOT NULL,
+    lmp DATE,                                 -- Ngày đầu kỳ kinh cuối (Last Menstrual Period)
+    q1_ultrasound_date DATE,                  -- Ngày thực hiện siêu âm quý 1
+    q1_gestational_weeks INT,                 -- Tuổi thai (tuần) tại thời điểm siêu âm Q1
+    q1_gestational_days INT,                  -- Tuổi thai (ngày lẻ) tại thời điểm siêu âm Q1 (0 - 6)
+    crl_mm NUMERIC(5,2),                      -- Chiều dài đầu mông (Crown-Rump Length mm)
+    edd DATE NOT NULL,                        -- Ngày dự sinh đã chốt (Estimated Date of Delivery)
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'terminated')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_gestational_days CHECK (q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)),
+    CONSTRAINT chk_gestational_weeks CHECK (q1_gestational_weeks IS NULL OR (q1_gestational_weeks >= 0 AND q1_gestational_weeks <= 42)),
+    CONSTRAINT chk_crl_positive CHECK (crl_mm IS NULL OR crl_mm > 0)
 );
+-- Chỉ mục tối ưu hóa truy vấn
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_patient ON pregnancy_profiles(patient_id);
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_doctor ON pregnancy_profiles(primary_doctor_id);
+CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_status ON pregnancy_profiles(status);
+
+-- Ràng buộc Partial Unique Index: Mỗi thai phụ chỉ có tối đa 1 hồ sơ ở trạng thái 'active'
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_pregnancy_per_patient 
+ON pregnancy_profiles(patient_id) 
+WHERE status = 'active';
 
 -- 4. Bảng Checkups
 CREATE TABLE IF NOT EXISTS checkups (
