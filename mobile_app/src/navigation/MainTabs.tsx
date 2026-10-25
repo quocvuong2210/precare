@@ -2,17 +2,19 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/HomeScreen';
 import { colors } from '../theme/colors';
-import UploadScreen from '../screens/UploadScreen';
+import UploadNavigator from './UploadNavigator';
+import type { UploadStackParamList } from './UploadNavigator';
 
 /* ================= TÊN CÁC TAB ================= */
 export type MainTabParamList = {
   Home: undefined;
   Records: undefined;
-  Upload: undefined;
+  Upload: NavigatorScreenParams<UploadStackParamList> | undefined;
   Charts: undefined;
   Settings: undefined;
 };
@@ -78,7 +80,7 @@ export default function MainTabs() {
     >
       <Tab.Screen name="Home"     component={HomeScreen}     options={{ tabBarLabel: 'Trang chủ' }} />
       <Tab.Screen name="Records"  component={RecordsScreen}  options={{ tabBarLabel: 'Hồ sơ' }} />
-      <Tab.Screen name="Upload"   component={UploadScreen}   options={{ tabBarLabel: 'Tải lên' }} />
+      <Tab.Screen name="Upload"   component={UploadNavigator} options={{ tabBarLabel: 'Tải lên' }} />
       <Tab.Screen name="Charts"   component={ChartsScreen}   options={{ tabBarLabel: 'Biểu đồ' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Cài đặt' }} />
     </Tab.Navigator>

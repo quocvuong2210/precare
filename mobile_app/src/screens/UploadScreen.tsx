@@ -6,11 +6,17 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { colors } from '../theme/colors';
 import type { MainTabParamList } from '../navigation/MainTabs';
+import type { UploadStackParamList } from '../navigation/UploadNavigator';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Upload'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<UploadStackParamList, 'UploadHome'>,
+  BottomTabScreenProps<MainTabParamList, 'Upload'>
+>;
 
 /* ================= KIỂU DỮ LIỆU ================= */
 type Status = 'processing' | 'done' | 'pending';
@@ -167,6 +173,15 @@ export default function UploadScreen({ navigation }: Props) {
             </View>
           );
         })}
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('ManualResultEntry')}
+          style={({ pressed }) => [styles.manualButton, pressed && { opacity: 0.85 }]}
+        >
+          <Ionicons name="create-outline" size={18} color={colors.primary} />
+          <Text style={styles.manualButtonText}>Nhập kết quả thủ công</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -263,4 +278,20 @@ const styles = StyleSheet.create({
 
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   badgeText: { fontSize: 10.5, fontWeight: '700' },
+
+  manualButton: {
+    marginTop: 36,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+  },
+  manualButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 });
