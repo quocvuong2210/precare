@@ -1,57 +1,274 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
-import { HeartPulse, User, LogOut, Bell, FileText } from 'lucide-react';
+import { Register } from './pages/Register';
+import { Login } from './pages/Login';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
+import {
+  HeartPulse,
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  BarChart2,
+  Settings,
+  Bell,
+  Stethoscope,
+  UserPlus,
+  LogIn,
+  LogOut,
+  ArrowRight,
+  KeyRound,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
+  type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
+
+  const getInitialView = (): AppView => {
+    if (typeof window === 'undefined') return 'login';
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/register' || path.startsWith('/register')) return 'register';
+    if (path === '/forgot-password' || path.startsWith('/forgot-password')) return 'forgot-password';
+    if (path === '/reset-password' || path.startsWith('/reset-password')) return 'reset-password';
+    if (path === '/login' || path.startsWith('/login')) return 'login';
+    const token = localStorage.getItem('precare_token');
+    if (token) return 'app';
+    return 'login';
+  };
+
+  const [currentView, setCurrentView] = useState<AppView>(getInitialView);
+
+  // Điều hướng chuyển trang và đồng bộ URL trình duyệt
+  const navigateTo = (view: AppView) => {
+    setCurrentView(view);
+    const pathMap: Record<AppView, string> = {
+      'app': '/',
+      'login': '/login',
+      'register': '/register',
+      'forgot-password': '/forgot-password',
+      'reset-password': '/reset-password',
+    };
+    const targetPath = pathMap[view];
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentView(getInitialView());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
+
+  // VIEW 1: ĐĂNG NHẬP (LOGIN THEO THIẾT KẾ FIGMA)
+  if (currentView === 'login') {
+    return (
+      <div className="relative">
+        <Login
+          onSuccess={(authData) => {
+            console.log('Login success:', authData);
+            navigateTo('app');
+          }}
+          onNavigateToRegister={() => navigateTo('register')}
+        />
+      </div>
+    );
+  }
+
+  // VIEW 2: ĐĂNG KÝ (REGISTER 5 BƯỚC)
+  if (currentView === 'register') {
+    return (
+      <div className="relative">
+        <Register
+          onLoginClick={() => navigateTo('login')}
+          onSuccess={(userData) => {
+            console.log('Registration success:', userData);
+            navigateTo('app');
+          }}
+        />
+      </div>
+    );
+  }
+
+  // VIEW 3: QUÊN MẬT KHẨU
+  if (currentView === 'forgot-password') {
+    return (
+      <ForgotPassword
+        onNavigateToLogin={() => navigateTo('login')}
+      />
+    );
+  }
+
+  // VIEW 4: ĐẶT LẠI MẬT KHẨU (từ link email)
+  if (currentView === 'reset-password') {
+    return (
+      <ResetPassword
+        onNavigateToLogin={() => navigateTo('login')}
+      />
+    );
+  }
+
+  // VIEW 3: GIAO DIỆN BÁC SĨ (DASHBOARD)
+  const navItems = [
+    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+    { id: 'patients', label: 'Danh sách bệnh nhân', icon: Users },
+    { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
+    { id: 'settings', label: 'Cài đặt', icon: Settings },
+  ] as const;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header Bar */}
-      <header style={{
-        background: 'rgba(15, 23, 42, 0.8)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        padding: '16px 24px'
-      }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setSelectedPatientId(null)}>
-            <div style={{ padding: '8px', background: 'linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%)', borderRadius: '10px', color: 'white', display: 'flex' }}>
-              <HeartPulse size={24} />
+    <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans">
+      {/* Left Sidebar (260px) */}
+      <aside className="w-[260px] bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen sticky top-0 h-screen p-5">
+        <div className="space-y-7">
+          {/* Logo & Brand Header */}
+          <div
+            className="flex items-center gap-3 cursor-pointer select-none"
+            onClick={() => {
+              setSelectedPatientId(null);
+              setActiveTab('overview');
+            }}
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#4D7D74] flex items-center justify-center text-white shadow-sm shadow-teal-900/10">
+              <HeartPulse className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#F8FAFC', letterSpacing: '-0.02em' }}>PreCare Doctor Portal</h1>
-              <p style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Hệ Thống Số Hóa Cận Lâm Sàng & Theo Dõi Thai Kỳ</p>
+              <div className="text-xl font-bold text-slate-800 tracking-tight leading-tight">PreCare</div>
+              <div className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">DIGITAL OBSTETRICS</div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button className="btn btn-secondary" style={{ padding: '8px 12px' }}>
-              <Bell size={16} />
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 14px', background: 'rgba(255,255,255,0.05)', borderRadius: '999px', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <User size={18} color="#38BDF8" />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#F8FAFC' }}>BS. Lê Hoàng</div>
-                <div style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Khoa Sản - Bệnh Viện ĐKKV</div>
-              </div>
+          {/* Navigation Items */}
+          <nav className="space-y-1.5">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id && !selectedPatientId;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSelectedPatientId(null);
+                  }}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#4D7D74] text-white shadow-sm font-semibold'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Quick Link to Auth Pages */}
+            <div className="pt-4 space-y-1.5 border-t border-slate-100">
+              <button
+                onClick={() => navigateTo('login')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <LogIn className="w-4 h-4 text-slate-500" />
+                <span>Xem màn Đăng nhập</span>
+              </button>
+              <button
+                onClick={() => navigateTo('register')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-teal-800 bg-teal-50 hover:bg-teal-100 transition-all cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-teal-700" />
+                <span>Xem màn Đăng ký</span>
+              </button>
+              <button
+                onClick={() => navigateTo('forgot-password')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 transition-all cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-amber-700" />
+                <span>Xem màn Quên mật khẩu</span>
+              </button>
             </div>
-          </div>
+          </nav>
         </div>
-      </header>
 
-      {/* Main Body Content */}
-      <main className="app-container" style={{ flex: 1 }}>
-        {selectedPatientId ? (
-          <PatientDetail patientId={selectedPatientId} onBack={() => setSelectedPatientId(null)} />
-        ) : (
-          <Dashboard onSelectPatient={(id) => setSelectedPatientId(id)} />
-        )}
-      </main>
+        {/* Doctor Profile Card & Logout */}
+        <div className="space-y-2">
+          <div className="border border-slate-200/80 rounded-2xl p-3 bg-white flex items-center gap-3 shadow-xs">
+            <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center text-teal-800">
+              <img
+                src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
+                alt="BS. Lê Minh"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+              <Stethoscope className="w-5 h-5 text-teal-700 hidden only:block" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-slate-800 truncate">BS. Lê Minh</div>
+              <div className="text-[11px] text-slate-500 truncate">Khoa Sản - Sản Phụ Khoa</div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigateTo('login')}
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Đăng xuất</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar */}
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-5 sticky top-0 z-30 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+            {selectedPatientId ? 'Hồ sơ chi tiết thai phụ' : 'Tổng quan hoạt động'}
+          </h1>
+
+          {/* Right Header Info */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigateTo('login')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5 text-slate-500" /> Về Đăng nhập
+            </button>
+
+            <button
+              aria-label="Thông báo"
+              className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-2.5 right-2.5"></span>
+            </button>
+
+            <div className="text-right pl-2">
+              <div className="text-sm font-bold text-slate-800 leading-tight">Bệnh viện Phụ sản Trung ương</div>
+              <div className="text-xs text-slate-500">Phòng khám sản 402</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content Body */}
+        <main className="p-8 max-w-[1440px] w-full mx-auto">
+          {selectedPatientId ? (
+            <PatientDetail
+              patientId={selectedPatientId}
+              onBack={() => setSelectedPatientId(null)}
+            />
+          ) : (
+            <Dashboard onSelectPatient={(id) => setSelectedPatientId(id)} />
+          )}
+        </main>
+      </div>
     </div>
   );
 };

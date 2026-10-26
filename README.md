@@ -27,10 +27,9 @@ PreCare is designed as a modular micro-services monorepo architecture:
 ### 1. Docker Compose Setup
 ```bash
 cp .env.example .env
-docker-compose up --build -d 
+docker-compose up --build -d
 
-#####
-docker-compose down 
+docker-compose down
 ```
 
 ### 2. Services Access Points

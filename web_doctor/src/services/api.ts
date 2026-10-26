@@ -1,18 +1,10 @@
-import axios from 'axios';
+﻿/**
+ * Central API Gateway Client
+ * Tích hợp các service con theo từng ticket chuyên biệt (Auth, Records, Ultrasound...)
+ */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { apiClient, authApi } from './auth.service';
 
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('precare_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+export const api = apiClient;
+export { authApi };
+export default api;

@@ -3,12 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PreCare - Portal Bác Sĩ Cận Lâm Sàng & Theo Dõi Thai Kỳ</title>
+    <title>PreCare - Hệ thống Quản lý Hồ sơ Thai kỳ Điện tử</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              brand: {
+                teal: '#345C59',
+                'teal-hover': '#2D5553',
+                'teal-dark': '#234442',
+                'teal-light': '#E6F4F1',
+                'teal-subtle': '#F0F9F8'
+              }
+            }
+          }
+        }
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-[#F8FAFC] text-slate-800 font-sans antialiased min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,3 +1,12 @@
+﻿/**
+ * Ticket Module Exports
+ */
+// STORY-2.1: Quản lý Tài khoản & Xác thực Người dùng (M-AUTH)
+export * from './auth.types';
+
+// =========================================================================
+// CLINICAL & ULTRASOUND DOMAIN TYPES
+// =========================================================================
 export type WarningLevel = 'green' | 'yellow' | 'red';
 export type IngestStatus = 'pending' | 'processing' | 'extracted' | 'verified' | 'failed';
 

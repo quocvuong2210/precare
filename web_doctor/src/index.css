@@ -1,165 +1,136 @@
-:root {
-  --bg-primary: #0F172A;
-  --bg-secondary: #1E293B;
-  --bg-card: rgba(30, 41, 59, 0.7);
-  --border-card: rgba(255, 255, 255, 0.1);
-  --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
-  --accent-primary: #3B82F6;
-  --accent-hover: #2563EB;
-  --accent-cyan: #06B6D4;
-  --status-green: #10B981;
-  --status-yellow: #F59E0B;
-  --status-red: #EF4444;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+﻿@layer base {
+  body {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Custom UI Utilities for Doctor Portal */
+.border-1\.5 {
+  border-width: 1.5px !important;
+  border-style: solid !important;
 }
 
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-main);
-  font-family: var(--font-sans);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+.h-13 {
+  height: 3.25rem !important;
 }
 
-/* Glassmorphism utilities */
-.glass-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-card);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-.glass-card:hover {
-  border-color: rgba(59, 130, 246, 0.3);
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-  color: white;
-  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px 0 rgba(37, 99, 235, 0.5);
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-main);
-  border: 1px solid var(--border-card);
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.btn-success {
-  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-  color: white;
-}
-
-.btn-danger {
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-  color: white;
-}
-
-/* Warning Badges */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
   border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
-.badge-green {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34D399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+/* PC Button and Form Styles from layout-ex */
+.pc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  border: none;
+  text-decoration: none;
 }
 
-.badge-yellow {
-  background: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+.pc-btn-primary {
+  background-color: #0d8a7c;
+  color: #ffffff;
 }
 
-.badge-red {
-  background: rgba(239, 68, 68, 0.15);
-  color: #F87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  animation: pulse-red 2s infinite;
+.pc-btn-primary:hover:not(:disabled) {
+  background-color: #097266;
 }
 
-@keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+.pc-btn-secondary {
+  background-color: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.pc-btn-secondary:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.pc-btn-danger {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.pc-btn-danger:hover {
+  background-color: #dc2626;
+}
+
+.pc-btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
 }
 
 /* Form Inputs */
-.form-input {
+.pc-input {
   width: 100%;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-card);
+  padding: 9px 12px;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 10px 14px;
-  color: var(--text-main);
-  font-size: 0.95rem;
+  font-size: 13px;
+  color: #0f172a;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
 }
 
-.form-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+.pc-input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
 }
 
-/* Layout Grids */
-.app-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px;
+.pc-input::placeholder {
+  color: #94a3b8;
 }
 
-.grid-cols-2 {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+.pc-input-error {
+  border-color: #ef4444 !important;
+  background-color: #fffbfb !important;
 }
 
-@media (max-width: 1024px) {
-  .grid-cols-2 {
-    grid-template-columns: 1fr;
+.pc-input-error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+.pc-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

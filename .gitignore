@@ -10,5 +10,13 @@ __pycache__/
 # OS
 .DS_Store
 
+# Dependencies
 node_modules/
 **/node_modules/
+.npm-cache/
+
+# Build outputs
+dist/
+build/
+
+layout-ex/
