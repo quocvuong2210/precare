@@ -186,7 +186,6 @@ export default function UploadScreen({ navigation }: Props) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F5F8FA' },
 

@@ -6,6 +6,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/HomeScreen';
+import RecordsScreen from '../screens/RecordsScreen';
 import { colors } from '../theme/colors';
 import UploadNavigator from './UploadNavigator';
 import type { UploadStackParamList } from './UploadNavigator';
@@ -40,7 +41,6 @@ function PlaceholderScreen({ title }: { title: string }) {
     </View>
   );
 }
-const RecordsScreen  = () => <PlaceholderScreen title="Hồ sơ" />;
 const ChartsScreen   = () => <PlaceholderScreen title="Biểu đồ" />;
 const SettingsScreen = () => <PlaceholderScreen title="Cài đặt" />;
 
