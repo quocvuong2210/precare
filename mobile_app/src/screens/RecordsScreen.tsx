@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { MainTabParamList } from '../navigation/MainTabs';
 import { colors } from '../theme/colors';
@@ -61,7 +62,7 @@ function OutlineButton({ title, icon, onPress }: {
   );
 }
 
-export default function RecordsScreen({ navigation }: BottomTabScreenProps<MainTabParamList, 'Records'>) {
+export default function RecordsScreen({ navigation, route }: BottomTabScreenProps<MainTabParamList, 'Records'>) {
   const [profile, setProfile] = useState(initialProfile);
   const [draft, setDraft] = useState(initialProfile);
   const [editor, setEditor] = useState<Editor>(null);
@@ -69,6 +70,21 @@ export default function RecordsScreen({ navigation }: BottomTabScreenProps<MainT
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [contactsVisible, setContactsVisible] = useState(false);
   const mainContact = contacts.find((contact) => contact.primary) || contacts[0];
+
+  useFocusEffect(useCallback(() => {
+    const section = route.params?.section;
+    if (!section) return;
+
+    if (section === 'personal') {
+      setDraft({ ...profile });
+      setError('');
+      setEditor('personal');
+    } else if (section === 'contacts') {
+      setContactsVisible(true);
+    }
+
+    navigation.setParams({ section: undefined });
+  }, [navigation, profile, route.params?.section]));
 
   const openEditor = (section: Editor) => {
     setDraft({ ...profile });
