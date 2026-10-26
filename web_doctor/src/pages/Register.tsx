@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Eye,
   EyeOff,
@@ -68,6 +68,7 @@ export const Register: React.FC<RegisterProps> = ({
   };
 
   const [step, setStep] = useState<number>(getInitialStep);
+  const [maxStepReached, setMaxStepReached] = useState<number>(getInitialStep);
 
   // =========================================================================
   // STEP 1 STATE: Email & Terms
@@ -85,7 +86,7 @@ export const Register: React.FC<RegisterProps> = ({
   // =========================================================================
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState<string>('');
-  const [otpSuccess, setOtpSuccess] = useState<boolean>(false);
+  const [otpSuccess, setOtpSuccess] = useState<boolean>(() => getInitialStep() >= 3);
   const [timerSeconds, setTimerSeconds] = useState<number>(59);
   const [canResendOtp, setCanResendOtp] = useState<boolean>(false);
   const [showOtpBanner, setShowOtpBanner] = useState<boolean>(true);
@@ -261,6 +262,47 @@ export const Register: React.FC<RegisterProps> = ({
     const remainder = secs % 60;
     return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
   };
+  /**
+   * Kiểm tra một bước trên progress bar có thể click để chuyển tới hay không.
+   * - Bước hiện tại hoặc các bước trước đó: luôn cho phép chuyển/quay lại.
+   * - Các bước sau đó: không cho phép bấm qua khi các bước trước đó chưa nhập/xác thực thành công.
+   */
+  const isStepAccessible = (targetStep: number): boolean => {
+    if (targetStep < 1 || targetStep > 4) return false;
+    if (targetStep <= step) return true;
+
+    // Bước 1: Phải có email hợp lệ, đồng ý điều khoản và đã gửi OTP thành công
+    if (targetStep >= 2) {
+      if (maxStepReached < 2 || !email.trim() || !agreedTerms) {
+        return false;
+      }
+    }
+
+    // Bước 2: Phải xác thực OTP thành công
+    if (targetStep >= 3) {
+      if (maxStepReached < 3 || !otpSuccess) {
+        return false;
+      }
+    }
+
+    // Bước 3: Phải nhập đầy đủ thông tin bác sĩ và tải lên tài liệu
+    if (targetStep >= 4) {
+      if (
+        maxStepReached < 4 ||
+        !doctorName.trim() ||
+        !phone.trim() ||
+        !specialty.trim() ||
+        !licenseNumber.trim() ||
+        !hospital.trim() ||
+        files.length === 0
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
 
   // =========================================================================
   // HANDLERS BƯỚC 1: EMAIL & TERMS
@@ -308,6 +350,7 @@ export const Register: React.FC<RegisterProps> = ({
       setOtpSuccess(false);
 
       setIsSendingOtp(false);
+      setMaxStepReached((prev) => Math.max(prev, 2));
       setStep(2);
     } catch (err: any) {
       setIsSendingOtp(false);
@@ -321,6 +364,9 @@ export const Register: React.FC<RegisterProps> = ({
   const handleOtpChange = (index: number, val: string) => {
     setOtpError('');
     setOtpSuccess(false);
+    if (maxStepReached > 2) {
+      setMaxStepReached(2);
+    }
 
     // Xử lý dán nhiều chữ số (paste)
     if (val.length > 1) {
@@ -376,6 +422,7 @@ export const Register: React.FC<RegisterProps> = ({
       }
       setOtpError('');
       setOtpSuccess(true);
+      setMaxStepReached((prev) => Math.max(prev, 3));
       return true;
     } catch {
       setIsVerifyingOtp(false);
@@ -410,6 +457,7 @@ export const Register: React.FC<RegisterProps> = ({
     const isOk = await verifyEnteredOtp(fullOtp);
     if (!isOk) return;
 
+    setMaxStepReached((prev) => Math.max(prev, 3));
     setStep(3);
   };
   // =========================================================================
@@ -467,6 +515,7 @@ export const Register: React.FC<RegisterProps> = ({
     }
 
     setStep3Errors({});
+    setMaxStepReached((prev) => Math.max(prev, 4));
     setStep(4);
   };
 
@@ -528,6 +577,7 @@ export const Register: React.FC<RegisterProps> = ({
       });
 
       setIsSubmitting(false);
+      setMaxStepReached((prev) => Math.max(prev, 5));
       setStep(5); // Chuyển sang màn hình Chờ duyệt
     } catch (err: any) {
       setIsSubmitting(false);
@@ -600,20 +650,35 @@ export const Register: React.FC<RegisterProps> = ({
 
               {/* 4 Segment Progress Bar */}
               <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      // Cho phép nhảy bước khi đang kiểm tra
-                      setStep(idx);
-                    }}
-                    title={`Chuyển tới bước ${idx}`}
-                    className={`h-[3px] rounded-full transition-all duration-200 cursor-pointer ${
-                      idx <= step ? 'bg-[#447C72]' : 'bg-slate-200 hover:bg-slate-300'
-                    }`}
-                  />
-                ))}
+                {[1, 2, 3, 4].map((idx) => {
+                  const accessible = isStepAccessible(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={!accessible}
+                      onClick={() => {
+                        if (accessible) {
+                          setStep(idx);
+                        }
+                      }}
+                      title={
+                        accessible
+                          ? idx === step
+                            ? `Bước hiện tại: Bước ${idx}`
+                            : `Chuyển tới bước ${idx}`
+                          : `Vui lòng hoàn thành bước trước để mở bước ${idx}`
+                      }
+                      className={`h-[3px] rounded-full transition-all duration-200 ${
+                        idx <= step
+                          ? 'bg-[#447C72]'
+                          : accessible
+                          ? 'bg-slate-200 hover:bg-slate-300'
+                          : 'bg-slate-200 opacity-50'
+                      } ${accessible ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -640,9 +705,15 @@ export const Register: React.FC<RegisterProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value);
+                    const val = e.target.value;
+                    setEmail(val);
                     if (emailError) setEmailError('');
                     if (emailAlreadyExists) setEmailAlreadyExists(false);
+                    if (maxStepReached > 1) {
+                      setMaxStepReached(1);
+                      setOtpSuccess(false);
+                      setOtp(['', '', '', '', '', '']);
+                    }
                   }}
                   placeholder="bacsi.nguyen@gmail.com"
                   className={`w-full px-3.5 py-2.5 rounded-lg border text-sm text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none transition-colors ${
@@ -684,8 +755,12 @@ export const Register: React.FC<RegisterProps> = ({
                     type="checkbox"
                     checked={agreedTerms}
                     onChange={(e) => {
-                      setAgreedTerms(e.target.checked);
-                      if (e.target.checked && termsError) setTermsError('');
+                      const checked = e.target.checked;
+                      setAgreedTerms(checked);
+                      if (checked && termsError) setTermsError('');
+                      if (!checked && maxStepReached > 1) {
+                        setMaxStepReached(1);
+                      }
                     }}
                     className="mt-0.5 w-4 h-4 rounded text-[#447C72] accent-[#447C72] focus:ring-[#447C72] cursor-pointer shrink-0"
                   />
