@@ -175,15 +175,41 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         </View>
 
         <Text style={styles.sectionTitle}>Hồ sơ khám & kết quả</Text>
-        <Pressable accessibilityRole="button" onPress={() => openEditor('history')}
-          style={({ pressed }) => [styles.card, styles.historyCard, pressed && styles.pressed]}>
-          <View style={styles.iconBox}><Ionicons name="document-text-outline" size={20} color={colors.primary} /></View>
+        {/* phần được sửa */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            navigation.getParent()?.navigate('HistoryResults' as never)
+          }
+          style={({ pressed }) => [
+            styles.card,
+            styles.historyCard,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.iconBox}>
+            <Ionicons
+              name="document-text-outline"
+              size={20}
+              color={colors.primary}
+            />
+          </View>
+
           <View style={styles.contactText}>
             <Text style={styles.cardTitle}>Xem lịch sử kết quả</Text>
-            <Text style={styles.subtitle}>Phiếu khám, xét nghiệm và siêu âm đã lưu</Text>
+            <Text style={styles.subtitle}>
+              Phiếu khám, xét nghiệm và siêu âm đã lưu
+            </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.textLight}
+          />
         </Pressable>
+
+
       </ScrollView>
 
       <EmergencyContacts visible={contactsVisible} contacts={contacts} onChange={setContacts} onClose={() => setContactsVisible(false)} />
