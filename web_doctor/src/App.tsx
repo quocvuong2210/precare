@@ -15,11 +15,8 @@ import {
   Settings,
   Bell,
   Stethoscope,
-  UserPlus,
-  LogIn,
   LogOut,
   ArrowRight,
-  KeyRound,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -167,31 +164,6 @@ export const App: React.FC = () => {
                 </button>
               );
             })}
-
-            {/* Quick Link to Auth Pages */}
-            <div className="pt-4 space-y-1.5 border-t border-slate-100">
-              <button
-                onClick={() => navigateTo('login')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all cursor-pointer"
-              >
-                <LogIn className="w-4 h-4 text-slate-500" />
-                <span>Xem màn Đăng nhập</span>
-              </button>
-              <button
-                onClick={() => navigateTo('register')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-teal-800 bg-teal-50 hover:bg-teal-100 transition-all cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4 text-teal-700" />
-                <span>Xem màn Đăng ký</span>
-              </button>
-              <button
-                onClick={() => navigateTo('forgot-password')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 transition-all cursor-pointer"
-              >
-                <KeyRound className="w-4 h-4 text-amber-700" />
-                <span>Xem màn Quên mật khẩu</span>
-              </button>
-            </div>
           </nav>
         </div>
 
@@ -235,12 +207,6 @@ export const App: React.FC = () => {
 
           {/* Right Header Info */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigateTo('login')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5 text-slate-500" /> Về Đăng nhập
-            </button>
 
             <button
               aria-label="Thông báo"
