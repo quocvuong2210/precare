@@ -317,9 +317,10 @@ export const Login: React.FC<LoginProps> = ({
       await authApi.forgotPassword({ email: forgotEmail.trim() });
       setIsForgotLoading(false);
       setForgotStep('otp');
-    } catch {
+    } catch (err: any) {
       setIsForgotLoading(false);
-      setForgotStep('otp');
+      const detail = err?.response?.data?.detail;
+      setForgotMessage(detail || 'Địa chỉ email này chưa được đăng ký trong hệ thống.');
     }
   };
 

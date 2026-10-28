@@ -502,10 +502,19 @@ export const authApi = {
       if (err.response) {
         throw err;
       }
-      // Backend offline → giả lập thành công (UX không bị block)
-      console.warn('[PreCare offline] forgotPassword fallback — backend không chạy');
-      return { success: true, message: 'Offline mode: giả lập gửi email thành công' };
+      throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc dịch vụ backend.');
     }
+  },
+
+  /**
+   * 8.1 POST /api/v1/auth/verify-reset-otp — Xác minh mã OTP quên mật khẩu
+   */
+  async verifyResetOtp(email: string, otpCode: string): Promise<any> {
+    const res = await apiClient.post('/auth/verify-reset-otp', {
+      email: email.trim(),
+      otp_code: otpCode.trim(),
+    });
+    return res.data;
   },
 
   /**

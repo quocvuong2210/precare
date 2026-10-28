@@ -27,7 +27,7 @@ from app.models.password_reset import PasswordReset
 # Import thêm schemas mới vừa tạo ở Bước 1
 from app.schemas.auth import (
     RefreshTokenRequest, TokenRefreshResponse,
-    ForgotPasswordRequest, ResetPasswordRequest,
+    ForgotPasswordRequest, VerifyResetOTPRequest, ResetPasswordRequest,
     StandardResponse, LogoutRequest
 )
 
@@ -267,12 +267,12 @@ async def forgot_password(
 ) -> Any:
     email_clean = payload.email.lower().strip()
     user = db.query(User).filter(User.email == email_clean).first()
-    # Chuẩn bảo mật: Nếu không tìm thấy email, vẫn báo gửi thành công để chống dò email
+    # Yêu cầu hệ thống: Chỉ cho phép quên mật khẩu với email đã đăng ký trong database
     if not user:
-        return {
-            "success": True,
-            "message": "Mã OTP đã được gửi đến email của bạn nếu tài khoản tồn tại"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Địa chỉ email này chưa được đăng ký trong hệ thống."
+        )
     # 1. Sinh mã OTP 6 chữ số ngẫu nhiên
     otp_code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
     otp_hash = security.hash_token(otp_code)
@@ -310,6 +310,45 @@ async def forgot_password(
         "success": True,
         "message": "Mã OTP đã được gửi đến email của bạn"
     }
+# ==============================================================================
+# 2.1 API XÁC MINH OTP QUÊN MẬT KHẨU (POST /api/v1/auth/verify-reset-otp)
+# ==============================================================================
+@router.post("/verify-reset-otp", response_model=StandardResponse)
+def verify_reset_otp(
+    payload: VerifyResetOTPRequest,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Xác minh mã OTP khôi phục mật khẩu trước khi cho phép người dùng đổi mật khẩu ở bước 4.
+    """
+    email_clean = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email_clean).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Địa chỉ email này chưa được đăng ký trong hệ thống."
+        )
+
+    otp_hash = security.hash_token(payload.otp_code.strip())
+    now_utc = datetime.now(timezone.utc)
+    reset_record = db.query(PasswordReset).filter(
+        PasswordReset.user_id == user.id,
+        PasswordReset.reset_code_hash == otp_hash,
+        PasswordReset.is_used == False,
+        PasswordReset.expires_at > now_utc
+    ).order_by(PasswordReset.created_at.desc()).first()
+
+    if not reset_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mã xác minh không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại."
+        )
+
+    return {
+        "success": True,
+        "message": "Xác minh mã OTP thành công."
+    }
+
 # ==============================================================================
 # 3. API ĐẶT LẠI MẬT KHẨU BẰNG OTP (POST /api/v1/auth/reset-password)
 # Xác thực OTP, cập nhật mật khẩu mới và thu hồi toàn bộ Refresh Tokens cũ

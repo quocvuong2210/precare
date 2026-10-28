@@ -35,6 +35,9 @@ class TokenRefreshResponse(BaseModel):
 # --- Schemas cho API Quên Mật Khẩu (Forgot Password) ---
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr = Field(..., example="user@example.com", description="Email cần khôi phục mật khẩu")
+class VerifyResetOTPRequest(BaseModel):
+    email: EmailStr = Field(..., example="user@example.com")
+    otp_code: str = Field(..., min_length=6, max_length=6, example="654321", description="Mã OTP 6 chữ số")
 # --- Schemas cho API Đặt Lại Mật Khẩu (Reset Password) ---
 class ResetPasswordRequest(BaseModel):
     email: EmailStr = Field(..., example="user@example.com")
