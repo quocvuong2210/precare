@@ -122,7 +122,12 @@ export const RegistrationStatusCard: React.FC<RegistrationStatusCardProps> = ({
                 <span className="text-xs sm:text-[13px] font-semibold text-slate-900 leading-tight truncate">
                   {row.label}
                 </span>
-                {row.sublabel && (
+                {Boolean(
+                  row.sublabel &&
+                    row.sublabel.trim() &&
+                    row.sublabel.trim() !== '.' &&
+                    row.sublabel.trim() !== '•'
+                ) && (
                   <span className="text-[11px] text-slate-500 leading-tight mt-0.5 truncate">
                     {row.sublabel}
                   </span>

@@ -411,6 +411,7 @@ export const Register: React.FC<RegisterProps> = ({
   };
 
   const verifyEnteredOtp = async (enteredCode: string): Promise<boolean> => {
+    if (isVerifyingOtp) return false;
     setIsVerifyingOtp(true);
     try {
       const res = await authApi.verifyOtp(email, enteredCode);
@@ -423,6 +424,10 @@ export const Register: React.FC<RegisterProps> = ({
       setOtpError('');
       setOtpSuccess(true);
       setMaxStepReached((prev) => Math.max(prev, 3));
+      // Tự động chuyển qua bước 3 ngay sau khi xác minh thành công, tránh việc bấm tiếp gây double submit
+      setTimeout(() => {
+        setStep(3);
+      }, 350);
       return true;
     } catch {
       setIsVerifyingOtp(false);
@@ -479,34 +484,12 @@ export const Register: React.FC<RegisterProps> = ({
     if (!cleanPhone) {
       errors.phone = 'Vui lòng nhập số điện thoại.';
     } else if (!phoneRegex.test(cleanPhone)) {
-      // Bắt buộc hiển thị lỗi khi Số điện thoại sai định dạng
       errors.phone = 'Số điện thoại sai định dạng. Vui lòng nhập số điện thoại hợp lệ (VD: 0903123456).';
     } else {
-      // Bắt buộc hiển thị lỗi khi Số điện thoại đã gắn với tài khoản khác
       const phoneCheck = await authApi.checkPhoneAvailability(cleanPhone);
       if (!phoneCheck.isAvailable) {
         errors.phone = phoneCheck.message || 'Số điện thoại đã gắn với tài khoản khác. Vui lòng sử dụng số điện thoại khác.';
       }
-    }
-
-    // 3. Validate Chuyên khoa
-    if (!specialty.trim()) {
-      errors.specialty = 'Vui lòng nhập chuyên khoa (VD: Sản khoa).';
-    }
-
-    // 4. Validate Số chứng chỉ hành nghề
-    if (!licenseNumber.trim()) {
-      errors.licenseNumber = 'Vui lòng nhập số chứng chỉ hành nghề.';
-    }
-
-    // 5. Validate Nơi công tác
-    if (!hospital.trim()) {
-      errors.hospital = 'Vui lòng nhập nơi công tác (bệnh viện / phòng khám).';
-    }
-
-    // 6. Validate Tài liệu chuyên môn
-    if (files.length === 0) {
-      errors.files = 'Vui lòng tải lên ít nhất một tài liệu chuyên môn (CCHN, bằng cấp...).';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -571,9 +554,6 @@ export const Register: React.FC<RegisterProps> = ({
         full_name: doctorName.trim(),
         phone_number: phone.trim(),
         role: 'doctor',
-        specialty,
-        license_number: licenseNumber,
-        hospital,
       });
 
       setIsSubmitting(false);
@@ -586,11 +566,11 @@ export const Register: React.FC<RegisterProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#F8FAFC] font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#447C72]/20 selection:text-[#447C72]">
+    <div className="h-screen max-h-screen w-full flex flex-col lg:flex-row bg-[#F8FAFC] font-sans antialiased text-slate-800 overflow-hidden selection:bg-[#447C72]/20 selection:text-[#447C72]">
       {/* =========================================================================
           LEFT PANEL (SOLID DEEP TEAL/CHARCOAL #0E262E - 40% WIDTH)
           ========================================================================= */}
-      <aside className="w-full lg:w-[40%] xl:w-[38%] min-h-[300px] lg:min-h-screen bg-[#0E262E] text-white p-8 sm:p-12 lg:p-14 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
+      <aside className="w-full lg:w-[40%] xl:w-[38%] h-full bg-[#0E262E] text-white p-6 sm:p-10 lg:p-12 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
         {/* Subtle decorative glow */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-[#447C72]/10 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-[#447C72]/10 blur-3xl pointer-events-none" />
@@ -606,7 +586,7 @@ export const Register: React.FC<RegisterProps> = ({
         </div>
 
         {/* Lower Content matching Figma screenshot */}
-        <div className="mt-auto mb-6 lg:mb-16 max-w-[420px] relative z-10 pt-10">
+        <div className="my-auto max-w-[420px] relative z-10 py-6">
           {step === 5 && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#447C72]/20 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[11px] font-bold tracking-wider uppercase mb-4">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -632,8 +612,8 @@ export const Register: React.FC<RegisterProps> = ({
       {/* =========================================================================
           RIGHT CONTENT PANEL (Clean #F8FAFC, Centered White Card)
           ========================================================================= */}
-      <main className="flex-1 min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-8 lg:p-12 overflow-y-auto">
-        <div className="w-full max-w-[490px] bg-white border border-slate-200/90 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.035)] p-6 sm:p-8 space-y-6">
+      <main className="flex-1 h-full bg-[#F8FAFC] flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <div className="w-full max-w-[460px] bg-white border border-slate-200/90 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.035)] p-5 sm:p-6 space-y-4">
           {/* ========================================================
               STEP PROGRESS HEADER (Steps 1 to 4)
               ======================================================== */}
@@ -925,7 +905,7 @@ export const Register: React.FC<RegisterProps> = ({
               {otpSuccess && (
                 <div className="text-xs text-[#447C72] text-center font-medium animate-in fade-in flex items-center justify-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Email đã xác minh. Bạn sẽ được chuyển sang bước điền thông tin hồ sơ.</span>
+                  <span>Email đã xác minh thành công! Đang chuyển sang bước điền thông tin...</span>
                 </div>
               )}
 
@@ -957,14 +937,7 @@ export const Register: React.FC<RegisterProps> = ({
                 </div>
               </div>
 
-              {/* Primary Button */}
-              <button
-                type="button"
-                onClick={handleStep2Submit}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer"
-              >
-                Tiếp tục hoàn thiện hồ sơ
-              </button>
+
 
               {/* Quay lại Bước 1 */}
               <div className="text-center">
@@ -993,8 +966,8 @@ export const Register: React.FC<RegisterProps> = ({
                 </p>
               </div>
 
-              {/* Row 1: Doctor Name & Phone */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Doctor Name & Phone (Khớp với model backend: full_name & phone_number) */}
+              <div className="space-y-3.5">
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-slate-900">
                     Họ và tên bác sĩ <span className="text-rose-500">*</span>
@@ -1009,7 +982,7 @@ export const Register: React.FC<RegisterProps> = ({
                       }
                     }}
                     placeholder="Nguyễn Minh Hoàng"
-                    className={`w-full px-3 py-2 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
+                    className={`w-full px-3.5 py-2.5 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
                       step3Errors.doctorName
                         ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
                         : 'border-slate-300 focus:border-[#447C72] focus:ring-1 focus:ring-[#447C72]'
@@ -1037,7 +1010,7 @@ export const Register: React.FC<RegisterProps> = ({
                       }
                     }}
                     placeholder="0903123456"
-                    className={`w-full px-3 py-2 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
+                    className={`w-full px-3.5 py-2.5 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
                       step3Errors.phone
                         ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
                         : 'border-slate-300 focus:border-[#447C72] focus:ring-1 focus:ring-[#447C72]'
@@ -1050,94 +1023,6 @@ export const Register: React.FC<RegisterProps> = ({
                     </span>
                   )}
                 </div>
-              </div>
-
-              {/* Row 2: Specialty & Practice License */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-900">
-                    Chuyên khoa <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={specialty}
-                    onChange={(e) => {
-                      setSpecialty(e.target.value);
-                      if (step3Errors.specialty) {
-                        setStep3Errors((prev) => ({ ...prev, specialty: undefined }));
-                      }
-                    }}
-                    placeholder="Sản khoa"
-                    className={`w-full px-3 py-2 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
-                      step3Errors.specialty
-                        ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
-                        : 'border-slate-300 focus:border-[#447C72] focus:ring-1 focus:ring-[#447C72]'
-                    }`}
-                  />
-                  {step3Errors.specialty && (
-                    <span className="text-[11px] text-rose-500 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{step3Errors.specialty}</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-900">
-                    Số chứng chỉ hành nghề <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={licenseNumber}
-                    onChange={(e) => {
-                      setLicenseNumber(e.target.value);
-                      if (step3Errors.licenseNumber) {
-                        setStep3Errors((prev) => ({ ...prev, licenseNumber: undefined }));
-                      }
-                    }}
-                    placeholder="012345/HNO-CCHN"
-                    className={`w-full px-3 py-2 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
-                      step3Errors.licenseNumber
-                        ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
-                        : 'border-slate-300 focus:border-[#447C72] focus:ring-1 focus:ring-[#447C72]'
-                    }`}
-                  />
-                  {step3Errors.licenseNumber && (
-                    <span className="text-[11px] text-rose-500 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{step3Errors.licenseNumber}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 3: Workplace / Hospital */}
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-900">
-                  Nơi công tác <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={hospital}
-                  onChange={(e) => {
-                    setHospital(e.target.value);
-                    if (step3Errors.hospital) {
-                      setStep3Errors((prev) => ({ ...prev, hospital: undefined }));
-                    }
-                  }}
-                  placeholder="Bệnh viện Phụ sản Hà Nội"
-                  className={`w-full px-3 py-2 rounded-lg border text-xs sm:text-[13px] text-slate-900 focus:outline-none transition-colors ${
-                    step3Errors.hospital
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
-                      : 'border-slate-300 focus:border-[#447C72] focus:ring-1 focus:ring-[#447C72]'
-                  }`}
-                />
-                {step3Errors.hospital && (
-                  <span className="text-[11px] text-rose-500 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    <span>{step3Errors.hospital}</span>
-                  </span>
-                )}
               </div>            
 
               {/* Submit Button */}
@@ -1358,16 +1243,16 @@ export const Register: React.FC<RegisterProps> = ({
               STEP 5: HOÀN TẤT & CHỜ DUYỆT (PENDING APPROVAL STATE)
               ======================================================== */}
           {step === 5 && (
-            <div className="space-y-5 text-center py-2">
-              <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
-                <Clock className="w-7 h-7 stroke-[2.2]" />
+            <div className="space-y-3.5 text-center py-1">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
+                <Clock className="w-6 h-6 stroke-[2.2]" />
               </div>
 
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
                   Hồ sơ đang chờ duyệt
                 </h2>
-                <p className="mt-2 text-xs sm:text-[13px] text-slate-600 max-w-sm mx-auto leading-relaxed">
+                <p className="mt-1 text-[11.5px] sm:text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
                   Cảm ơn Bác sĩ <b className="text-slate-900">{doctorName}</b> đã gửi hồ sơ đăng ký. Ban chuyên môn PreCare đang tiến hành thẩm định và đối chiếu thông tin chứng chỉ hành nghề.
                 </p>
               </div>
@@ -1382,7 +1267,6 @@ export const Register: React.FC<RegisterProps> = ({
                 }}
                 profileStatus={{
                   label: 'Hồ sơ bác sĩ',
-                  sublabel: `${specialty} • ${licenseNumber}`,
                   statusText: 'Chờ duyệt',
                   tone: 'amber',
                 }}
@@ -1394,23 +1278,15 @@ export const Register: React.FC<RegisterProps> = ({
                 }}
               />
 
-              {/* Thông tin tóm tắt đã nộp */}
-              <div className="bg-[#F8FAFC] border border-slate-200/90 rounded-xl p-3.5 text-left text-xs space-y-2">
-                <div className="flex justify-between border-b border-slate-200/60 pb-2">
+              {/* Thông tin tóm tắt đã nộp (đã bỏ Nơi công tác và Tài liệu đính kèm) */}
+              <div className="bg-[#F8FAFC] border border-slate-200/90 rounded-xl p-3 text-left text-xs space-y-1.5">
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                   <span className="text-slate-500">Bác sĩ đăng ký:</span>
                   <span className="font-semibold text-slate-800">{doctorName}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                   <span className="text-slate-500">Số điện thoại:</span>
                   <span className="font-semibold text-slate-800">{phone}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/60 pb-2">
-                  <span className="text-slate-500">Nơi công tác:</span>
-                  <span className="font-semibold text-slate-800">{hospital}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/60 pb-2">
-                  <span className="text-slate-500">Tài liệu đính kèm:</span>
-                  <span className="font-semibold text-[#447C72]">{files.length} tệp tin</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Thời gian phản hồi dự kiến:</span>
@@ -1418,40 +1294,14 @@ export const Register: React.FC<RegisterProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-2.5 pt-2">
+              {/* Nút duy nhất: Về trang Đăng nhập (không có nút demo, không có link đăng ký lại) */}
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={handleNavigateToLogin}
-                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] transition-all shadow-xs cursor-pointer"
+                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer"
                 >
                   Về trang Đăng nhập
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleCompleteRegistration({
-                      email,
-                      doctorName,
-                      phone,
-                      specialty,
-                      licenseNumber,
-                      hospital,
-                      role: 'doctor',
-                    });
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-[#447C72] bg-[#447C72]/10 hover:bg-[#447C72]/15 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Trải nghiệm giao diện Bác sĩ (Demo)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="w-full py-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                >
-                  Đăng ký hồ sơ khác
                 </button>
               </div>
             </div>
