@@ -31,7 +31,7 @@ import {
  * Thiết kế chuẩn theo ảnh tham chiếu PreCare — Digital Obstetrics Portal.
  */
 const DoctorPortal: React.FC = () => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
@@ -63,8 +63,10 @@ const DoctorPortal: React.FC = () => {
     navigate('/login');
   };
 
-  // Tên bác sĩ theo đúng yêu cầu: BS. CKI LÊ HOÀNG
-  const doctorDisplayName = 'BS. CKI LÊ HOÀNG';
+  // Tên bác sĩ theo đúng yêu cầu hoặc lấy từ tài khoản đăng nhập
+  const doctorDisplayName = user?.full_name
+    ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
+    : 'BS. CKI LÊ HOÀNG';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans">
@@ -154,7 +156,7 @@ const DoctorPortal: React.FC = () => {
                 {doctorDisplayName}
               </div>
               <div className="text-[10px] text-slate-500 truncate">
-                Chuyên khoa Sản Phụ Khoa
+                {user?.email || 'Chuyên khoa Sản Phụ Khoa'}
               </div>
               <div className="text-[9.5px] text-teal-700 font-medium truncate">
                 Bệnh viện Sản Phụ Khoa PreCare

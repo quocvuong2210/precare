@@ -59,24 +59,21 @@ const DEFAULT_EXISTING_PHONES = [
   '0933221100',
 ];
 
-const getRegisteredUsersStore = (): Array<{ email: string; phone_number?: string }> => {
-  try {
-    const raw = localStorage.getItem('precare_registered_users');
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
+// Tự động dọn dẹp cache tài khoản cũ trong localStorage để không xung đột với Database PostgreSQL
+try {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('precare_registered_users');
   }
+} catch {
+  // ignore
+}
+
+const getRegisteredUsersStore = (): Array<{ email: string; phone_number?: string }> => {
+  return [];
 };
 
-const saveUserToStore = (user: { email: string; phone_number?: string; full_name?: string }) => {
-  try {
-    const current = getRegisteredUsersStore();
-    current.push(user);
-    localStorage.setItem('precare_registered_users', JSON.stringify(current));
-  } catch {
-    // ignore
-  }
+const saveUserToStore = (_user: { email: string; phone_number?: string; full_name?: string }) => {
+  // Không lưu tài khoản vào localStorage để việc kiểm tra luôn do Database PostgreSQL quyết định
 };
 
 // =========================================================================
@@ -116,18 +113,6 @@ export const authApi = {
       // Fallback sang store c?c b?
     }
 
-    const registeredStore = getRegisteredUsersStore();
-    const isExisted =
-      DEFAULT_EXISTING_EMAILS.includes(trimmed) ||
-      registeredStore.some((u) => u.email.toLowerCase() === trimmed);
-
-    if (isExisted) {
-      return {
-        isAvailable: false,
-        message: 'Email n�y d� du?c dang k�. Vui l�ng dang nh?p ho?c s? d?ng email kh�c.',
-      };
-    }
-
     return { isAvailable: true };
   },
 
@@ -143,23 +128,6 @@ export const authApi = {
       return {
         isAvailable: false,
         message: 'S? di?n tho?i sai d?nh d?ng. Vui l�ng nh?p s? di?n tho?i h?p l? (VD: 0903123456).',
-      };
-    }
-
-    // Chu?n h�a v? d?ng 0xxxxxxxxx d? ki?m tra tr�ng
-    const normalized = cleanPhone.startsWith('+84')
-      ? '0' + cleanPhone.slice(3)
-      : cleanPhone;
-
-    const registeredStore = getRegisteredUsersStore();
-    const isExisted =
-      DEFAULT_EXISTING_PHONES.includes(normalized) ||
-      registeredStore.some((u) => (u.phone_number || '').replace(/\s+/g, '') === normalized);
-
-    if (isExisted) {
-      return {
-        isAvailable: false,
-        message: 'S? di?n tho?i d� g?n v?i t�i kho?n kh�c. Vui l�ng s? d?ng s? di?n tho?i kh�c.',
       };
     }
 
@@ -534,10 +502,19 @@ export const authApi = {
       if (err.response) {
         throw err;
       }
-      // Backend offline → giả lập thành công (UX không bị block)
-      console.warn('[PreCare offline] forgotPassword fallback — backend không chạy');
-      return { success: true, message: 'Offline mode: giả lập gửi email thành công' };
+      throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc dịch vụ backend.');
     }
+  },
+
+  /**
+   * 8.1 POST /api/v1/auth/verify-reset-otp — Xác minh mã OTP quên mật khẩu
+   */
+  async verifyResetOtp(email: string, otpCode: string): Promise<any> {
+    const res = await apiClient.post('/auth/verify-reset-otp', {
+      email: email.trim(),
+      otp_code: otpCode.trim(),
+    });
+    return res.data;
   },
 
   /**

@@ -194,13 +194,12 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
     } catch (err: any) {
       setIsSubmitting(false);
       const status = err?.response?.status;
-      // Luôn chuyển sang bước 2 để không lộ email tồn tại hay không
-      if (!err?.response || status === 404 || status === 400) {
-        sessionStorage.setItem('precare_forgot_email', trimmed);
-        setStep(2);
+      const detail = err?.response?.data?.detail;
+      if (status === 404 || status === 400) {
+        setEmailError(detail || 'Địa chỉ email này chưa được đăng ký trong hệ thống.');
       } else {
         setApiError(
-          err?.response?.data?.detail || err?.message ||
+          detail || err?.message ||
           'Không thể gửi yêu cầu. Vui lòng kiểm tra kết nối và thử lại.'
         );
       }
@@ -274,28 +273,35 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
 
   const triggerVerify = async (code: string) => {
     if (code.length < 6) return;
+    if (isVerifying) return;
     setIsVerifying(true);
-
-    // Không gọi /auth/verify-otp vì endpoint đó dành cho flow đăng ký (Redis).
-    // OTP forgot-password được lưu trong bảng password_resets (DB) và chỉ được
-    // xác thực khi submit POST /auth/reset-password ở bước 4.
-    // Ở đây chỉ cần lưu code vào sessionStorage rồi chuyển trang.
-    await new Promise((r) => setTimeout(r, 400)); // nhỏ delay cho UX
-
-    sessionStorage.setItem('precare_forgot_email', email.trim());
-    sessionStorage.setItem('precare_reset_otp', code);
-    setOtpSuccess(true);
     setOtpError(null);
-    setIsVerifying(false);
 
-    setTimeout(() => {
-      if (onOtpVerified) {
-        onOtpVerified(email.trim(), code);
-      } else {
-        window.history.pushState(null, '', '/reset-password');
-        window.dispatchEvent(new PopStateEvent('popstate'));
-      }
-    }, 600);
+    try {
+      await authApi.verifyResetOtp(email.trim(), code);
+
+      sessionStorage.setItem('precare_forgot_email', email.trim());
+      sessionStorage.setItem('precare_reset_otp', code);
+      setOtpSuccess(true);
+      setOtpError(null);
+      setIsVerifying(false);
+
+      setTimeout(() => {
+        if (onOtpVerified) {
+          onOtpVerified(email.trim(), code);
+        } else {
+          window.history.pushState(null, '', '/reset-password');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+      }, 500);
+    } catch (err: any) {
+      setIsVerifying(false);
+      setOtpSuccess(false);
+      const detail = err?.response?.data?.detail;
+      setOtpError(
+        detail || 'Mã xác minh không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại.'
+      );
+    }
   };
 
   const handleStep3Submit = () => {
