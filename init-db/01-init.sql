@@ -108,16 +108,26 @@ CREATE TABLE IF NOT EXISTS biometric_data (
     pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
     checkup_id UUID NOT NULL REFERENCES checkups(id) ON DELETE CASCADE,
     uploaded_file_id UUID REFERENCES uploaded_files(id) ON DELETE SET NULL,
-    gestational_age_days INT NOT NULL,
-    bpd NUMERIC(5,2),
-    hc NUMERIC(5,2),
-    ac NUMERIC(5,2),
-    fl NUMERIC(5,2),
-    efw NUMERIC(6,2),
+    gestational_age_days INT NOT NULL,        -- Đồng bộ gt với lần khám
+    bpd NUMERIC(5,2),                         -- Biparietal Diameter: Đường kính lưỡng đỉnh (mm)
+    hc NUMERIC(5,2),                          -- Head Circumference: Chu vi vòng đầu (mm)
+    ac NUMERIC(5,2),                          -- Abdominal Circumference: Chu vi vòng bụng (mm)
+    fl NUMERIC(5,2),                          -- Femur Length: Chiều dài xương đùi (mm)
+    efw NUMERIC(6,2),                         -- Estimated Fetal Weight: Cân nặng thai nhi ước tính (gram)
     status VARCHAR(50) DEFAULT 'pending_verification' CHECK (status IN ('pending_verification', 'verified')),
-    verified_by UUID REFERENCES users(id),
+    verified_by UUID REFERENCES users(id),    -- Bác sĩ xác thực chỉ số
+    is_deleted BOOLEAN DEFAULT FALSE,         -- Hỗ trợ Soft-delete y tế (PRC-37)
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Ràng buộc giá trị hợp lý lâm sàng
+    CONSTRAINT chk_biometrics_positive CHECK (
+        (bpd IS NULL OR (bpd >= 10.0 AND bpd <= 120.0)) AND
+        (hc IS NULL OR (hc >= 50.0 AND hc <= 400.0)) AND
+        (ac IS NULL OR (ac >= 50.0 AND ac <= 450.0)) AND
+        (fl IS NULL OR (fl >= 5.0 AND fl <= 95.0)) AND
+        (efw IS NULL OR (efw >= 50.0 AND efw <= 6000.0))
+    )
 );
 CREATE INDEX IF NOT EXISTS idx_biometric_data_profile ON biometric_data(pregnancy_profile_id);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_checkup ON biometric_data(checkup_id);
