@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
     crl_mm NUMERIC(5,2),                      -- Chiều dài đầu mông (Crown-Rump Length mm)
     edd DATE NOT NULL,                        -- Ngày dự sinh đã chốt (Estimated Date of Delivery)
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'terminated')),
+    -- [THÊM 4 DÒNG MỚI VÀO ĐÂY]
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    is_anonymized BOOLEAN DEFAULT FALSE,
+    is_purged_from_research BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_gestational_days CHECK (q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)),
@@ -52,6 +57,8 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_patient ON pregnancy_profiles(patient_id);
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_doctor ON pregnancy_profiles(primary_doctor_id);
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_status ON pregnancy_profiles(status);
+-- [THÊM INDEX NÀY ĐỂ TỐI ƯU TRUY VẤN LỌC HỒ SƠ CHƯA XÓA]
+CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_not_deleted ON pregnancy_profiles(patient_id) WHERE is_deleted = FALSE;
 
 -- Ràng buộc Partial Unique Index: Mỗi thai phụ chỉ có tối đa 1 hồ sơ ở trạng thái 'active'
 CREATE UNIQUE INDEX IF NOT EXISTS uq_active_pregnancy_per_patient 
@@ -64,15 +71,28 @@ CREATE TABLE IF NOT EXISTS checkups (
     pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id),
     checkup_date DATE NOT NULL,
-    gestational_age_days INT NOT NULL,
-    weight_kg NUMERIC(5,2),
-    blood_pressure_systolic INT,
-    blood_pressure_diastolic INT,
-    notes TEXT,
+    gestational_age_days INT NOT NULL,        -- Tuổi thai gt tính bằng ngày tại ngày khám (nội suy từ EDD)
+    weight_kg NUMERIC(5,2),                   -- Cân nặng mẹ bầu (kg)
+    blood_pressure_systolic INT,              -- Huyết áp tâm thu (mmHg)
+    blood_pressure_diastolic INT,             -- Huyết áp tâm trương (mmHg)
+    notes TEXT,                               -- Lời dặn, chẩn đoán sơ bộ
+    is_deleted BOOLEAN DEFAULT FALSE,         -- Hỗ trợ Soft-delete y tế (PRC-37)
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Ràng buộc y tế hợp lý
+    CONSTRAINT chk_gestational_age_range CHECK (gestational_age_days >= 0 AND gestational_age_days <= 315),
+    CONSTRAINT chk_weight_positive CHECK (weight_kg IS NULL OR (weight_kg >= 30.0 AND weight_kg <= 200.0)),
+    CONSTRAINT chk_blood_pressure CHECK (
+        (blood_pressure_systolic IS NULL AND blood_pressure_diastolic IS NULL) OR
+        (blood_pressure_systolic > blood_pressure_diastolic AND blood_pressure_systolic >= 60 AND blood_pressure_systolic <= 250 AND blood_pressure_diastolic >= 40 AND blood_pressure_diastolic <= 150)
+    )
 );
 CREATE INDEX IF NOT EXISTS idx_checkups_profile ON checkups(pregnancy_profile_id);
+CREATE INDEX IF NOT EXISTS idx_checkups_doctor ON checkups(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_checkups_date ON checkups(checkup_date);
+CREATE INDEX IF NOT EXISTS idx_checkups_gt ON checkups(gestational_age_days);
+CREATE INDEX IF NOT EXISTS idx_checkups_not_deleted ON checkups(pregnancy_profile_id) WHERE is_deleted = FALSE;
 
 -- 5. Bảng Uploaded Files
 CREATE TABLE IF NOT EXISTS uploaded_files (
@@ -95,16 +115,26 @@ CREATE TABLE IF NOT EXISTS biometric_data (
     pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
     checkup_id UUID NOT NULL REFERENCES checkups(id) ON DELETE CASCADE,
     uploaded_file_id UUID REFERENCES uploaded_files(id) ON DELETE SET NULL,
-    gestational_age_days INT NOT NULL,
-    bpd NUMERIC(5,2),
-    hc NUMERIC(5,2),
-    ac NUMERIC(5,2),
-    fl NUMERIC(5,2),
-    efw NUMERIC(6,2),
+    gestational_age_days INT NOT NULL,        -- Đồng bộ gt với lần khám
+    bpd NUMERIC(5,2),                         -- Biparietal Diameter: Đường kính lưỡng đỉnh (mm)
+    hc NUMERIC(5,2),                          -- Head Circumference: Chu vi vòng đầu (mm)
+    ac NUMERIC(5,2),                          -- Abdominal Circumference: Chu vi vòng bụng (mm)
+    fl NUMERIC(5,2),                          -- Femur Length: Chiều dài xương đùi (mm)
+    efw NUMERIC(6,2),                         -- Estimated Fetal Weight: Cân nặng thai nhi ước tính (gram)
     status VARCHAR(50) DEFAULT 'pending_verification' CHECK (status IN ('pending_verification', 'verified')),
-    verified_by UUID REFERENCES users(id),
+    verified_by UUID REFERENCES users(id),    -- Bác sĩ xác thực chỉ số
+    is_deleted BOOLEAN DEFAULT FALSE,         -- Hỗ trợ Soft-delete y tế (PRC-37)
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Ràng buộc giá trị hợp lý lâm sàng
+    CONSTRAINT chk_biometrics_positive CHECK (
+        (bpd IS NULL OR (bpd >= 10.0 AND bpd <= 120.0)) AND
+        (hc IS NULL OR (hc >= 50.0 AND hc <= 400.0)) AND
+        (ac IS NULL OR (ac >= 50.0 AND ac <= 450.0)) AND
+        (fl IS NULL OR (fl >= 5.0 AND fl <= 95.0)) AND
+        (efw IS NULL OR (efw >= 50.0 AND efw <= 6000.0))
+    )
 );
 CREATE INDEX IF NOT EXISTS idx_biometric_data_profile ON biometric_data(pregnancy_profile_id);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_checkup ON biometric_data(checkup_id);
@@ -182,3 +212,27 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+
+-- ============================================================================
+-- Bảng Deletion Requests (PRC-37)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS deletion_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
+    checkup_id UUID REFERENCES checkups(id) ON DELETE CASCADE,
+    target_type VARCHAR(50) NOT NULL CHECK (target_type IN ('full_profile', 'single_checkup')),
+    reason TEXT NOT NULL,
+    allow_anonymized_research BOOLEAN DEFAULT TRUE,
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    review_notes TEXT,
+    is_anonymized BOOLEAN DEFAULT FALSE,
+    is_purged_from_research BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_requester ON deletion_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_profile ON deletion_requests(pregnancy_profile_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_status ON deletion_requests(status);
