@@ -15,11 +15,8 @@ import {
   Settings,
   Bell,
   Stethoscope,
-  UserPlus,
-  LogIn,
   LogOut,
   ArrowRight,
-  KeyRound,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -31,9 +28,12 @@ export const App: React.FC = () => {
     if (path === '/register' || path.startsWith('/register')) return 'register';
     if (path === '/forgot-password' || path.startsWith('/forgot-password')) return 'forgot-password';
     if (path === '/reset-password' || path.startsWith('/reset-password')) return 'reset-password';
-    if (path === '/login' || path.startsWith('/login')) return 'login';
-    const token = localStorage.getItem('precare_token');
-    if (token) return 'app';
+    if (path === '/dashboard' || path.startsWith('/dashboard')) {
+      const token = localStorage.getItem('precare_token');
+      if (token) return 'app';
+      return 'login';
+    }
+    // Mặc định khi truy cập web (bao gồm root path '/' hoặc '/login') đều mở trang Login
     return 'login';
   };
 
@@ -43,7 +43,7 @@ export const App: React.FC = () => {
   const navigateTo = (view: AppView) => {
     setCurrentView(view);
     const pathMap: Record<AppView, string> = {
-      'app': '/',
+      'app': '/dashboard',
       'login': '/login',
       'register': '/register',
       'forgot-password': '/forgot-password',
@@ -60,8 +60,35 @@ export const App: React.FC = () => {
       setCurrentView(getInitialView());
     };
     window.addEventListener('popstate', handlePopState);
+
+    // Khi truy cập vào root path '/', đồng bộ URL về '/login'
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+      window.history.replaceState(null, '', '/login');
+    }
+
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const handleLogout = () => {
+    try {
+      authApi.logout();
+    } catch {
+      // ignore
+    }
+    localStorage.removeItem('precare_token');
+    localStorage.removeItem('precare_user');
+    sessionStorage.clear();
+    navigateTo('login');
+  };
+
+  const storedUser = (() => {
+    try {
+      const u = localStorage.getItem('precare_user');
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  })();
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
 
@@ -167,31 +194,6 @@ export const App: React.FC = () => {
                 </button>
               );
             })}
-
-            {/* Quick Link to Auth Pages */}
-            <div className="pt-4 space-y-1.5 border-t border-slate-100">
-              <button
-                onClick={() => navigateTo('login')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all cursor-pointer"
-              >
-                <LogIn className="w-4 h-4 text-slate-500" />
-                <span>Xem màn Đăng nhập</span>
-              </button>
-              <button
-                onClick={() => navigateTo('register')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-teal-800 bg-teal-50 hover:bg-teal-100 transition-all cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4 text-teal-700" />
-                <span>Xem màn Đăng ký</span>
-              </button>
-              <button
-                onClick={() => navigateTo('forgot-password')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 transition-all cursor-pointer"
-              >
-                <KeyRound className="w-4 h-4 text-amber-700" />
-                <span>Xem màn Quên mật khẩu</span>
-              </button>
-            </div>
           </nav>
         </div>
 
@@ -210,13 +212,17 @@ export const App: React.FC = () => {
               <Stethoscope className="w-5 h-5 text-teal-700 hidden only:block" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-slate-800 truncate">BS. Lê Minh</div>
-              <div className="text-[11px] text-slate-500 truncate">Khoa Sản - Sản Phụ Khoa</div>
+              <div className="text-sm font-bold text-slate-800 truncate">
+                {storedUser?.full_name ? `BS. ${storedUser.full_name}` : 'BS. Lê Minh'}
+              </div>
+              <div className="text-[11px] text-slate-500 truncate">
+                {storedUser?.email || 'Khoa Sản - Sản Phụ Khoa'}
+              </div>
             </div>
           </div>
 
           <button
-            onClick={() => navigateTo('login')}
+            onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -235,12 +241,6 @@ export const App: React.FC = () => {
 
           {/* Right Header Info */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigateTo('login')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5 text-slate-500" /> Về Đăng nhập
-            </button>
 
             <button
               aria-label="Thông báo"

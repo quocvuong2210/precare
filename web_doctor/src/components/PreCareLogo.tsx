@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 interface PreCareLogoProps {
   variant?: 'light' | 'dark' | 'simple';
@@ -59,13 +59,15 @@ export const PreCareLogo: React.FC<PreCareLogoProps> = ({
           >
             PreCare
           </span>
-          <span
-            className={`${subtextSize} font-semibold uppercase tracking-[0.08em] leading-tight mt-1 ${
-              isDark ? 'text-slate-400' : 'text-slate-500'
-            }`}
-          >
-            {subtitle || 'ĐĂNG KÝ BÁC SĨ'}
-          </span>
+          {Boolean(subtitle) && (
+            <span
+              className={`${subtextSize} font-semibold uppercase tracking-[0.08em] leading-tight mt-1 ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}
+            >
+              {subtitle}
+            </span>
+          )}
         </div>
       )}
     </div>

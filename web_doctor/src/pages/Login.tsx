@@ -72,8 +72,8 @@ export const Login: React.FC<LoginProps> = ({
       : null;
 
   const [role, setRole] = useState<'doctor' | 'admin'>(defaultRole);
-  const [email, setEmail] = useState('bacsi.leminh@phusantw.org');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -130,12 +130,6 @@ export const Login: React.FC<LoginProps> = ({
 
   const handleRoleChange = (newRole: 'doctor' | 'admin') => {
     setRole(newRole);
-    if (newRole === 'admin') {
-      setEmail('quantri.nam@phusantw.org');
-    } else {
-      setEmail('bacsi.leminh@phusantw.org');
-    }
-    setPassword('password123');
     setEmailError(null);
     setPasswordError(null);
     setLoginError(null);
@@ -323,9 +317,10 @@ export const Login: React.FC<LoginProps> = ({
       await authApi.forgotPassword({ email: forgotEmail.trim() });
       setIsForgotLoading(false);
       setForgotStep('otp');
-    } catch {
+    } catch (err: any) {
       setIsForgotLoading(false);
-      setForgotStep('otp');
+      const detail = err?.response?.data?.detail;
+      setForgotMessage(detail || 'Địa chỉ email này chưa được đăng ký trong hệ thống.');
     }
   };
 
@@ -356,246 +351,71 @@ export const Login: React.FC<LoginProps> = ({
   };
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        maxHeight: '100vh',
-        overflow: 'hidden',
-        backgroundColor: '#e6edf2',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        position: 'relative',
-        boxSizing: 'border-box',
-      }}
-    >
-      {/* Central Login Card */}
-      <div
-        className="pc-auth-container"
-        style={{
-          width: '100%',
-          maxWidth: '1020px',
-          maxHeight: 'min(94vh, 640px)',
-          backgroundColor: '#ffffff',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          display: 'grid',
-          gridTemplateColumns: '44% 56%',
-          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.1)',
-        }}
-      >
-        ﻿{/* Left Teal Illustration Panel with Submerged Background */}
-        <div
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            background: 'linear-gradient(160deg, #021a17 0%, #063832 45%, #0a4d45 80%, #031e1a 100%)',
-            padding: '28px 30px',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            color: '#ffffff',
-          }}
-        >
-          {/* Submerged Background Image (image.png chìm phía sau chữ, hòa quyện với nền) */}
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#0D9488]/20 selection:text-[#0D9488] relative">
+      {/* =========================================================================
+          LEFT PANEL (SAGE TEAL WITH IMAGE BACKGROUND - EXACT SAMPLE DIMENSIONS)
+          ========================================================================= */}
+      <aside className="w-full lg:w-[45%] xl:w-[44%] min-h-[360px] lg:min-h-screen bg-[#0D9488] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
+        {/* Submerged Illustration Background (image.png chìm phía sau nền xanh) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <img
             src={loginIllustration}
-            alt="Medical DNA Illustration"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center 45%',
-              mixBlendMode: 'screen',
-              opacity: 0.38,
-              filter: 'contrast(1.15) brightness(0.95)',
-              pointerEvents: 'none',
-              zIndex: 1,
-            }}
+            alt="Doctor & Patient Consultation"
+            className="w-full h-full object-cover object-center scale-105 opacity-30 mix-blend-luminosity"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-
-          {/* Vignette Depth Gradient Overlay */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'radial-gradient(ellipse at 75% 65%, rgba(6, 56, 50, 0.22) 0%, rgba(2, 26, 23, 0.88) 100%), linear-gradient(180deg, rgba(2, 26, 23, 0.72) 0%, rgba(3, 40, 35, 0.45) 50%, rgba(2, 22, 19, 0.85) 100%)',
-              pointerEvents: 'none',
-              zIndex: 2,
-            }}
-          />
-
-          {/* Top Logo */}
-          <div style={{ position: 'relative', zIndex: 3 }}>
-            <PreCareLogo variant="dark" size="md" subtitle="DIGITAL OBSTETRICS" />
-          </div>
-
-          {/* Foreground Middle Content - Nổi bật, sắc nét và dễ đọc */}
-          <div style={{ position: 'relative', zIndex: 3, marginTop: 'auto', marginBottom: 'auto', padding: '16px 0' }}>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                borderRadius: '16px',
-                backgroundColor: 'rgba(20, 184, 166, 0.18)',
-                border: '1px solid rgba(45, 212, 191, 0.3)',
-                color: '#5eead4',
-                fontSize: '11px',
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                marginBottom: '12px',
-                backdropFilter: 'blur(6px)',
-              }}
-            >
-              <span>TRỢ LÝ SẢN KHOA SỐ</span>
-            </div>
-
-            <h1
-              style={{
-                fontSize: '23px',
-                fontWeight: 700,
-                lineHeight: 1.35,
-                color: '#ffffff',
-                marginBottom: '10px',
-                textShadow: '0 2px 10px rgba(0, 0, 0, 0.6)',
-              }}
-            >
-              Số hóa hồ sơ thai kỳ chuyên nghiệp
-            </h1>
-
-            <p
-              style={{
-                fontSize: '13px',
-                color: '#ccfbf1',
-                lineHeight: 1.6,
-                maxWidth: '350px',
-                marginBottom: '18px',
-                textShadow: '0 1px 4px rgba(0, 0, 0, 0.5)',
-              }}
-            >
-              Giải pháp trích xuất dữ liệu cận lâm sàng bằng OCR thông minh dành cho Bác sĩ Sản khoa.
-            </p>
-
-            {/* Feature Highlights */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '7px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  maxWidth: '340px',
-                }}
-              >
-                <CheckCircle2 size={15} style={{ color: '#2dd4bf', flexShrink: 0 }} />
-                <span style={{ fontSize: '12px', color: '#f0fdfa', fontWeight: 500 }}>
-                  OCR phiếu siêu âm & xét nghiệm tự động
-                </span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '7px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  maxWidth: '340px',
-                }}
-              >
-                <CheckCircle2 size={15} style={{ color: '#2dd4bf', flexShrink: 0 }} />
-                <span style={{ fontSize: '12px', color: '#f0fdfa', fontWeight: 500 }}>
-                  Biểu đồ bách phân vị FMF & Cảnh báo nguy cơ
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer copyright & Thai phụ app hint */}
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 3,
-              fontSize: '11px',
-              color: '#99f6e4',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span>© 2026 PreCare Medical Systems.</span>
-            <span
-              onClick={() => setShowQrModal(true)}
-              style={{
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                color: '#ffffff',
-                textDecoration: 'underline',
-                fontSize: '11.5px',
-              }}
-            >
-              <Smartphone size={13} />
-              App Thai phụ
-            </span>
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0D9488]/80 via-[#0D9488]/50 to-[#0D9488]/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0D9488]/70 via-transparent to-[#0D9488]/70" />
         </div>
 
-        
+        {/* Top: Logo PreCare đồng bộ với Register (không có subtitle chữ cổng bác sĩ) */}
+        <div className="relative z-10">
+          <PreCareLogo
+            variant="dark"
+            size="md"
+          />
+        </div>
 
-        {/* Right White Form Panel */}
-        <div
-          style={{
-            padding: '24px 34px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            backgroundColor: '#ffffff',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div style={{ marginBottom: '12px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+        {/* Middle Main Heading & Description */}
+        <div className="relative z-10 max-w-[420px] my-auto py-8 lg:py-12">
+          <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-bold text-white tracking-tight leading-[1.3] drop-shadow-sm">
+            Số hóa hồ sơ thai kỳ chuyên nghiệp
+          </h1>
+          <p className="mt-4 text-teal-50/90 text-xs sm:text-[13.5px] leading-relaxed">
+            Giải pháp trích xuất dữ liệu cận lâm sàng bằng OCR thông minh dành cho Bác sĩ Sản khoa.
+          </p>
+        </div>
+
+        {/* Bottom subtle system watermark / copyright */}
+        <div className="relative z-10 text-xs sm:text-[12px] text-teal-100/75 flex items-center justify-between border-t border-white/10 pt-4">
+          <span>© 2026 PreCare Medical Systems.</span>
+        </div>
+      </aside>
+
+      {/* =========================================================================
+          RIGHT CONTENT PANEL (Pure White, Form Sits Directly - No Outer Card Box)
+          ========================================================================= */}
+      <main className="flex-1 min-h-screen bg-white flex items-center justify-center p-6 sm:p-10 lg:p-16 overflow-y-auto">
+        <div className="w-full max-w-[418px]">
+          {/* Header: Title 26px bold, 12px margin to subtitle, 32px margin to form */}
+          <div className="mb-8">
+            <h2 className="text-[30px] font-bold text-slate-900 tracking-tight leading-tight">
               Chào mừng trở lại
             </h2>
-            <p style={{ fontSize: '12.5px', color: '#64748b' }}>
+            <p className="mt-3 text-[13px] text-slate-500 leading-normal">
               Vui lòng đăng nhập để truy cập hệ thống bệnh án điện tử.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '11px' }} noValidate>
-            {/* Role selector - Strictly 2 roles: Bác sĩ & Quản trị viên */}
-            <div>
-              <label className="pc-label" style={{ marginBottom: '8px' }}>
+          <form onSubmit={handleSubmit} noValidate>
+            {/* Role selector */}
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Vai trò người dùng
               </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '10px',
-                  padding: '3px',
-                  gap: '3px',
-                }}
-              >
+              <div className="grid grid-cols-2 bg-[#F8FAFC] border border-slate-100 rounded-xl p-1 gap-1 h-[38px]">
                 {[
                   { key: 'doctor', label: 'Bác sĩ' },
                   { key: 'admin', label: 'Quản trị viên' },
@@ -606,17 +426,11 @@ export const Login: React.FC<LoginProps> = ({
                       type="button"
                       key={r.key}
                       onClick={() => handleRoleChange(r.key as 'doctor' | 'admin')}
-                      style={{
-                        padding: '6px 10px',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: isSelected ? 600 : 500,
-                        backgroundColor: isSelected ? '#0d8a7c' : 'transparent',
-                        color: isSelected ? '#ffffff' : '#475569',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
+                      className={`h-full px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                        isSelected
+                          ? 'bg-[#0D9488] text-white font-semibold shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
                     >
                       {r.label}
                     </button>
@@ -625,98 +439,80 @@ export const Login: React.FC<LoginProps> = ({
               </div>
             </div>
 
-            {/* Email input */}
-            <div>
-              <label className="pc-label">Email đăng nhập</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (emailError) setEmailError(null);
-                  if (loginError) setLoginError(null);
-                }}
-                className={`pc-input ${emailError ? 'pc-input-error' : ''}`}
-                placeholder="example@domain.com"
-                style={{ fontSize: '13px', padding: '8px 12px' }}
-                autoComplete="email"
-              />
-              {emailError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    marginTop: '6px',
-                  }}
-                >
-                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                  <span>{emailError}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Password input */}
-            <div>
-              <label className="pc-label">Mật khẩu</label>
-              <div style={{ position: 'relative' }}>
+            {/* Inputs container with 16px spacing */}
+            <div className="space-y-4">
+              {/* Email input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Email đăng nhập <span className="text-rose-500">*</span>
+                </label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
+                  type="email"
+                  value={email}
                   onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (passwordError) setPasswordError(null);
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError(null);
                     if (loginError) setLoginError(null);
                   }}
-                  className={`pc-input ${passwordError ? 'pc-input-error' : ''}`}
-                  placeholder="••••••••"
-                  style={{ paddingRight: '38px', fontSize: '13px', padding: '8px 12px' }}
-                  autoComplete="current-password"
+                  className={`w-full h-[38px] px-3.5 rounded-lg border text-sm text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none transition-colors ${
+                    emailError
+                      ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                      : 'border-slate-200 focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]'
+                  }`}
+                  placeholder="Nhập email"
+                  autoComplete="email"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                {emailError && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-500 font-medium mt-1 animate-in fade-in">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{emailError}</span>
+                  </div>
+                )}
               </div>
-              {passwordError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    marginTop: '6px',
-                  }}
-                >
-                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                  <span>{passwordError}</span>
+
+              {/* Password input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Mật khẩu <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (passwordError) setPasswordError(null);
+                      if (loginError) setLoginError(null);
+                    }}
+                    className={`w-full h-[38px] px-3.5 pr-10 rounded-lg border text-sm text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none transition-colors ${
+                      passwordError
+                        ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                        : 'border-slate-200 focus:border-[#0D9488] focus:ring-1 focus:ring-[#0D9488]'
+                    }`}
+                    placeholder="Nhập mật khẩu"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-              )}
+                {passwordError && (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-500 font-medium mt-1 animate-in fade-in">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+              </div>
             </div>
-                        {/* Google reCAPTCHA Widget - Chuẩn layout mẫu với ô tick */}
-            <div style={{ margin: '2px 0' }}>
-              <div style={{ minHeight: '78px', overflow: 'hidden' }}>
+
+            {/* Google reCAPTCHA Widget */}
+            <div className="mt-5 mb-4">
+              <div className="min-h-[78px] overflow-hidden flex justify-center">
                 <ReCAPTCHA
                   ref={recaptchaRef}
                   sitekey={SITE_KEY}
@@ -735,22 +531,8 @@ export const Login: React.FC<LoginProps> = ({
               </div>
 
               {captchaError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#ef4444',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    marginTop: '6px',
-                    padding: '6px 10px',
-                    backgroundColor: '#fef2f2',
-                    borderRadius: '6px',
-                    border: '1px solid #fee2e2',
-                  }}
-                >
-                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <div className="flex items-center gap-1.5 text-xs text-rose-500 font-medium bg-rose-50 border border-rose-200 rounded-lg p-2.5 mt-2">
+                  <AlertCircle size={14} className="shrink-0" />
                   <span>{captchaError}</span>
                 </div>
               )}
@@ -758,121 +540,62 @@ export const Login: React.FC<LoginProps> = ({
 
             {/* General Login Error Notification */}
             {loginError && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#b91c1c',
-                  fontSize: '12.5px',
-                  fontWeight: 500,
-                  padding: '10px 14px',
-                  backgroundColor: '#fef2f2',
-                  borderRadius: '8px',
-                  border: '1px solid #fee2e2',
-                }}
-              >
-                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <div className="mb-4 flex items-center gap-2 text-xs sm:text-[12.5px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3 font-medium">
+                <AlertCircle size={16} className="shrink-0" />
                 <span>{loginError}</span>
               </div>
             )}
 
-            {/* Submit button */}
+            {/* Submit button: height 38px, 100% full width matching inputs */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="pc-btn pc-btn-primary"
-              style={{
-                width: '100%',
-                padding: '10px 14px',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                borderRadius: '8px',
-                marginTop: '2px',
-                opacity: isSubmitting ? 0.7 : 1,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              }}
+              className="w-full h-[38px] px-4 rounded-lg text-sm font-semibold text-white bg-[#0D9488] hover:bg-[#0f766e] active:scale-[0.99] transition-all shadow-xs cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
             </button>
 
             {/* Remember & Forgot password */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#334155' }}>
+            <div className="flex justify-between items-center text-xs text-slate-600 mt-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ accentColor: '#0d8a7c' }}
+                  className="w-4 h-4 rounded border-slate-300 text-[#0D9488] focus:ring-[#0D9488] accent-[#0D9488]"
                 />
                 <span>Ghi nhớ thông tin đăng nhập</span>
               </label>
 
               <span
                 onClick={() => {
-                  // Điều hướng đến trang Quên mật khẩu riêng biệt
                   window.history.pushState(null, '', '/forgot-password');
                   window.dispatchEvent(new PopStateEvent('popstate'));
                 }}
-                style={{ color: '#0d8a7c', fontWeight: 600, cursor: 'pointer' }}
+                className="text-[#0D9488] font-semibold hover:underline cursor-pointer"
               >
                 Quên mật khẩu?
               </span>
             </div>
 
             {/* Switch to Register */}
-            <div style={{ textAlign: 'center', marginTop: '4px', fontSize: '12.5px', color: '#64748b' }}>
+            <div className="text-center text-xs text-slate-500 mt-4 pt-3 border-t border-slate-100">
               Chưa có tài khoản?{' '}
               <span
                 onClick={() => {
                   if (onGoToRegister) onGoToRegister();
                   if (onNavigateToRegister) onNavigateToRegister();
                 }}
-                style={{ color: '#0d8a7c', fontWeight: 600, cursor: 'pointer' }}
+                className="text-[#0D9488] font-semibold hover:underline cursor-pointer"
               >
                 Đăng ký ngay
               </span>
             </div>
-
-            {/* Thai phụ Mobile App Download notice & link */}
-            <div
-              style={{
-                marginTop: '8px',
-                paddingTop: '8px',
-                borderTop: '1px solid #f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                color: '#64748b',
-                textAlign: 'center',
-              }}
-            >
-              <QrCode size={16} color="#0f766e" style={{ flexShrink: 0 }} />
-              <span>
-                Bạn là thai phụ?{' '}
-                <button
-                  type="button"
-                  onClick={() => setShowQrModal(true)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    color: '#0f766e',
-                    fontWeight: 600,
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    fontSize: '12.5px',
-                  }}
-                >
-                  Quét mã QR để tải ứng dụng di động.
-                </button>
-              </span>
-            </div>
           </form>
         </div>
-      </div>
+      </main>
+
+
 
       {/* Floating Error Toast Notification */}
       {showToast && (
@@ -1001,7 +724,7 @@ export const Login: React.FC<LoginProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#0f766e',
+                color: '#0D9488',
                 marginBottom: '16px',
               }}
             >
@@ -1021,7 +744,7 @@ export const Login: React.FC<LoginProps> = ({
                 padding: '16px',
                 borderRadius: '16px',
                 backgroundColor: '#f8fafc',
-                border: '2px dashed #0f766e',
+                border: '2px dashed #0D9488',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1129,7 +852,7 @@ export const Login: React.FC<LoginProps> = ({
                   height: '40px',
                   borderRadius: '10px',
                   backgroundColor: '#e6f4f2',
-                  color: '#0d8a7c',
+                  color: '#0D9488',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1221,7 +944,7 @@ export const Login: React.FC<LoginProps> = ({
 
             {forgotStep === 'success' && (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <CheckCircle2 size={48} color="#0d8a7c" style={{ margin: '0 auto 12px' }} />
+                <CheckCircle2 size={48} color="#0D9488" style={{ margin: '0 auto 12px' }} />
                 <p style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
                   Mật khẩu đã được cập nhật thành công!
                 </p>

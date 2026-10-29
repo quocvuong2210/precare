@@ -125,6 +125,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onNavigateToLogin 
   const [newPassword,      setNewPassword]      = useState('');
   const [confirmPassword,  setConfirmPassword]  = useState('');
   const [showPassword,     setShowPassword]     = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [criteriaError,    setCriteriaError]    = useState<string | null>(null);
   const [apiError,         setApiError]         = useState<string | null>(null);
@@ -328,7 +329,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onNavigateToLogin 
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); if (criteriaError) setCriteriaError(null); if (apiError) setApiError(null); }}
-                    placeholder="••••••••" autoComplete="new-password"
+                    autoComplete="new-password"
                     style={{ flex: 1, border: 'none', outline: 'none', fontSize: '14px', color: '#0F172A', backgroundColor: 'transparent', fontFamily: 'inherit' }}
                   />
                   <button type="button" onClick={() => setShowPassword((p) => !p)}
@@ -362,12 +363,17 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onNavigateToLogin 
                   <Lock size={16} color={passwordMismatch ? '#EF4444' : '#94A3B8'} style={{ flexShrink: 0 }} />
                   <input
                     id="rp-confirm"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); if (passwordMismatch) setPasswordMismatch(false); }}
-                    placeholder="••••••••" autoComplete="new-password"
+                    autoComplete="new-password"
                     style={{ flex: 1, border: 'none', outline: 'none', fontSize: '14px', color: passwordMismatch ? '#EF4444' : '#0F172A', backgroundColor: 'transparent', fontFamily: 'inherit' }}
                   />
+                  <button type="button" onClick={() => setShowConfirmPassword((p) => !p)}
+                    style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {passwordMismatch && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
