@@ -81,7 +81,7 @@ export const StatusFilterDropdown: React.FC<StatusFilterDropdownProps> = ({
 
   return (
     <div ref={dropdownRef} className={`relative inline-block text-left ${className}`}>
-      {/* 1. Nút bấm mở Dropdown (Trigger Button) */}
+      {/* Trigger Button */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -102,7 +102,7 @@ export const StatusFilterDropdown: React.FC<StatusFilterDropdownProps> = ({
         )}
       </button>
 
-      {/* 2. Dropdown Menu Panel: Neo về bên phải (right-0), z-index cao (z-50) để tránh bị cắt lẹm cạnh phải */}
+      {/* Dropdown Menu Panel */}
       {isOpen && (
         <div
           role="listbox"
@@ -144,7 +144,7 @@ export const StatusFilterDropdown: React.FC<StatusFilterDropdownProps> = ({
                       : 'text-slate-700 hover:bg-slate-50 font-medium'
                   }`}
                 >
-                  {/* Left: Icon Check + Tên mục */}
+                  {/* Icon Check & Tên mục */}
                   <div className="flex items-center gap-2 min-w-0">
                     {isSelected ? (
                       <Check className="w-4 h-4 text-teal-700 shrink-0" />
@@ -154,7 +154,7 @@ export const StatusFilterDropdown: React.FC<StatusFilterDropdownProps> = ({
                     <span className="truncate">{option.label}</span>
                   </div>
 
-                  {/* Right: Badge đếm số lượng */}
+                  {/* Badge đếm số lượng */}
                   <span
                     className={`text-[11px] px-2 py-0.5 rounded-full font-bold ml-2 shrink-0 ${
                       isSelected

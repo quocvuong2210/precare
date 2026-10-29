@@ -27,8 +27,7 @@ import {
 } from 'lucide-react';
 
 /**
- * GIAO DIỆN BÁC SĨ (DOCTOR PORTAL)
- * Thiết kế chuẩn theo ảnh tham chiếu PreCare — Digital Obstetrics Portal.
+ * Giao diện Bác sĩ (Doctor Portal)
  */
 const DoctorPortal: React.FC = () => {
   const { user, logout } = useAuth();
@@ -63,19 +62,16 @@ const DoctorPortal: React.FC = () => {
     navigate('/login');
   };
 
-  // Tên bác sĩ theo đúng yêu cầu hoặc lấy từ tài khoản đăng nhập
   const doctorDisplayName = user?.full_name
     ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
     : 'BS. CKI LÊ HOÀNG';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans">
-      {/* ========================================================
-          1. Left Sidebar (Tái hiện chuẩn xác thiết kế tham chiếu)
-         ======================================================== */}
+      {/* Left Sidebar */}
       <aside className="w-[260px] bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen sticky top-0 h-screen p-5">
         <div className="space-y-6">
-          {/* Logo & Brand Header: PreCare [MD] */}
+          {/* Logo & Brand */}
           <div
             className="flex items-center gap-3 cursor-pointer select-none"
             onClick={() => {
@@ -94,13 +90,13 @@ const DoctorPortal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section Heading: BẢNG ĐIỀU KHIỂN */}
+          {/* Bảng điều khiển */}
           <div>
             <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-3 mb-2">
               BẢNG ĐIỀU KHIỂN
             </div>
 
-            {/* Navigation Items (Active: nền xanh ngọc rất nhạt bg-teal-50, chữ đen/xám đậm, icon xanh) */}
+            {/* Navigation Items */}
             <nav className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -127,14 +123,13 @@ const DoctorPortal: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Section: Unified Doctor Profile Card (Law of Proximity) */}
+        {/* Doctor Profile Card */}
         <div className="pt-3 border-t border-slate-100">
           <div
             onClick={() => navigate('/login')}
             title="Nhấp để chuyển tài khoản hoặc quản lý hồ sơ bác sĩ"
             className="border border-slate-200/80 rounded-xl p-2.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-2.5 shadow-2xs group"
           >
-            {/* Avatar */}
             <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center text-teal-800">
               <img
                 src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
@@ -147,7 +142,6 @@ const DoctorPortal: React.FC = () => {
               <span className="font-bold text-xs text-teal-800 hidden only:block">LH</span>
             </div>
 
-            {/* Doctor Info */}
             <div className="min-w-0 flex-1">
               <div
                 className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition-colors truncate"
@@ -163,7 +157,6 @@ const DoctorPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Action: LogOut / Chuyển tài khoản */}
             <button
               type="button"
               onClick={(e) => {
@@ -180,13 +173,10 @@ const DoctorPortal: React.FC = () => {
         </div>
       </aside>
 
-      {/* ========================================================
-          2. Main Content Area (Header + Dashboard Body)
-         ======================================================== */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header Bar */}
         <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-8 py-4 sticky top-0 z-30 flex items-center justify-between gap-4">
-          {/* Left: Ô tìm kiếm bệnh nhân theo thời gian thực (Live Search) */}
+          {/* Ô tìm kiếm bệnh nhân (Live Search) */}
           <div className="flex-1 max-w-md relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -208,7 +198,7 @@ const DoctorPortal: React.FC = () => {
             )}
           </div>
 
-          {/* Right: Thông tin bệnh viện & Chuông thông báo */}
+          {/* Thông tin cơ sở y tế & Thông báo */}
           <div className="flex items-center gap-4">
             <button
               aria-label="Thông báo"
@@ -234,7 +224,7 @@ const DoctorPortal: React.FC = () => {
           </div>
         </header>
 
-        {/* Page Content Body: Tối ưu không gian ngang (Horizontal Real Estate) và padding chuẩn */}
+        {/* Page Content Body */}
         <main className="w-full max-w-[1600px] mx-auto px-6 py-6 sm:px-8 sm:py-6">
           {selectedPatientId ? (
             <PatientDetail
@@ -251,9 +241,7 @@ const DoctorPortal: React.FC = () => {
         </main>
       </div>
 
-      {/* ========================================================
-          3. Patient Search Dialog (Mở qua click ô tìm kiếm)
-         ======================================================== */}
+      {/* Patient Search Dialog */}
       <PatientSearchDialog
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}

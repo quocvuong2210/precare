@@ -26,13 +26,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
   const handleClearSearch = externalClearSearch || (() => setInternalSearchQuery(''));
 
-  // Tên bác sĩ theo đúng yêu cầu nhận diện thương hiệu: BS. CKI LÊ HOÀNG
+  // Tên bác sĩ hiển thị mặc định
   const doctorDisplayName = 'BS. CKI LÊ HOÀNG';
 
-  // Dữ liệu hồ sơ thai kỳ chuẩn từ Database Backend
+  // Dữ liệu hồ sơ thai kỳ lâm sàng
   const records = mockClinicalRecords;
 
-  // Single Source of Truth: Đồng bộ hóa toàn bộ các con số thống kê (Task 8)
+  // Thống kê số liệu lâm sàng trong ngày
   const metrics = useMemo(() => {
     const totalPatientsManaged = 1248;
     const recordsToday = records.length;
@@ -56,17 +56,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [records]);
 
-  // Format số 2 chữ số (VD: 02, 06, 07)
   const formatTwoDigits = (num: number) => (num < 10 ? `0${num}` : `${num}`);
 
   return (
     <div className="space-y-5">
-      {/* ========================================================
-          1. BANNER CHÀO BÁC SĨ (Màu xanh Teal gradient)
-          Typography: Serif font sang trọng, bold, tracking-wide cho tiêu đề;
-          Sans-serif cho đoạn mô tả phụ bên dưới.
-          Thuật ngữ lâm sàng chuẩn khớp API :8001 /predict
-         ======================================================== */}
+      {/* 1. Banner chào bác sĩ */}
       <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0C4E47] via-[#0F5C53] to-[#0A423C] p-6 sm:p-7 text-white shadow-sm">
         {/* Subtle decorative background glow */}
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
@@ -104,25 +98,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </section>
 
-      {/* ========================================================
-          [TASK 1 & 2] DISCLAIMER Y TẾ & THÔNG TIN RULE/MODEL
-          Tuân thủ nguyên tắc an toàn lâm sàng PreCare (API :8001)
-          Không có nút tắt/đóng, hiển thị cố định mọi thời điểm
-         ======================================================== */}
+      {/* 2. Cảnh báo an toàn lâm sàng & thông tin mô hình phân tích */}
       <ClinicalDisclaimerBanner
         rulesVersion="Hadlock-ACOG-v1.0"
         modelVersion="RACA-Net-ResNet50-v1.2"
         disclaimerText="LƯU Ý Y TẾ: Kết quả phân tích của PreCare chỉ mang tính chất hỗ trợ sàng lọc và tham khảo, không thay thế quyết định chẩn đoán của bác sĩ chuyên khoa."
       />
 
-      {/* ========================================================
-          [TASK 3] BỐN THẺ KPI TINH GỌN (Baseline & Căn chỉnh hoàn hảo)
-          - Loại bỏ các chỉ số trang trí thiếu căn cứ (+12%, Độ tin cậy TB)
-          - Tránh lặp lại badge Rule ở KPI 3 (đã thể hiện ở Disclaimer)
-          - Sửa câu văn cắt cụt, đồng nhất chiều cao và baseline số liệu
-         ======================================================== */}
+      {/* 3. Thẻ thống kê chỉ số (KPI Cards) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {/* KPI 1: TỔNG THAI PHỤ - Bỏ tỷ lệ % trang trí vô căn cứ */}
+        {/* KPI 1: Tổng thai phụ */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
           <div className="h-8 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -142,7 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* KPI 2: HỒ SƠ KHÁM HÔM NAY - Số liệu đồng bộ với bảng & bộ lọc */}
+        {/* KPI 2: Hồ sơ khám hôm nay */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
           <div className="h-8 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -164,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* KPI 3: CẢNH BÁO NGUY CƠ CAO - Dòng phụ ngắn gọn, không lặp badge */}
+        {/* KPI 3: Cảnh báo nguy cơ cao */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
           <div className="h-8 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -184,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* KPI 4: HỒ SƠ CHỜ DUYỆT OCR - Làm nổi bật số lượng tệp cần đối soát */}
+        {/* KPI 4: Hồ sơ chờ duyệt OCR */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
           <div className="h-8 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -205,10 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </section>
 
-      {/* ========================================================
-          3. BẢNG HỒ SƠ THAI KỲ & ĐỐI SOÁT CẬN LÂM SÀNG (Task 6 & 9)
-          Khớp 100% Data Model Backend (:8000 & :8001), chiều rộng ổn định
-         ======================================================== */}
+      {/* 4. Danh sách hồ sơ thai kỳ & đối soát cận lâm sàng */}
       <section className="w-full">
         <AppointmentTable
           records={records}

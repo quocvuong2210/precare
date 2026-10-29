@@ -201,7 +201,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   const activeRecords = records || appointments || mockClinicalRecords;
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('all');
 
-  // Thống kê số lượng động từ tập dữ liệu thực tế (Task 5 & 8)
+  // Thống kê số lượng theo trạng thái đối soát
   const statusCounts = useMemo<StatusCounts>(() => {
     return {
       all: activeRecords.length,
@@ -253,13 +253,13 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
     });
   }, [activeRecords, selectedStatus, searchQuery]);
 
-  // Nút Xóa lọc đưa giao diện về trạng thái không lọc ban đầu (Task 7)
+  // Xóa bộ lọc trạng thái và tìm kiếm
   const handleClearAllFilters = () => {
     setSelectedStatus('all');
     if (clearSearch) clearSearch();
   };
 
-  // Render Badge Mức Cảnh Báo Lâm Sàng (kết hợp Icon + Màu + Nhãn theo Task 10)
+  // Render Badge Mức Cảnh Báo Lâm Sàng
   const renderWarningLevelBadge = (level: WarningLevel) => {
     switch (level) {
       case 'red':
@@ -308,9 +308,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
 
   return (
     <div className="w-full bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col relative">
-      {/* ========================================================
-          Thanh trạng thái tìm kiếm (Live Search Banner)
-         ======================================================== */}
+      {/* Thanh trạng thái tìm kiếm */}
       {hasActiveSearch && (
         <div className="bg-teal-50 text-teal-900 p-2.5 px-5 rounded-t-2xl border-b border-teal-100 flex items-center justify-between text-xs animate-in fade-in-0 duration-150">
           <div className="flex items-center gap-1.5">
@@ -330,10 +328,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
         </div>
       )}
 
-      {/* ========================================================
-          1. Table Header: Tiêu đề + Dropdown Filter + Nút Xóa lọc trung tính
-          Lưu ý: Không dùng overflow-hidden ở header để dropdown không bị cắt
-         ======================================================== */}
+      {/* 1. Header Bảng: Tiêu đề & Bộ lọc trạng thái */}
       <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-4 relative z-30">
         {/* Left: Tiêu đề chuẩn lâm sàng + Badge đếm số lượng */}
         <div className="flex items-center gap-2.5">
@@ -347,7 +342,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
           </span>
         </div>
 
-        {/* Right: Dropdown bộ lọc trạng thái & Nút Xóa lọc màu trung tính (Task 7) */}
+        {/* Right: Bộ lọc trạng thái & Nút Xóa lọc */}
         <div className="flex items-center gap-2">
           <StatusFilterDropdown
             value={selectedStatus}
@@ -369,10 +364,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
         </div>
       </div>
 
-      {/* ========================================================
-          2. Table Content: 7 Cột Chuẩn DB Backend
-          Ổn định chiều rộng cột bằng colgroup và min-w cố định (Task 6)
-         ======================================================== */}
+      {/* 2. Bảng Dữ Liệu Lâm Sàng */}
       <div className="w-full overflow-x-auto rounded-b-2xl">
         <table className="w-full min-w-[1080px] text-left border-collapse">
           {/* Colgroup giữ cố định tỷ lệ các cột bất kể số dòng thay đổi */}
@@ -457,7 +449,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                     key={rec.id}
                     className="hover:bg-slate-50/80 transition-colors group"
                   >
-                    {/* Cột 1: THAI PHỤ / HỒ SƠ - Không chứa phòng khám */}
+                    {/* Cột 1: THAI PHỤ / HỒ SƠ */}
                     <td className="py-4 px-5 text-left whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div
@@ -472,7 +464,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                           >
                             {rec.patientName}
                           </div>
-                          {/* Mã hồ sơ + Ngày dự sinh EDD - Text tương phản đạt WCAG 2.2 AA */}
+                          {/* Mã hồ sơ & Ngày dự sinh EDD */}
                           <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium truncate">
                             <span className="font-mono text-slate-600 font-semibold">
                               {rec.patientCode}
@@ -522,7 +514,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                       {renderOcrStatusBadge(rec)}
                     </td>
 
-                    {/* Cột 7: HÀNH ĐỘNG - Đối soát OCR nổi bật cho hồ sơ pending, Mở hồ sơ cho đã verified */}
+                    {/* Cột 7: HÀNH ĐỘNG */}
                     <td className="py-4 px-5 text-right whitespace-nowrap">
                       {isPendingOcr ? (
                         <button
@@ -555,7 +547,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
         </table>
       </div>
 
-      {/* Table Footer: Hiển thị phân trang / số đếm rõ ràng & độ tương phản cao */}
+      {/* Table Footer */}
       <div className="p-4 bg-slate-50/70 border-t border-slate-100 text-xs text-slate-600 flex items-center justify-between">
         <span className="font-medium">
           Hiển thị {filteredRecords.length > 0 ? `1–${filteredRecords.length}` : '0'} trên tổng số{' '}
