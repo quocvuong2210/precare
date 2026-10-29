@@ -64,15 +64,28 @@ CREATE TABLE IF NOT EXISTS checkups (
     pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id),
     checkup_date DATE NOT NULL,
-    gestational_age_days INT NOT NULL,
-    weight_kg NUMERIC(5,2),
-    blood_pressure_systolic INT,
-    blood_pressure_diastolic INT,
-    notes TEXT,
+    gestational_age_days INT NOT NULL,        -- Tuổi thai gt tính bằng ngày tại ngày khám (nội suy từ EDD)
+    weight_kg NUMERIC(5,2),                   -- Cân nặng mẹ bầu (kg)
+    blood_pressure_systolic INT,              -- Huyết áp tâm thu (mmHg)
+    blood_pressure_diastolic INT,             -- Huyết áp tâm trương (mmHg)
+    notes TEXT,                               -- Lời dặn, chẩn đoán sơ bộ
+    is_deleted BOOLEAN DEFAULT FALSE,         -- Hỗ trợ Soft-delete y tế (PRC-37)
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Ràng buộc y tế hợp lý
+    CONSTRAINT chk_gestational_age_range CHECK (gestational_age_days >= 0 AND gestational_age_days <= 315),
+    CONSTRAINT chk_weight_positive CHECK (weight_kg IS NULL OR (weight_kg >= 30.0 AND weight_kg <= 200.0)),
+    CONSTRAINT chk_blood_pressure CHECK (
+        (blood_pressure_systolic IS NULL AND blood_pressure_diastolic IS NULL) OR
+        (blood_pressure_systolic > blood_pressure_diastolic AND blood_pressure_systolic >= 60 AND blood_pressure_systolic <= 250 AND blood_pressure_diastolic >= 40 AND blood_pressure_diastolic <= 150)
+    )
 );
 CREATE INDEX IF NOT EXISTS idx_checkups_profile ON checkups(pregnancy_profile_id);
+CREATE INDEX IF NOT EXISTS idx_checkups_doctor ON checkups(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_checkups_date ON checkups(checkup_date);
+CREATE INDEX IF NOT EXISTS idx_checkups_gt ON checkups(gestational_age_days);
+CREATE INDEX IF NOT EXISTS idx_checkups_not_deleted ON checkups(pregnancy_profile_id) WHERE is_deleted = FALSE;
 
 -- 5. Bảng Uploaded Files
 CREATE TABLE IF NOT EXISTS uploaded_files (
