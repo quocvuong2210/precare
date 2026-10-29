@@ -1,218 +1,248 @@
-import React from 'react';
-import { Users, Calendar, AlertTriangle, FileText } from 'lucide-react';
-
-interface PatientAppointment {
-  id: string;
-  name: string;
-  gestational_age: string;
-  time: string;
-  reason: string;
-  ocr_status: 'confirmed' | 'pending';
-}
-
-const APPOINTMENTS: PatientAppointment[] = [
-  {
-    id: 'prof-001',
-    name: 'Nguyễn Thảo Chi',
-    gestational_age: '32 tuần',
-    time: '08:30 AM',
-    reason: 'Khám định kỳ + Siêu âm',
-    ocr_status: 'confirmed',
-  },
-  {
-    id: 'prof-002',
-    name: 'Phạm Minh Thư',
-    gestational_age: '18 tuần',
-    time: '09:15 AM',
-    reason: 'Xét nghiệm sinh hóa',
-    ocr_status: 'pending',
-  },
-  {
-    id: 'prof-003',
-    name: 'Trần Hồng Nhung',
-    gestational_age: '36 tuần',
-    time: '10:00 AM',
-    reason: 'Theo dõi huyết áp cao',
-    ocr_status: 'confirmed',
-  },
-];
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Users,
+  Calendar,
+  AlertTriangle,
+  FileCheck2,
+  ArrowRight,
+  RefreshCw,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { AppointmentTable, mockClinicalRecords } from '../components/AppointmentTable';
+import { ClinicalDisclaimerBanner } from '../components/ClinicalDisclaimerBanner';
+import { ClinicalPregnancyRecord } from '../types';
+import { dashboardService } from '../services/dashboard.service';
 
 interface DashboardProps {
   onSelectPatient: (id: string) => void;
+  searchQuery?: string;
+  onClearSearch?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
+export const Dashboard: React.FC<DashboardProps> = ({
+  onSelectPatient,
+  searchQuery: externalSearchQuery,
+  onClearSearch: externalClearSearch,
+}) => {
+  const { user } = useAuth();
+
+  // Quản lý internal search query nếu không được truyền từ props ngoài
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const handleClearSearch = externalClearSearch || (() => setInternalSearchQuery(''));
+
+  // Tên bác sĩ ưu tiên lấy từ phiên người dùng đã xác thực (GET /api/v1/auth/me)
+  const doctorDisplayName = user?.full_name
+    ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
+    : 'BS. CKI LÊ HOÀNG';
+
+  // State dữ liệu lâm sàng & trạng thái API
+  const [records, setRecords] = useState<ClinicalPregnancyRecord[]>(mockClinicalRecords);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [apiNotice, setApiNotice] = useState<string | null>(null);
+  const [analysisInfo, setAnalysisInfo] = useState<{ ruleVersion: string; modelVersion: string }>({
+    ruleVersion: 'Hadlock-ACOG-v1.0',
+    modelVersion: 'RACA-Net-ResNet50-v1.2',
+  });
+
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    setApiNotice(null);
+    try {
+      // 1. Lấy thông tin phiên bản luật/mô hình từ Analysis Service (:8001 GET /api/v1/health)
+      const health = await dashboardService.getAnalysisHealth();
+      setAnalysisInfo({
+        ruleVersion: health.rule_version || 'Hadlock-ACOG-v1.0',
+        modelVersion: health.model_version || 'RACA-Net-ResNet50-v1.2',
+      });
+
+      // 2. Tải danh sách hồ sơ thai kỳ từ API Gateway
+      const res = await dashboardService.getClinicalRecords();
+      setRecords(res.data);
+      if (res.message) {
+        setApiNotice(res.message);
+      }
+    } catch {
+      setApiNotice('Không thể kết nối đến máy chủ API Gateway. Đang sử dụng dữ liệu dự phòng.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  // Thống kê số liệu lâm sàng trong ngày
+  const metrics = useMemo(() => {
+    return dashboardService.calculateMetrics(records);
+  }, [records]);
+
+  const formatTwoDigits = (num: number) => (num < 10 ? `0${num}` : `${num}`);
+
   return (
-    <div className="space-y-6">
-      {/* Top 4 KPI / Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Tổng thai phụ quản lý */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <span className="text-sm font-medium text-slate-600">Tổng thai phụ quản lý</span>
-            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">248</div>
-            <p className="text-xs font-medium text-teal-600 mt-2">Tăng 8 thai kỳ mới tuần này</p>
-          </div>
-        </div>
+    <div className="space-y-5">
+      {/* 1. Banner chào bác sĩ */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0C4E47] via-[#0F5C53] to-[#0A423C] p-6 sm:p-7 text-white shadow-sm">
+        {/* Subtle decorative background glow */}
+        <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Card 2: Lượt khám hôm nay */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <span className="text-sm font-medium text-slate-600">Lượt khám hôm nay</span>
-            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700">
-              <Calendar className="w-5 h-5" />
-            </div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-1.5 max-w-3xl">
+            <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-wide text-white uppercase">
+              CHÀO BUỔI SÁNG, {doctorDisplayName}!
+            </h1>
+            <p className="font-sans text-xs sm:text-sm text-teal-100/95 leading-relaxed">
+              Hôm nay bạn có{' '}
+              <strong className="text-white font-bold">{metrics.recordsToday} hồ sơ thai kỳ</strong> cần
+              theo dõi. Hệ thống tự động phát hiện{' '}
+              <strong className="text-white font-bold">
+                {metrics.redAlertsToday} hồ sơ có cờ đỏ lâm sàng (nghi ngờ thai chậm phát triển FGR)
+              </strong>{' '}
+              và <strong className="text-white font-bold">{metrics.pendingOcrTotal} tệp siêu âm</strong>{' '}
+              đang ở trạng thái chờ bác sĩ đối soát kết quả OCR.
+            </p>
           </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">18</div>
-            <p className="text-xs text-slate-500 mt-2">Đã hoàn thành 12 ca</p>
-          </div>
-        </div>
 
-        {/* Card 3: Cảnh báo chờ xử lý */}
-        <div className="bg-[#FFF5F5] rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <span className="text-sm font-medium text-rose-600">Cảnh báo chờ xử lý</span>
-            <div className="w-10 h-10 rounded-xl bg-red-100/70 flex items-center justify-center text-rose-500">
-              <AlertTriangle className="w-5 h-5" />
-            </div>  
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold text-rose-500 tracking-tight">04</div>
-            <p className="text-xs font-normal text-rose-500/90 mt-2">2 ca nguy cơ cao (Tiền sản giật / Nhau tiền đạo)</p>
-          </div>
-        </div>
-
-        {/* Card 4: Phiếu OCR chờ xác nhận */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <span className="text-sm font-medium text-slate-600">Phiếu OCR chờ xác nhận</span>
-            <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700">
-              <FileText className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">07</div>
-            <p className="text-xs text-slate-500 mt-2">Độ chính xác trung bình 96%</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Lịch khám hôm nay & Bảng phân loại nguy cơ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Lịch khám hôm nay (Width ~ 68%) */}
-        <div className="lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
-          <div className="flex items-center justify-between pb-5 border-b border-slate-100">
-            <h2 className="text-base font-bold text-slate-800">Lịch khám hôm nay (18 thai phụ)</h2>
-            <button className="text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline">
-              Xem tất cả
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.querySelector('[aria-label="Danh sách trạng thái hồ sơ thai kỳ"]');
+                if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-[#0C4E47] hover:bg-teal-50 text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer hover:shadow-md active:scale-95 whitespace-nowrap"
+            >
+              <span>Xem {metrics.pendingOcrTotal} tệp OCR cần duyệt</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
+        </div>
+      </section>
 
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500 font-semibold border-b border-slate-100">
-                  <th className="py-3.5 px-2 font-medium">Họ và tên</th>
-                  <th className="py-3.5 px-2 font-medium">Tuổi thai</th>
-                  <th className="py-3.5 px-2 font-medium">Giờ khám</th>
-                  <th className="py-3.5 px-2 font-medium">Lý do khám</th>
-                  <th className="py-3.5 px-2 font-medium">Trạng thái OCR</th>
-                  <th className="py-3.5 px-2 font-medium text-center">Hành động</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {APPOINTMENTS.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-4 px-2 font-bold text-slate-800 whitespace-nowrap">
-                      {item.name}
-                    </td>
-                    <td className="py-4 px-2 text-slate-600 whitespace-nowrap">
-                      {item.gestational_age}
-                    </td>
-                    <td className="py-4 px-2 text-slate-600 whitespace-nowrap font-medium">
-                      {item.time}
-                    </td>
-                    <td className="py-4 px-2 text-slate-600">
-                      {item.reason}
-                    </td>
-                    <td className="py-4 px-2 whitespace-nowrap">
-                      {item.ocr_status === 'confirmed' ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-emerald-100/70 text-emerald-700">
-                          Đã xác nhận
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-rose-100/70 text-rose-600">
-                          Chờ duyệt
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-2 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => onSelectPatient(item.id)}
-                        className="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-[#345C59] hover:bg-[#2A4B48] transition-colors shadow-sm cursor-pointer"
-                      >
-                        Xem bệnh án
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Thông báo trạng thái kết nối API (khi backend chưa có API danh sách hồ sơ) */}
+      {apiNotice && (
+        <div className="bg-amber-50/90 border border-amber-200/90 text-amber-900 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="truncate">{apiNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            className="inline-flex items-center gap-1 font-bold text-teal-800 hover:text-teal-950 hover:underline shrink-0 cursor-pointer"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Thử lại</span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Cảnh báo an toàn lâm sàng & thông tin mô hình phân tích */}
+      <ClinicalDisclaimerBanner
+        rulesVersion={analysisInfo.ruleVersion}
+        modelVersion={analysisInfo.modelVersion}
+        disclaimerText="LƯU Ý Y TẾ: Kết quả phân tích của PreCare chỉ mang tính chất hỗ trợ sàng lọc và tham khảo, không thay thế quyết định chẩn đoán của bác sĩ chuyên khoa."
+      />
+
+      {/* 3. Thẻ thống kê chỉ số (KPI Cards) */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* KPI 1: Tổng thai phụ */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
+          <div className="h-8 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              TỔNG THAI PHỤ
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-100/80 text-teal-700 flex items-center justify-center shrink-0">
+              <Users className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
+              {metrics.totalPatientsManaged.toLocaleString()}
+            </div>
+            <div className="h-5 flex items-center text-xs font-medium text-slate-500 mt-1">
+              <span>Hồ sơ trong hệ thống</span>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Bảng phân loại nguy cơ (Width ~ 32%) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-          <h2 className="text-base font-bold text-slate-800">Bảng phân loại nguy cơ</h2>
-
-          <div className="space-y-3.5 pt-1">
-            {/* 1. Nguy cơ cao */}
-            <div className="bg-[#FEF2F2] border border-rose-200/70 rounded-xl p-4 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-rose-600 tracking-tight">
-                  NGUY CƠ CAO (CẤP BÁCH)
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                02 trường hợp nghi ngờ tiền sản giật, huyết áp đo được &gt; 140/90 mmHg.
-              </p>
+        {/* KPI 2: Hồ sơ khám hôm nay */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
+          <div className="h-8 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              HỒ SƠ KHÁM HÔM NAY
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-100/80 text-teal-700 flex items-center justify-center shrink-0">
+              <Calendar className="w-4.5 h-4.5" />
             </div>
-
-            {/* 2. Cần theo dõi sát */}
-            <div className="bg-[#FEFCE8] border border-amber-200/70 rounded-xl p-4 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-amber-600 tracking-tight">
-                  CẦN THEO DÕI SÁT
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                05 thai kỳ chậm phát triển trong tử cung (bách phân vị &lt; bách phân vị thứ 10).
-              </p>
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
+              {formatTwoDigits(metrics.recordsToday)}
             </div>
-
-            {/* 3. Bình thường / Khỏe mạnh */}
-            <div className="bg-[#F0FDF4] border border-emerald-200/70 rounded-xl p-4 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-emerald-600 tracking-tight">
-                  BÌNH THƯỜNG / KHỎE MẠNH
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                241 thai phụ ghi nhận thể trạng và chỉ số thai nhi phát triển đồng đều.
-              </p>
+            <div className="h-5 flex items-center gap-1.5 text-xs font-medium text-slate-600 mt-1 truncate">
+              <span>{metrics.verifiedToday} đã xác nhận</span>
+              <span className="text-slate-400">·</span>
+              <span className="text-teal-700 font-semibold">{metrics.pendingOcrToday} chờ đối soát</span>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* KPI 3: Cảnh báo nguy cơ cao */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
+          <div className="h-8 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              CẢNH BÁO NGUY CƠ CAO
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4.5 h-4.5 stroke-[2.2]" />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-rose-600 tracking-tight leading-none">
+              {formatTwoDigits(metrics.redAlertsToday)}
+            </div>
+            <div className="h-5 flex items-center text-xs text-rose-600 font-medium mt-1 truncate">
+              <span>Hồ sơ cần bác sĩ xem xét</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4: Hồ sơ chờ duyệt OCR */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-xs transition-shadow">
+          <div className="h-8 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              HỒ SƠ CHỜ DUYỆT OCR
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-700 flex items-center justify-center shrink-0">
+              <FileCheck2 className="w-4.5 h-4.5 stroke-[2.2]" />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
+              {formatTwoDigits(metrics.pendingOcrTotal)}
+            </div>
+            <div className="h-5 flex items-center text-xs text-slate-600 font-medium mt-1">
+              <span>Tệp siêu âm chờ đối soát</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Danh sách hồ sơ thai kỳ & đối soát cận lâm sàng */}
+      <section className="w-full">
+        <AppointmentTable
+          records={records}
+          isLoading={isLoading}
+          searchQuery={searchQuery}
+          clearSearch={handleClearSearch}
+          onOpenRecord={(rec: ClinicalPregnancyRecord) => onSelectPatient(rec.patientId)}
+          onReviewOcr={(rec: ClinicalPregnancyRecord) => onSelectPatient(rec.patientId)}
+        />
+      </section>
     </div>
   );
 };
+
+export default Dashboard;

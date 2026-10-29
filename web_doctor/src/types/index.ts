@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ticket Module Exports
  */
 // STORY-2.1: Quản lý Tài khoản & Xác thực Người dùng (M-AUTH)
@@ -9,6 +9,8 @@ export * from './auth.types';
 // =========================================================================
 export type WarningLevel = 'green' | 'yellow' | 'red';
 export type IngestStatus = 'pending' | 'processing' | 'extracted' | 'verified' | 'failed';
+export type OcrFileStatus = 'pending' | 'processing' | 'extracted' | 'verified' | 'failed';
+export type BiometricStatus = 'pending_verification' | 'verified';
 
 export interface User {
   id: string;
@@ -77,7 +79,7 @@ export interface BiometricData {
   ac?: number;
   fl?: number;
   efw?: number;
-  status: 'pending_verification' | 'verified';
+  status: BiometricStatus;
   verified_by?: string;
 }
 
@@ -104,4 +106,50 @@ export interface AnalysisResult {
   explanation_patient: string;
   disclaimer_text: string;
   analyzed_at: string;
+}
+
+/**
+ * Hồ sơ thai kỳ & Đối soát cận lâm sàng (DTO hiển thị danh sách khám & cận lâm sàng)
+ * Đồng bộ chính xác với API Gateway (:8000) & Analysis Microservice (:8001)
+ */
+export interface ClinicalPregnancyRecord {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientCode: string;
+  edd: string;
+  eddFormatted: string;
+  trimester: 1 | 2 | 3;
+  trimesterName: string;
+  gestationalAgeDays: number;
+  gestationalAgeFormatted: string;
+  checkupDate: string;
+  biometricSummary: string;
+  warningLevel: WarningLevel;
+  ocrStatus: OcrFileStatus;
+  biometricStatus: BiometricStatus;
+  hasOcrAttachment?: boolean;
+  uploadedFileId?: string;
+  // Thuộc tính tương thích ngược cho các dialog tìm kiếm & modal
+  appointmentTime?: string;
+  reason: string;
+  status?: 'confirmed' | 'pending' | 'completed';
+  roomNumber?: string;
+  gestationalAge: string | { weeks?: number; days?: number; formatted: string };
+}
+
+export interface DashboardMetrics {
+  totalPatientsManaged: number;
+  recordsToday: number;
+  redAlertsToday: number;
+  verifiedToday: number;
+  pendingOcrToday: number;
+  pendingOcrTotal: number;
+}
+
+export interface AnalysisServiceHealth {
+  status: string;
+  service: string;
+  rule_version: string;
+  model_version: string;
 }
