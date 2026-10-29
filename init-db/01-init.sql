@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
     crl_mm NUMERIC(5,2),                      -- Chiều dài đầu mông (Crown-Rump Length mm)
     edd DATE NOT NULL,                        -- Ngày dự sinh đã chốt (Estimated Date of Delivery)
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'terminated')),
+    -- [THÊM 4 DÒNG MỚI VÀO ĐÂY]
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    is_anonymized BOOLEAN DEFAULT FALSE,
+    is_purged_from_research BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_gestational_days CHECK (q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)),
@@ -52,6 +57,8 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_patient ON pregnancy_profiles(patient_id);
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_doctor ON pregnancy_profiles(primary_doctor_id);
 CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_status ON pregnancy_profiles(status);
+-- [THÊM INDEX NÀY ĐỂ TỐI ƯU TRUY VẤN LỌC HỒ SƠ CHƯA XÓA]
+CREATE INDEX IF NOT EXISTS idx_pregnancy_profiles_not_deleted ON pregnancy_profiles(patient_id) WHERE is_deleted = FALSE;
 
 -- Ràng buộc Partial Unique Index: Mỗi thai phụ chỉ có tối đa 1 hồ sơ ở trạng thái 'active'
 CREATE UNIQUE INDEX IF NOT EXISTS uq_active_pregnancy_per_patient 
