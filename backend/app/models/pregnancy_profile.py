@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Numeric, Date, DateTime, ForeignKey, CheckConstraint, Index
+    Column, String, Integer, Numeric, Date, DateTime, ForeignKey, CheckConstraint, Index, Boolean
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -26,9 +26,18 @@ class PregnancyProfile(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
+     # Cờ Soft-delete y tế và Ẩn danh hóa NCKH (PRC-37)
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    is_anonymized = Column(Boolean, default=False, nullable=False)
+    is_purged_from_research = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     patient = relationship("User", foreign_keys=[patient_id], backref="patient_pregnancy_profiles")
     primary_doctor = relationship("User", foreign_keys=[primary_doctor_id], backref="doctor_pregnancy_profiles")
+    checkups = relationship("Checkup", back_populates="pregnancy_profile", cascade="all, delete-orphan", order_by="Checkup.checkup_date")
+    biometric_records = relationship("BiometricData", back_populates="pregnancy_profile", cascade="all, delete-orphan")
+    deletion_requests = relationship("DeletionRequest", back_populates="pregnancy_profile", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed', 'terminated')", name="chk_pregnancy_status"),
