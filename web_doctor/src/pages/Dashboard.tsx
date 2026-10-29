@@ -1,14 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Calendar,
   AlertTriangle,
   FileCheck2,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { AppointmentTable, mockClinicalRecords } from '../components/AppointmentTable';
 import { ClinicalDisclaimerBanner } from '../components/ClinicalDisclaimerBanner';
 import { ClinicalPregnancyRecord } from '../types';
+import { dashboardService } from '../services/dashboard.service';
 
 interface DashboardProps {
   onSelectPatient: (id: string) => void;
@@ -21,39 +24,58 @@ export const Dashboard: React.FC<DashboardProps> = ({
   searchQuery: externalSearchQuery,
   onClearSearch: externalClearSearch,
 }) => {
+  const { user } = useAuth();
+
   // Quản lý internal search query nếu không được truyền từ props ngoài
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
   const handleClearSearch = externalClearSearch || (() => setInternalSearchQuery(''));
 
-  // Tên bác sĩ hiển thị mặc định
-  const doctorDisplayName = 'BS. CKI LÊ HOÀNG';
+  // Tên bác sĩ ưu tiên lấy từ phiên người dùng đã xác thực (GET /api/v1/auth/me)
+  const doctorDisplayName = user?.full_name
+    ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
+    : 'BS. CKI LÊ HOÀNG';
 
-  // Dữ liệu hồ sơ thai kỳ lâm sàng
-  const records = mockClinicalRecords;
+  // State dữ liệu lâm sàng & trạng thái API
+  const [records, setRecords] = useState<ClinicalPregnancyRecord[]>(mockClinicalRecords);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [apiNotice, setApiNotice] = useState<string | null>(null);
+  const [analysisInfo, setAnalysisInfo] = useState<{ ruleVersion: string; modelVersion: string }>({
+    ruleVersion: 'Hadlock-ACOG-v1.0',
+    modelVersion: 'RACA-Net-ResNet50-v1.2',
+  });
+
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    setApiNotice(null);
+    try {
+      // 1. Lấy thông tin phiên bản luật/mô hình từ Analysis Service (:8001 GET /api/v1/health)
+      const health = await dashboardService.getAnalysisHealth();
+      setAnalysisInfo({
+        ruleVersion: health.rule_version || 'Hadlock-ACOG-v1.0',
+        modelVersion: health.model_version || 'RACA-Net-ResNet50-v1.2',
+      });
+
+      // 2. Tải danh sách hồ sơ thai kỳ từ API Gateway
+      const res = await dashboardService.getClinicalRecords();
+      setRecords(res.data);
+      if (res.message) {
+        setApiNotice(res.message);
+      }
+    } catch {
+      setApiNotice('Không thể kết nối đến máy chủ API Gateway. Đang sử dụng dữ liệu dự phòng.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   // Thống kê số liệu lâm sàng trong ngày
   const metrics = useMemo(() => {
-    const totalPatientsManaged = 1248;
-    const recordsToday = records.length;
-    const redAlertsToday = records.filter((r) => r.warningLevel === 'red').length;
-    const verifiedToday = records.filter(
-      (r) => r.ocrStatus === 'verified' || r.biometricStatus === 'verified'
-    ).length;
-    const pendingOcrToday = records.filter(
-      (r) => r.ocrStatus === 'extracted' || r.biometricStatus === 'pending_verification'
-    ).length;
-    // Tổng số tệp siêu âm OCR cần duyệt toàn hệ thống
-    const pendingOcrTotal = 7;
-
-    return {
-      totalPatientsManaged,
-      recordsToday,
-      redAlertsToday,
-      verifiedToday,
-      pendingOcrToday,
-      pendingOcrTotal,
-    };
+    return dashboardService.calculateMetrics(records);
   }, [records]);
 
   const formatTwoDigits = (num: number) => (num < 10 ? `0${num}` : `${num}`);
@@ -98,10 +120,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </section>
 
+      {/* Thông báo trạng thái kết nối API (khi backend chưa có API danh sách hồ sơ) */}
+      {apiNotice && (
+        <div className="bg-amber-50/90 border border-amber-200/90 text-amber-900 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="truncate">{apiNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            className="inline-flex items-center gap-1 font-bold text-teal-800 hover:text-teal-950 hover:underline shrink-0 cursor-pointer"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Thử lại</span>
+          </button>
+        </div>
+      )}
+
       {/* 2. Cảnh báo an toàn lâm sàng & thông tin mô hình phân tích */}
       <ClinicalDisclaimerBanner
-        rulesVersion="Hadlock-ACOG-v1.0"
-        modelVersion="RACA-Net-ResNet50-v1.2"
+        rulesVersion={analysisInfo.ruleVersion}
+        modelVersion={analysisInfo.modelVersion}
         disclaimerText="LƯU Ý Y TẾ: Kết quả phân tích của PreCare chỉ mang tính chất hỗ trợ sàng lọc và tham khảo, không thay thế quyết định chẩn đoán của bác sĩ chuyên khoa."
       />
 
@@ -194,6 +234,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <section className="w-full">
         <AppointmentTable
           records={records}
+          isLoading={isLoading}
           searchQuery={searchQuery}
           clearSearch={handleClearSearch}
           onOpenRecord={(rec: ClinicalPregnancyRecord) => onSelectPatient(rec.patientId)}

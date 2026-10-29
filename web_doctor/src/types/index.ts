@@ -137,3 +137,19 @@ export interface ClinicalPregnancyRecord {
   roomNumber?: string;
   gestationalAge: string | { weeks?: number; days?: number; formatted: string };
 }
+
+export interface DashboardMetrics {
+  totalPatientsManaged: number;
+  recordsToday: number;
+  redAlertsToday: number;
+  verifiedToday: number;
+  pendingOcrToday: number;
+  pendingOcrTotal: number;
+}
+
+export interface AnalysisServiceHealth {
+  status: string;
+  service: string;
+  rule_version: string;
+  model_version: string;
+}

@@ -27,6 +27,7 @@ export interface AppointmentTableProps {
   clearSearch?: () => void;
   onOpenRecord?: (record: ClinicalPregnancyRecord) => void;
   onReviewOcr?: (record: ClinicalPregnancyRecord) => void;
+  isLoading?: boolean;
 }
 
 /**
@@ -196,6 +197,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   clearSearch,
   onOpenRecord,
   onReviewOcr,
+  isLoading = false,
 }) => {
   // Ưu tiên sử dụng prop `records`, fallback sang `appointments` hoặc `mockClinicalRecords`
   const activeRecords = records || appointments || mockClinicalRecords;
@@ -410,7 +412,16 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {filteredRecords.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="py-14 text-center text-slate-400 text-sm">
+                  <div className="flex flex-col items-center justify-center gap-2.5">
+                    <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs font-medium text-slate-500">Đang tải danh sách hồ sơ thai kỳ từ máy chủ...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : filteredRecords.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-14 text-center text-slate-400 text-sm">
                   <div className="flex flex-col items-center justify-center gap-2">
