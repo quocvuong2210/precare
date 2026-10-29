@@ -212,3 +212,27 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+
+-- ============================================================================
+-- Bảng Deletion Requests (PRC-37)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS deletion_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
+    checkup_id UUID REFERENCES checkups(id) ON DELETE CASCADE,
+    target_type VARCHAR(50) NOT NULL CHECK (target_type IN ('full_profile', 'single_checkup')),
+    reason TEXT NOT NULL,
+    allow_anonymized_research BOOLEAN DEFAULT TRUE,
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    review_notes TEXT,
+    is_anonymized BOOLEAN DEFAULT FALSE,
+    is_purged_from_research BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_requester ON deletion_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_profile ON deletion_requests(pregnancy_profile_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_requests_status ON deletion_requests(status);
