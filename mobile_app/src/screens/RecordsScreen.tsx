@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,17 +8,64 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { MainTabParamList } from '../navigation/MainTabs';
 import { colors } from '../theme/colors';
 import EmergencyContacts, { type EmergencyContact } from '../components/EmergencyContacts';
+import {
+  calculatePregnancyProfile,
+  currentUserProfile,
+  fetchPregnancyProfileFromDB,
+  restoreSession,
+  savePregnancyProfileToDB,
+  type PregnancyCalculateRequest,
+} from '../services/api';
 
 type Editor = 'personal' | 'medical' | 'history' | null;
 type Profile = {
   name: string; birthday: string; phone: string; email: string;
   blood: string; allergies: string; conditions: string; obstetricHistory: string;
+  target_date: string; lmp: string; q1_ultrasound_date: string;
+  q1_gestational_weeks: string; q1_gestational_days: string; crl_mm: string; override_edd: string;
 };
 type Field = { key: keyof Profile; label: string; placeholder?: string };
+
+type SavedAccountRecord = {
+  profile: Profile;
+  trimester: string;
+  gestationalAge: string;
+  dueDate: string;
+  contacts: EmergencyContact[];
+};
+
+function getTodayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function normalizeIsoDate(raw: string): string {
+  const s = String(raw || '')
+    .replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '')
+    .replace(/[–—−/]/g, '-');
+
+  const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+
+  const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+  }
+
+  return s;
+}
+
+function getStorageKey(email?: string, id?: string): string {
+  const identifier = (email || id || 'guest').trim().toLowerCase();
+  return `precare_account_record_${identifier}`;
+}
 
 const fields: Record<'personal' | 'medical', Field[]> = {
   personal: [
@@ -26,6 +73,13 @@ const fields: Record<'personal' | 'medical', Field[]> = {
     { key: 'birthday', label: 'Ngày sinh', placeholder: 'DD/MM/YYYY' },
     { key: 'phone', label: 'Số điện thoại' },
     { key: 'email', label: 'Email' },
+    { key: 'target_date', label: 'Ngày tính toán (Target Date)', placeholder: 'Tự động lấy ngày hiện tại' },
+    { key: 'lmp', label: 'Ngày kinh cuối (LMP)', placeholder: 'YYYY-MM-DD (VD: 2026-01-20)' },
+    { key: 'q1_ultrasound_date', label: 'Ngày siêu âm Quý 1', placeholder: 'YYYY-MM-DD' },
+    { key: 'q1_gestational_weeks', label: 'Tuần thai siêu âm Q1', placeholder: 'VD: 6' },
+    { key: 'q1_gestational_days', label: 'Ngày lẻ thai siêu âm Q1', placeholder: 'VD: 0' },
+    { key: 'crl_mm', label: 'Chiều dài đầu mông CRL (mm)', placeholder: 'VD: 10' },
+    { key: 'override_edd', label: 'Ngày dự sinh ấn định (Override EDD)', placeholder: 'YYYY-MM-DD' },
   ],
   medical: [
     { key: 'blood', label: 'Nhóm máu', placeholder: 'Ví dụ: O+' },
@@ -35,11 +89,25 @@ const fields: Record<'personal' | 'medical', Field[]> = {
   ],
 };
 
-const initialProfile: Profile = {
-  name: 'Nguyễn Thị Lan', birthday: '15/09/1996', phone: '0912345456',
-  email: 'nguyen.lan@gmail.com', blood: '', allergies: '', conditions: '',
-  obstetricHistory: '',
-};
+function createEmptyProfile(account?: { full_name?: string; email?: string; phone_number?: string; birthday?: string } | null): Profile {
+  return {
+    name: account?.full_name || '',
+    birthday: account?.birthday || '',
+    phone: account?.phone_number || '',
+    email: account?.email || '',
+    blood: '',
+    allergies: '',
+    conditions: '',
+    obstetricHistory: '',
+    target_date: getTodayISO(),
+    lmp: '',
+    q1_ultrasound_date: '',
+    q1_gestational_weeks: '',
+    q1_gestational_days: '',
+    crl_mm: '',
+    override_edd: '',
+  };
+}
 
 function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
@@ -63,52 +131,297 @@ function OutlineButton({ title, icon, onPress }: {
 }
 
 export default function RecordsScreen({ navigation, route }: BottomTabScreenProps<MainTabParamList, 'Records'>) {
-  const [profile, setProfile] = useState(initialProfile);
-  const [draft, setDraft] = useState(initialProfile);
+  const [profile, setProfile] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
+  const [draft, setDraft] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
   const [editor, setEditor] = useState<Editor>(null);
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [contactsVisible, setContactsVisible] = useState(false);
   const mainContact = contacts.find((contact) => contact.primary) || contacts[0];
 
-  useFocusEffect(useCallback(() => {
-    const section = route.params?.section;
-    if (!section) return;
+  const [trimester, setTrimester] = useState('Chưa cập nhật');
+  const [gestationalAge, setGestationalAge] = useState('--');
+  const [dueDate, setDueDate] = useState('Chưa cập nhật');
 
-    if (section === 'personal') {
-      setDraft({ ...profile });
-      setError('');
-      setEditor('personal');
-    } else if (section === 'contacts') {
-      setContactsVisible(true);
+  const persistAccountData = async (
+    nextProfile: Profile,
+    nextTrimester: string,
+    nextGestationalAge: string,
+    nextDueDate: string,
+    nextContacts: EmergencyContact[],
+  ) => {
+    try {
+      const account = currentUserProfile || (await restoreSession());
+      const storageKey = getStorageKey(account?.email || nextProfile.email, account?.id);
+      const payload: SavedAccountRecord = {
+        profile: nextProfile,
+        trimester: nextTrimester,
+        gestationalAge: nextGestationalAge,
+        dueDate: nextDueDate,
+        contacts: nextContacts,
+      };
+      await AsyncStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch (e) {
+      console.log('Lỗi lưu dữ liệu tài khoản:', e);
     }
+  };
 
-    navigation.setParams({ section: undefined });
-  }, [navigation, profile, route.params?.section]));
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadCurrentAccountData() {
+        const today = getTodayISO();
+        const account = currentUserProfile || (await restoreSession());
+        const storageKey = getStorageKey(account?.email, account?.id);
+
+        let loadedProfile = createEmptyProfile(account);
+        let loadedTrimester = 'Chưa cập nhật';
+        let loadedAge = '--';
+        let loadedDue = 'Chưa cập nhật';
+        let loadedContacts: EmergencyContact[] = [];
+
+        try {
+          const raw = await AsyncStorage.getItem(storageKey);
+          if (raw) {
+            const parsed: SavedAccountRecord = JSON.parse(raw);
+            if (parsed.profile) {
+              loadedProfile = {
+                ...loadedProfile,
+                ...parsed.profile,
+                name: parsed.profile.name || account?.full_name || '',
+                email: parsed.profile.email || account?.email || '',
+                phone: parsed.profile.phone || account?.phone_number || '',
+                birthday: parsed.profile.birthday || account?.birthday || '',
+                target_date: today,
+              };
+            }
+            if (parsed.trimester) loadedTrimester = parsed.trimester;
+            if (parsed.gestationalAge) loadedAge = parsed.gestationalAge;
+            if (parsed.dueDate) loadedDue = parsed.dueDate;
+            if (Array.isArray(parsed.contacts)) loadedContacts = parsed.contacts;
+          }
+        } catch (e) {
+          console.log('Lỗi đọc dữ liệu tài khoản:', e);
+        }
+
+        const dbRecord = await fetchPregnancyProfileFromDB();
+        if (dbRecord && typeof dbRecord === 'object') {
+          if (dbRecord.lmp) loadedProfile.lmp = String(dbRecord.lmp).slice(0, 10);
+          if (dbRecord.q1_ultrasound_date) {
+            loadedProfile.q1_ultrasound_date = String(dbRecord.q1_ultrasound_date).slice(0, 10);
+          }
+          if (dbRecord.q1_gestational_weeks !== undefined && dbRecord.q1_gestational_weeks !== null) {
+            loadedProfile.q1_gestational_weeks = String(dbRecord.q1_gestational_weeks);
+          }
+          if (dbRecord.q1_gestational_days !== undefined && dbRecord.q1_gestational_days !== null) {
+            loadedProfile.q1_gestational_days = String(dbRecord.q1_gestational_days);
+          }
+          if (dbRecord.crl_mm !== undefined && dbRecord.crl_mm !== null) {
+            loadedProfile.crl_mm = String(dbRecord.crl_mm);
+          }
+          if (dbRecord.edd && loadedDue === 'Chưa cập nhật') {
+            loadedDue = String(dbRecord.edd).slice(0, 10).split('-').reverse().join('/');
+          }
+        }
+
+        const hasPregnancyInput =
+          loadedProfile.lmp ||
+          loadedProfile.q1_ultrasound_date ||
+          loadedProfile.crl_mm ||
+          loadedProfile.override_edd;
+
+        if (hasPregnancyInput) {
+          try {
+            const body: PregnancyCalculateRequest = { target_date: today };
+            if (loadedProfile.lmp) body.lmp = loadedProfile.lmp;
+            if (loadedProfile.q1_ultrasound_date) body.q1_ultrasound_date = loadedProfile.q1_ultrasound_date;
+            if (loadedProfile.q1_gestational_weeks !== '') {
+              body.q1_gestational_weeks = Number(loadedProfile.q1_gestational_weeks);
+            }
+            if (loadedProfile.q1_gestational_days !== '') {
+              body.q1_gestational_days = Number(loadedProfile.q1_gestational_days);
+            }
+            if (loadedProfile.crl_mm !== '') {
+              body.crl_mm = Number(loadedProfile.crl_mm);
+            }
+            if (loadedProfile.override_edd) {
+              body.override_edd = loadedProfile.override_edd;
+            }
+
+            const res = await calculatePregnancyProfile(body);
+            const responseData = res?.data || res;
+            const w = responseData.gestational_age?.weeks;
+            const days = responseData.gestational_age?.remaining_days ?? 0;
+            const edd = responseData.calculated_edd || responseData.override_edd;
+            const trimesterName = responseData.gestational_age?.trimester_name;
+
+            if (w !== undefined) {
+              loadedAge = `${w} tuần ${days} ngày`;
+              loadedTrimester =
+                trimesterName ||
+                (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
+            }
+            if (edd) {
+              loadedDue = String(edd).slice(0, 10).split('-').reverse().join('/');
+            }
+          } catch (e) {
+            // Giữ nguyên kết quả
+          }
+        }
+
+        if (!isActive) return;
+
+        setProfile(loadedProfile);
+        setDraft(loadedProfile);
+        setTrimester(loadedTrimester);
+        setGestationalAge(loadedAge);
+        setDueDate(loadedDue);
+        setContacts(loadedContacts);
+
+        const section = route.params?.section;
+        if (section === 'personal') {
+          setError('');
+          setEditor('personal');
+          navigation.setParams({ section: undefined });
+        } else if (section === 'contacts') {
+          setContactsVisible(true);
+          navigation.setParams({ section: undefined });
+        }
+      }
+
+      loadCurrentAccountData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [navigation, route.params?.section]),
+  );
 
   const openEditor = (section: Editor) => {
-    setDraft({ ...profile });
+    setDraft({
+      ...profile,
+      target_date: getTodayISO(),
+    });
     setError('');
     setEditor(section);
   };
 
-  const save = () => {
-    const next = Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, value.trim()])) as Profile;
+  const handleContactsChange = (nextContacts: EmergencyContact[]) => {
+    setContacts(nextContacts);
+    persistAccountData(profile, trimester, gestationalAge, dueDate, nextContacts);
+    Alert.alert('Thành công', 'Đã cập nhật danh sách liên hệ khẩn cấp.')
+  };
+
+  const save = async () => {
+    const today = getTodayISO();
+    const next = Object.fromEntries(
+      Object.entries(draft).map(([key, value]) => [
+        key,
+        String(value || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim(),
+      ]),
+    ) as Profile;
+
+    next.target_date = today;
+
+    let nextTrimester = trimester;
+    let nextGestationalAge = gestationalAge;
+    let nextDueDate = dueDate;
+
     if (editor === 'personal') {
-      if (!next.name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) {
-        setError('Vui lòng nhập họ tên và email hợp lệ.'); return;
+      const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+      for (const k of ['lmp', 'q1_ultrasound_date', 'override_edd'] as const) {
+        if (next[k]) {
+          next[k] = normalizeIsoDate(next[k]);
+          if (!isoDate.test(next[k])) {
+            setError('Ngày thai kỳ phải theo định dạng YYYY-MM-DD (VD: 2026-05-01).');
+            return;
+          }
+        }
       }
-      const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(next.birthday);
-      const date = match ? new Date(+match[3], +match[2] - 1, +match[1]) : null;
-      if (!match || !date || date.getDate() !== +match[1] || date.getMonth() !== +match[2] - 1 || date.getFullYear() !== +match[3] || date > new Date()) {
-        setError('Ngày sinh chưa hợp lệ. Vui lòng nhập theo DD/MM/YYYY.'); return;
+
+      for (const k of ['q1_gestational_weeks', 'q1_gestational_days', 'crl_mm'] as const) {
+        if (next[k] !== '' && Number.isNaN(Number(next[k]))) {
+          setError('Tuần thai, ngày lẻ và CRL phải là số.');
+          return;
+        }
+      }
+
+      if (next.phone) {
+        const cleanedPhone = next.phone.replace(/[\s.-]/g, '');
+        if (!/^\+?\d{9,15}$/.test(cleanedPhone)) {
+          setError('Số điện thoại không hợp lệ.');
+          return;
+        }
+      }
+
+      const hasInput = next.lmp || next.q1_ultrasound_date || next.crl_mm || next.override_edd;
+      if (hasInput) {
+        try {
+          const body: PregnancyCalculateRequest = {
+            target_date: today,
+          };
+          if (next.lmp) body.lmp = next.lmp;
+          if (next.q1_ultrasound_date) body.q1_ultrasound_date = next.q1_ultrasound_date;
+          if (next.q1_gestational_weeks !== '') body.q1_gestational_weeks = Number(next.q1_gestational_weeks);
+          if (next.q1_gestational_days !== '') body.q1_gestational_days = Number(next.q1_gestational_days);
+          if (next.crl_mm !== '') body.crl_mm = Number(next.crl_mm);
+          if (next.override_edd) body.override_edd = next.override_edd;
+
+          const res = await calculatePregnancyProfile(body);
+          const responseData = res?.data || res;
+
+          const w = responseData.gestational_age?.weeks;
+          const days = responseData.gestational_age?.remaining_days ?? 0;
+          const edd = responseData.calculated_edd || responseData.override_edd;
+          const trimesterName = responseData.gestational_age?.trimester_name;
+
+          if (w !== undefined) {
+            nextGestationalAge = `${w} tuần ${days} ngày`;
+            nextTrimester =
+              trimesterName ||
+              (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
+            setGestationalAge(nextGestationalAge);
+            setTrimester(nextTrimester);
+          }
+
+          if (edd) {
+            nextDueDate = String(edd).slice(0, 10).split('-').reverse().join('/');
+            setDueDate(nextDueDate);
+          }
+
+          await savePregnancyProfileToDB({
+            ...body,
+            edd: edd ? String(edd).slice(0, 10) : undefined,
+          });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Lỗi tính toán tuổi thai từ máy chủ.');
+          return;
+        }
+      } else {
+        nextGestationalAge = '--';
+        nextTrimester = 'Chưa cập nhật';
+        nextDueDate = 'Chưa cập nhật';
+        setGestationalAge(nextGestationalAge);
+        setTrimester(nextTrimester);
+        setDueDate(nextDueDate);
       }
     }
-    if (editor === 'personal' && !/^\+?\d{9,15}$/.test(next.phone.replace(/[\s.-]/g, ''))) {
-      setError('Vui lòng nhập đầy đủ tên và số điện thoại hợp lệ.'); return;
+
+    if (currentUserProfile) {
+      if (next.name) currentUserProfile.full_name = next.name;
+      if (next.email) currentUserProfile.email = next.email;
+      if (next.phone) currentUserProfile.phone_number = next.phone;
+      if (next.birthday) currentUserProfile.birthday = next.birthday;
+      await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
     }
+
     setProfile(next);
+    await persistAccountData(next, nextTrimester, nextGestationalAge, nextDueDate, contacts);
     setEditor(null);
+
+    // Hiển thị thông báo thành công khi lưu thay đổi hồ sơ
+    Alert.alert('Thành công', 'Đã lưu thông tin hồ sơ và đồng bộ vào cơ sở dữ liệu.');
   };
 
   const modalTitle = editor === 'personal' ? 'Chỉnh sửa hồ sơ' : editor === 'medical'
@@ -122,7 +435,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         <View style={styles.identity}>
           <Image source={require('../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
           <View style={styles.identityText}>
-            <Text style={styles.name}>{profile.name}</Text>
+            <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
             <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
           </View>
         </View>
@@ -131,19 +444,19 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         <View style={styles.pregnancyCard}>
           <View style={styles.between}>
             <Text style={styles.pregnancyLabel}>Thai kỳ hiện tại</Text>
-            <Text style={styles.trimester}>Tam cá nguyệt 3</Text>
+            <Text style={styles.trimester}>{trimester}</Text>
           </View>
-          <Text style={styles.gestationalAge}>32 tuần 4 ngày</Text>
+          <Text style={styles.gestationalAge}>{gestationalAge}</Text>
           <View style={styles.dueRow}>
             <Text style={styles.label}>Ngày dự sinh</Text>
-            <Text style={styles.value}>03/12/2026</Text>
+            <Text style={styles.value}>{dueDate}</Text>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
         <View style={styles.card}>
           <InfoRow label="Ngày sinh" value={profile.birthday} />
-          <InfoRow label="Số điện thoại" value={`${profile.phone.slice(0, 4)} *** ${profile.phone.slice(-2)}`} />
+          <InfoRow label="Số điện thoại" value={profile.phone ? `${profile.phone.slice(0, 4)} *** ${profile.phone.slice(-2)}` : ''} />
           <InfoRow label="Email" value={profile.email} last />
         </View>
 
@@ -167,7 +480,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             <View style={styles.contactText}>
               <Text style={styles.cardTitle}>{mainContact?.name || 'Chưa thêm người liên hệ'}</Text>
               <Text style={styles.subtitle}>{mainContact
-                ? `${mainContact.relationship} • ${mainContact.phone}`
+                ? `${mainContact.relationship}\n${mainContact.phone}`
                 : 'Thêm người thân để dễ liên lạc khi mẹ cần hỗ trợ.'}</Text>
             </View>
           </View>
@@ -175,7 +488,6 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         </View>
 
         <Text style={styles.sectionTitle}>Hồ sơ khám & kết quả</Text>
-        {/* phần được sửa */}
         <Pressable
           accessibilityRole="button"
           onPress={() =>
@@ -208,11 +520,14 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             color={colors.textLight}
           />
         </Pressable>
-
-
       </ScrollView>
 
-      <EmergencyContacts visible={contactsVisible} contacts={contacts} onChange={setContacts} onClose={() => setContactsVisible(false)} />
+      <EmergencyContacts
+        visible={contactsVisible}
+        contacts={contacts}
+        onChange={handleContactsChange}
+        onClose={() => setContactsVisible(false)}
+      />
       <Modal visible={editor !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditor(null)}>
         <SafeAreaView style={styles.modalContainer}>
           <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -234,18 +549,30 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
                 </View>
               ) : editor && (
                 <>
-                  <Text style={styles.formNote}>Thông tin hiện được lưu tạm trong phiên sử dụng.</Text>
-                  {fields[editor].map((field) => (
-                    <View key={field.key} style={styles.field}>
-                      <Text style={styles.inputLabel}>{field.label}</Text>
-                      <TextInput accessibilityLabel={field.label} style={styles.input}
-                        value={draft[field.key]} placeholder={field.placeholder || field.label}
-                        placeholderTextColor={colors.textLight}
-                        keyboardType={field.key === 'email' ? 'email-address' : field.key.toLowerCase().includes('phone') ? 'phone-pad' : 'default'}
-                        autoCapitalize={field.key === 'email' ? 'none' : 'sentences'}
-                        onChangeText={(value) => setDraft((current) => ({ ...current, [field.key]: value }))} />
-                    </View>
-                  ))}
+                  <Text style={styles.formNote}>Thông tin được lưu theo tài khoản của mẹ.</Text>
+                  {fields[editor].map((field) => {
+                    const isTargetDate = field.key === 'target_date';
+                    return (
+                      <View key={field.key} style={styles.field}>
+                        <Text style={styles.inputLabel}>{field.label}</Text>
+                        <TextInput
+                          accessibilityLabel={field.label}
+                          style={styles.input}
+                          value={isTargetDate ? getTodayISO() : draft[field.key]}
+                          editable={!isTargetDate}
+                          placeholder={field.placeholder || field.label}
+                          placeholderTextColor={colors.textLight}
+                          keyboardType={field.key === 'email' ? 'email-address' : field.key.toLowerCase().includes('phone') ? 'phone-pad' : 'default'}
+                          autoCapitalize={field.key === 'email' ? 'none' : 'sentences'}
+                          onChangeText={(value) => {
+                            if (!isTargetDate) {
+                              setDraft((current) => ({ ...current, [field.key]: value }));
+                            }
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
                   {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
                   <Pressable accessibilityRole="button" style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]} onPress={save}>
                     <Text style={styles.saveText}>Lưu thay đổi</Text>
