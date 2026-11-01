@@ -44,7 +44,7 @@ export function getRouteAccessDecision({
 
       if (!fallbackTarget) {
         if (userRole === 'doctor') {
-          fallbackTarget = '/';
+          fallbackTarget = '/dashboard';
         } else if (userRole === 'admin') {
           fallbackTarget = '/admin';
         } else {

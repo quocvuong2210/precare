@@ -283,7 +283,7 @@ const LoginWrapper: React.FC = () => {
     if (role === 'admin') {
       navigate('/admin', { replace: true });
     } else {
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   };
 
@@ -354,6 +354,7 @@ export const AppRoutes: React.FC = () => {
       <Route element={<ProtectedRoute allowedRoles={['doctor']} />}>
         <Route path="/" element={<DoctorPortal />} />
         <Route path="/doctor" element={<DoctorPortal />} />
+        <Route path="/dashboard" element={<DoctorPortal />} />
       </Route>
 
       {/* 3. ADMIN PROTECTED ROUTES (Chỉ vai trò 'admin') */}

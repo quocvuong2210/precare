@@ -42,12 +42,11 @@ export function removeVietnameseTones(str: string): string {
  * - Bỏ khoảng trắng thừa
  * - Khớp một phần hoặc khớp mọi từ khóa
  */
-export function matchesFuzzy(text: string, query: string): boolean {
-  if (!query || !query.trim()) return true;
+export function matchesFuzzy(text: string, cleanQuery: string): boolean {
+  if (!cleanQuery) return true;
   if (!text) return false;
 
   const cleanText = removeVietnameseTones(text).toLowerCase().trim();
-  const cleanQuery = removeVietnameseTones(query).toLowerCase().trim();
 
   // 1. Khớp chuỗi con trực tiếp (có hoặc không dấu)
   if (cleanText.includes(cleanQuery)) return true;
@@ -92,18 +91,34 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Khóa cuộn trang (body scroll lock) khi dialog mở và dọn dẹp khi đóng hoặc unmount
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
   // Danh sách bệnh nhân khớp với từ khóa tìm kiếm
   const searchResults = useMemo(() => {
     const trimmed = keyword.trim();
     if (!trimmed) return [];
 
+    // Chuẩn hóa chuỗi tìm kiếm một lần duy nhất từ bên ngoài vòng lặp
+    const cleanQuery = removeVietnameseTones(trimmed).toLowerCase().trim();
+    if (!cleanQuery) return [];
+
     return appointments.filter((apt) => {
       return (
-        matchesFuzzy(apt.patientName, trimmed) ||
-        matchesFuzzy(apt.patientCode, trimmed) ||
-        (apt.reason ? matchesFuzzy(apt.reason, trimmed) : false) ||
-        (apt.biometricSummary ? matchesFuzzy(apt.biometricSummary, trimmed) : false) ||
-        (apt.roomNumber ? matchesFuzzy(apt.roomNumber, trimmed) : false)
+        matchesFuzzy(apt.patientName, cleanQuery) ||
+        matchesFuzzy(apt.patientCode, cleanQuery) ||
+        (apt.reason ? matchesFuzzy(apt.reason, cleanQuery) : false) ||
+        (apt.biometricSummary ? matchesFuzzy(apt.biometricSummary, cleanQuery) : false) ||
+        (apt.roomNumber ? matchesFuzzy(apt.roomNumber, cleanQuery) : false)
       );
     });
   }, [keyword, appointments]);
@@ -113,6 +128,13 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
   const handleSelect = (patientId: string) => {
     onSelectPatient(patientId);
     onClose();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchResults.length > 0) {
+      e.preventDefault();
+      handleSelect(searchResults[0].patientId);
+    }
   };
 
   const renderStatusBadge = (status: Appointment['status']) => {
@@ -165,6 +187,7 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={handleInputKeyDown}
               placeholder="Tìm theo họ tên (vd: Minh Anh, nguyen thi) hoặc mã bệnh nhân (vd: PRE-8492)..."
               className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all"
             />
