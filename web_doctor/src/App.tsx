@@ -8,8 +8,6 @@ import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
-import { AdminLayout } from './layouts/AdminLayout';
-import { Dashboard, UserManagement, AuditLogs } from './pages/admin';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PatientSearchDialog } from './components/PatientSearchDialog';
@@ -434,12 +432,14 @@ export const AppRoutes: React.FC = () => {
 
       {/* 3. ADMIN PROTECTED ROUTES (Chỉ vai trò 'admin') */}
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="logs" element={<AuditLogs />} />
-        </Route>
+        <Route
+          path="/admin"
+          element={<div className="p-10 text-center">Trang quản trị đang phát triển (Sprint 4)</div>}
+        />
+        <Route
+          path="/admin/*"
+          element={<div className="p-10 text-center">Trang quản trị đang phát triển (Sprint 4)</div>}
+        />
       </Route>
 
       {/* 4. CATCH-ALL UNKNOWN ROUTES (Fallback 404) */}

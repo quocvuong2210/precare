@@ -13,13 +13,13 @@ import {
   Hourglass,
   Check,
 } from 'lucide-react';
-import { mockAppointments, Appointment } from './AppointmentTable';
+import type { Appointment } from './AppointmentTable';
 
 export interface PatientSearchDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectPatient: (patientId: string) => void;
-  appointments?: Appointment[];
+  appointments?: any[];
 }
 
 /**
@@ -64,7 +64,7 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
   isOpen,
   onClose,
   onSelectPatient,
-  appointments = mockAppointments,
+  appointments = [],
 }) => {
   const [keyword, setKeyword] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,25 +103,8 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
     };
   }, [isOpen]);
 
-  // Danh sách bệnh nhân khớp với từ khóa tìm kiếm
-  const searchResults = useMemo(() => {
-    const trimmed = keyword.trim();
-    if (!trimmed) return [];
-
-    // Chuẩn hóa chuỗi tìm kiếm một lần duy nhất từ bên ngoài vòng lặp
-    const cleanQuery = removeVietnameseTones(trimmed).toLowerCase().trim();
-    if (!cleanQuery) return [];
-
-    return appointments.filter((apt) => {
-      return (
-        matchesFuzzy(apt.patientName, cleanQuery) ||
-        matchesFuzzy(apt.patientCode, cleanQuery) ||
-        (apt.reason ? matchesFuzzy(apt.reason, cleanQuery) : false) ||
-        (apt.biometricSummary ? matchesFuzzy(apt.biometricSummary, cleanQuery) : false) ||
-        (apt.roomNumber ? matchesFuzzy(apt.roomNumber, cleanQuery) : false)
-      );
-    });
-  }, [keyword, appointments]);
+  // Tạm thời trả về mảng rỗng để không bị lỗi, tính năng search gọi API sẽ gắn sau
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   if (!isOpen) return null;
 
@@ -137,7 +120,7 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
     }
   };
 
-  const renderStatusBadge = (status: Appointment['status']) => {
+  const renderStatusBadge = (status: any) => {
     switch (status) {
       case 'confirmed':
         return (
@@ -232,7 +215,7 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {appointments.slice(0, 4).map((apt) => (
+                {appointments.slice(0, 4).map((apt: any) => (
                   <button
                     key={apt.id}
                     onClick={() => handleSelect(apt.patientId)}
@@ -241,9 +224,9 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-teal-100 group-hover:text-teal-800 transition-colors">
                         {apt.patientName
-                          .split(' ')
+                          ?.split(' ')
                           .slice(-2)
-                          .map((n) => n[0])
+                          .map((n: string) => n[0])
                           .join('')}
                       </div>
                       <div className="min-w-0">
@@ -279,7 +262,7 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                {searchResults.map((apt) => (
+                {searchResults.map((apt: any) => (
                   <div
                     key={apt.id}
                     onClick={() => handleSelect(apt.patientId)}
@@ -288,9 +271,9 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center font-bold text-sm shrink-0">
                         {apt.patientName
-                          .split(' ')
+                          ?.split(' ')
                           .slice(-2)
-                          .map((n) => n[0])
+                          .map((n: string) => n[0])
                           .join('')}
                       </div>
                       <div>

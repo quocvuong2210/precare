@@ -441,9 +441,9 @@ export const authApi = {
    * 6. POST /api/v1/auth/login � �ang nh?p h? th?ng theo API Contract STORY-2.1
    */
   async login(data: LoginRequest): Promise<AuthResponseData> {
-    // Role mặc định phục vụ kịch bản offline/mock theo dữ liệu form người dùng chọn (không tự ép quyền bằng chuỗi email)
-    const fallbackRole: UserRole = data.role === 'admin' ? 'admin' : 'doctor';
-    const fallbackName = fallbackRole === 'admin' ? 'Quản trị viên Hệ thống' : 'BS. Lê Minh';
+    // Role mặc định phục vụ kịch bản offline/fallback
+    const fallbackRole: UserRole = 'doctor';
+    const fallbackName = 'BS. Lê Minh';
 
     try {
       const formData = new URLSearchParams();

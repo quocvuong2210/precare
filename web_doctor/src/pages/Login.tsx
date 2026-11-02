@@ -176,7 +176,6 @@ export const Login: React.FC<LoginProps> = ({
         authResponse = await authApi.login({
           email: trimmedEmail,
           password: password,
-          role: role,
         });
       } catch (apiErr: any) {
         // Xử lý phản hồi từ Backend API / Database precare_db
