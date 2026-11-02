@@ -17,12 +17,12 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/AppNavigator";
 import { sendOtp, verifyOtp } from "../../services/api";
 
-type Props = NativeStackScreenProps<RootStackParamList, "OtpVerification">;
+type Props = NativeStackScreenProps<RootStackParamList, "RegisterOtpVerification">;
 
 const PRIMARY = "#0D9488";
 const OTP_LENGTH = 6;
 
-export default function OtpVerificationScreen({ navigation, route }: Props) {
+export default function RegisterOtpVerification({ navigation, route }: Props) {
   const { email, role, retryAfter = 60 } = route.params;
 
   const inputRef = useRef<TextInput>(null);
@@ -85,10 +85,6 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
         "Xác nhận email thành công! Bạn có thể tiếp tục bước tạo tài khoản.",
       );
       inputRef.current?.blur();
-
-      // Ví dụ sau khi tạo màn hình điền thông tin:
-      
-
     } catch (error: unknown) {
       setMessageType("error");
       setMessage(

@@ -50,8 +50,7 @@ export default function LoginScreen({ navigation }: Props) {
 
       if (!data.access_token) {
         throw new Error('API không trả về access_token.');
-      }
-
+      }   
       console.log('Đăng nhập thành công!');
 
       // Chuyển thẳng vào Home

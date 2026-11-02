@@ -1,0 +1,26 @@
+export const settingsThemes = {
+  light: {
+    background: '#F7F9FC',
+    surface: '#FFFFFF',
+    text: '#0F172A',
+    muted: '#758198',
+    border: '#E2E8F0',
+    divider: '#F1F4F8',
+    iconBackground: '#EBF3FF',
+    switchTrack: '#E3E7ED',
+    danger: '#FF4D55',
+    dangerBackground: '#FFE4E7',
+  },
+  dark: {
+    background: '#101827',
+    surface: '#1B2638',
+    text: '#F1F5F9',
+    muted: '#A0AEC3',
+    border: '#2F3C50',
+    divider: '#263449',
+    iconBackground: '#243C54',
+    switchTrack: '#475569',
+    danger: '#FF858B',
+    dangerBackground: '#492A38',
+  },
+};

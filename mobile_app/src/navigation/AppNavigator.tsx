@@ -4,15 +4,21 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
+
 import RegisterScreen from '../screens/register/RegisterScreen';
+import RegisterOtpVerificationScreen from '../screens/register/RegisterOtpVerificationScreen';
+import RegisterDetailsScreen from '../screens/register/RegisterDetailScreen';
+
 import AppointmentsScreen from '../screens/AppointmentsScreen';
 import MainTabs from './MainTabs';
 
 import ForgotPasswordScreen from '../screens/forgot-password/ForgotPasswordScreen';
 import OtpVerificationScreen from '../screens/forgot-password/OtpVerificationScreen';
 import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen';
-import RegisterDetailsScreen from '../screens/register/RegisterDetailScreen';
 
+
+
+import HistoryResultsScreen from '../screens/profile/HistoryResultsScreen';
 export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
@@ -22,6 +28,16 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   OtpVerification: {
     email: string;
+    role: string; // <-- Thêm dòng này vào để nhận role truyền sang
+    retryAfter?: number;
+  };
+  ForgotOtpVerification: {
+    email: string;
+  };
+  RegisterOtpVerification: {
+    email: string;
+    role: string;
+    retryAfter?: number;
   };
   RegisterDetails: {
     email: string;
@@ -32,6 +48,7 @@ export type RootStackParamList = {
     email: string;
     otp_code: string;
   };
+  HistoryResults: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -77,7 +94,7 @@ export default function AppNavigator() {
         />
 
         <Stack.Screen
-          name="OtpVerification"
+          name="ForgotOtpVerification"
           component={OtpVerificationScreen}
           options={{ title: 'Xác thực mã OTP' }}
         />
@@ -93,6 +110,21 @@ export default function AppNavigator() {
           component={RegisterDetailsScreen}
           options={{ headerShown: false }}
         />
+
+        <Stack.Screen
+          name="RegisterOtpVerification"
+          component={RegisterOtpVerificationScreen}
+          options={{ headerShown: false }}
+        />
+
+
+        <Stack.Screen
+          name="HistoryResults"
+          component={HistoryResultsScreen}
+          options={{ headerShown: false }}
+        />
+
+
       </Stack.Navigator>
     </NavigationContainer>
   );
