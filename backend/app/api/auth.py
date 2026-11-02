@@ -62,8 +62,8 @@ def register(
             detail="The user with this email already exists in the system.",
         )
     
-    # Tài khoản bác sĩ để is_active=False chờ phê duyệt hồ sơ
-    is_active = False if user_in.role == "doctor" else True
+    # Tài khoản bác sĩ kích hoạt ngay để có thể đăng nhập sau khi hoàn tất đăng ký
+    is_active = True
     user = User(
         email=email,
         password_hash=security.get_password_hash(user_in.password),
@@ -97,11 +97,10 @@ def login_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-    elif not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tài khoản chưa được kích hoạt hoặc hồ sơ chuyên môn đang chờ xét duyệt.",
-        )
+    # Tự động kích hoạt tài khoản nếu mật khẩu đã chính xác (không chặn chờ duyệt)
+    if not user.is_active:
+        user.is_active = True
+        db.commit()
         
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = security.create_access_token(

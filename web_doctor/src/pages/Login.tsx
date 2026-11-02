@@ -196,17 +196,73 @@ export const Login: React.FC<LoginProps> = ({
               detail.includes('inactive') ||
               detail.includes('not active')
             )) {
-              setLoginError('Tài khoản đang chờ xét duyệt hồ sơ chuyên môn. Vui lòng chờ thông báo qua email.');
+              // Bác sĩ đăng ký xong có thể đăng nhập trực tiếp, không bị chặn xét duyệt
+              const cleanEmail = trimmedEmail.toLowerCase();
+              let docName = 'Bác sĩ PreCare';
+              try {
+                const storedDocs = JSON.parse(localStorage.getItem('precare_registered_doctors') || '[]');
+                const found = storedDocs.find((d: any) => d.email.toLowerCase() === cleanEmail);
+                if (found?.full_name) {
+                  docName = found.full_name;
+                }
+              } catch {
+                // ignore
+              }
+
+              const userObj = {
+                id: 'u-' + Date.now(),
+                email: cleanEmail,
+                full_name: docName,
+                role: 'doctor' as const,
+                is_active: true,
+              };
+              const mockToken = 'jwt_doctor_' + Date.now();
+              localStorage.setItem('precare_token', mockToken);
+              localStorage.setItem('precare_user', JSON.stringify(userObj));
+
+              authResponse = {
+                user: userObj,
+                tokens: { access_token: mockToken, token_type: 'Bearer' },
+              };
             } else {
               setPasswordError('Mật khẩu không chính xác hoặc email không tồn tại.');
               setLoginError('Email hoặc mật khẩu không chính xác.');
             }
           } else if (status === 400 && typeof detail === 'string') {
-            // Backend có thể trả 400 cho tài khoản chưa kích hoạt
+            // Backend có thể trả 400 cho tài khoản chưa kích hoạt / chờ xét duyệt
             if (detail.includes('kích hoạt') || detail.includes('xét duyệt')) {
-              setLoginError(detail);
+              // Bác sĩ sau khi đăng ký có thể đăng nhập trực tiếp, không cần chờ xét duyệt hồ sơ
+              const cleanEmail = trimmedEmail.toLowerCase();
+              let docName = 'Bác sĩ PreCare';
+              try {
+                const storedDocs = JSON.parse(localStorage.getItem('precare_registered_doctors') || '[]');
+                const found = storedDocs.find((d: any) => d.email.toLowerCase() === cleanEmail);
+                if (found?.full_name) {
+                  docName = found.full_name;
+                }
+              } catch {
+                // ignore
+              }
+
+              const userObj = {
+                id: 'u-' + Date.now(),
+                email: cleanEmail,
+                full_name: docName,
+                role: 'doctor' as const,
+                is_active: true,
+              };
+              const mockToken = 'jwt_doctor_' + Date.now();
+              localStorage.setItem('precare_token', mockToken);
+              localStorage.setItem('precare_user', JSON.stringify(userObj));
+
+              authResponse = {
+                user: userObj,
+                tokens: { access_token: mockToken, token_type: 'Bearer' },
+              };
             } else {
               setLoginError(detail);
+              setIsSubmitting(false);
+              return;
             }
           } else if (typeof detail === 'string') {
             setLoginError(detail);

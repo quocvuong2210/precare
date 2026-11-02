@@ -10,7 +10,6 @@ import {
   ArrowRight,
   Loader2,
   ShieldCheck,
-  Clock,
   Sparkles,
   AlertCircle,
   Mail,
@@ -18,7 +17,6 @@ import {
   Info,
 } from 'lucide-react';
 import { PreCareLogo } from '../components/PreCareLogo';
-import { RegistrationStatusCard } from '../components/RegistrationStatusCard';
 import { authApi } from '../services/auth.service';
 import { ExternalLink } from 'lucide-react';
 
@@ -242,10 +240,10 @@ export const Register: React.FC<RegisterProps> = ({
     },
     {
       step: 5,
-      stepLabel: 'Chờ xét duyệt',
-      leftTitle: 'Đăng ký đang chờ duyệt',
+      stepLabel: 'Hoàn tất',
+      leftTitle: 'Đăng ký hồ sơ thành công!',
       leftDesc:
-        'Hệ thống PreCare đang tiến hành xác minh thông tin chứng chỉ hành nghề và hồ sơ chuyên môn của bạn. Quá trình này thường mất từ 24 - 48 giờ làm việc.',
+        'Hồ sơ của bạn đã được khởi tạo thành công trên cổng PreCare. Bạn có thể đăng nhập ngay để bắt đầu sử dụng hệ thống.',
     },
   ];
 
@@ -556,9 +554,29 @@ export const Register: React.FC<RegisterProps> = ({
         role: 'doctor',
       });
 
+      // Lưu thông tin bác sĩ vừa đăng ký để tự động kích hoạt phiên khi login không cần xét duyệt
+      try {
+        const stored = JSON.parse(localStorage.getItem('precare_registered_doctors') || '[]');
+        const existingIndex = stored.findIndex((d: any) => d.email.toLowerCase() === email.trim().toLowerCase());
+        const doctorData = {
+          email: email.trim().toLowerCase(),
+          full_name: doctorName.trim(),
+          phone_number: phone.trim(),
+          registered_at: new Date().toISOString(),
+        };
+        if (existingIndex >= 0) {
+          stored[existingIndex] = doctorData;
+        } else {
+          stored.push(doctorData);
+        }
+        localStorage.setItem('precare_registered_doctors', JSON.stringify(stored));
+      } catch {
+        // ignore
+      }
+
       setIsSubmitting(false);
       setMaxStepReached((prev) => Math.max(prev, 5));
-      setStep(5); // Chuyển sang màn hình Chờ duyệt
+      setStep(5); // Chuyển sang Màn hình thông báo thành công
     } catch (err: any) {
       setIsSubmitting(false);
       setSubmitError(err.message || 'Đăng ký không thành công. Vui lòng thử lại sau.');
@@ -588,9 +606,9 @@ export const Register: React.FC<RegisterProps> = ({
         {/* Lower Content matching Figma screenshot */}
         <div className="my-auto max-w-[420px] relative z-10 py-6">
           {step === 5 && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#447C72]/20 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[11px] font-bold tracking-wider uppercase mb-4">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Đang xét duyệt hồ sơ</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[11px] font-bold tracking-wider uppercase mb-4">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Đăng ký thành công</span>
             </div>
           )}
 
@@ -927,15 +945,7 @@ export const Register: React.FC<RegisterProps> = ({
                 )}
               </div>
 
-              {/* Callout Notice Box */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-xl p-3.5 space-y-1">
-                <div className="text-xs font-semibold text-slate-900">
-                  Hồ sơ sẽ được xét duyệt chuyên môn
-                </div>
-                <div className="text-[11.5px] text-slate-500 leading-relaxed">
-                  Xác minh email không kích hoạt tài khoản. Bác sĩ chỉ được truy cập sau khi hồ sơ được phê duyệt.
-                </div>
-              </div>
+
 
 
 
@@ -1199,16 +1209,6 @@ export const Register: React.FC<RegisterProps> = ({
                 </div>
               )}
 
-              {/* Callout Notice Box */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-xl p-3.5 space-y-1">
-                <div className="text-xs font-semibold text-slate-900">
-                  Hồ sơ sẽ được xét duyệt chuyên môn
-                </div>
-                <div className="text-[11.5px] text-slate-500 leading-relaxed">
-                  Xác minh email không kích hoạt tài khoản. Bác sĩ chỉ được truy cập sau khi hồ sơ được phê duyệt.
-                </div>
-              </div>
-
               {/* Submit Button */}
               <button
                 type="button"
@@ -1219,10 +1219,10 @@ export const Register: React.FC<RegisterProps> = ({
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Đang kết nối API gửi hồ sơ...</span>
+                    <span>Đang hoàn tất đăng ký...</span>
                   </>
                 ) : (
-                  <span>Gửi hồ sơ xét duyệt</span>
+                  <span>Hoàn tất</span>
                 )}
               </button>
 
@@ -1240,68 +1240,34 @@ export const Register: React.FC<RegisterProps> = ({
           )}
 
           {/* ========================================================
-              STEP 5: HOÀN TẤT & CHỜ DUYỆT (PENDING APPROVAL STATE)
+              STEP 5: MÀN HÌNH THÔNG BÁO THÀNH CÔNG (SUCCESS SCREEN)
               ======================================================== */}
           {step === 5 && (
-            <div className="space-y-3.5 text-center py-1">
-              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
-                <Clock className="w-6 h-6 stroke-[2.2]" />
+            <div className="space-y-6 text-center py-4 animate-in fade-in zoom-in-95 duration-200">
+              {/* Biểu tượng dấu tick xanh thành công lớn ở giữa màn hình */}
+              <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-200 shadow-sm shadow-emerald-500/10">
+                <Check className="w-10 h-10 stroke-[3]" />
               </div>
 
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
-                  Hồ sơ đang chờ duyệt
+              {/* Tiêu đề & Thông điệp */}
+              <div className="space-y-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Đăng ký hồ sơ thành công!
                 </h2>
-                <p className="mt-1 text-[11.5px] sm:text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                  Cảm ơn Bác sĩ <b className="text-slate-900">{doctorName}</b> đã gửi hồ sơ đăng ký. Ban chuyên môn PreCare đang tiến hành thẩm định và đối chiếu thông tin chứng chỉ hành nghề.
+                <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto leading-relaxed">
+                  Chào mừng Bác sĩ <b className="text-slate-900">{doctorName}</b>! Hồ sơ tài khoản của bạn đã được khởi tạo thành công trên hệ thống PreCare.
                 </p>
               </div>
 
-              {/* Bảng theo dõi tiến độ thẩm định */}
-              <RegistrationStatusCard
-                emailStatus={{
-                  label: 'Email xác thực',
-                  sublabel: email,
-                  statusText: 'Đã xác minh',
-                  tone: 'green',
-                }}
-                profileStatus={{
-                  label: 'Hồ sơ bác sĩ',
-                  statusText: 'Chờ duyệt',
-                  tone: 'amber',
-                }}
-                accountStatus={{
-                  label: 'Trạng thái tài khoản',
-                  sublabel: 'Quyền truy cập cổng y tế Sản khoa',
-                  statusText: 'Chưa kích hoạt',
-                  tone: 'gray',
-                }}
-              />
-
-              {/* Thông tin tóm tắt đã nộp (đã bỏ Nơi công tác và Tài liệu đính kèm) */}
-              <div className="bg-[#F8FAFC] border border-slate-200/90 rounded-xl p-3 text-left text-xs space-y-1.5">
-                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
-                  <span className="text-slate-500">Bác sĩ đăng ký:</span>
-                  <span className="font-semibold text-slate-800">{doctorName}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
-                  <span className="text-slate-500">Số điện thoại:</span>
-                  <span className="font-semibold text-slate-800">{phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Thời gian phản hồi dự kiến:</span>
-                  <span className="font-semibold text-amber-700">24 - 48 giờ làm việc</span>
-                </div>
-              </div>
-
-              {/* Nút duy nhất: Về trang Đăng nhập (không có nút demo, không có link đăng ký lại) */}
-              <div className="pt-1">
+              {/* Nút điều hướng tiếp theo: "Đến trang đăng nhập" */}
+              <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleNavigateToLogin}
-                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Về trang Đăng nhập
+                  <span>Đến trang đăng nhập</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
