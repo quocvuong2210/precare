@@ -12,6 +12,7 @@ import {
   ResetPasswordRequest,
   UserProfile,
   AuthResponseData,
+  UserRole,
 } from '../types/auth.types';
 
 const API_BASE_URL =
@@ -32,6 +33,57 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Response interceptor: Lắng nghe mã lỗi 401 để xử lý Refresh Token hoặc tự động đăng xuất
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    // Bắt lỗi 401 Unauthorized khi token hết hạn và chưa từng thử retry
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Thử gọi API refresh token nếu có precare_refresh_token trong kho lưu trữ
+      const storedRefreshToken = localStorage.getItem('precare_refresh_token');
+      if (storedRefreshToken) {
+        try {
+          const refreshRes = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            { refresh_token: storedRefreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+
+          const newAccessToken =
+            refreshRes.data?.data?.access_token || refreshRes.data?.access_token;
+          const newRefreshToken =
+            refreshRes.data?.data?.refresh_token || refreshRes.data?.refresh_token;
+
+          if (newAccessToken) {
+            localStorage.setItem('precare_token', newAccessToken);
+            if (newRefreshToken) {
+              localStorage.setItem('precare_refresh_token', newRefreshToken);
+            }
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = 'Bearer ' + newAccessToken;
+            }
+            return apiClient(originalRequest);
+          }
+        } catch (refreshErr) {
+          console.warn('[PreCare Auth] Refresh token expired or rejected:', refreshErr);
+        }
+      }
+
+      // Xóa phiên làm việc khi không thể phục hồi token
+      localStorage.removeItem('precare_token');
+      localStorage.removeItem('precare_user');
+      localStorage.removeItem('precare_refresh_token');
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Danh sách tài khoản đã đăng ký mẫu (kiểm tra trùng lặp offline / demo)
 // Đồng bộ với dữ liệu thực trong precare_db (users table)
@@ -389,6 +441,10 @@ export const authApi = {
    * 6. POST /api/v1/auth/login � �ang nh?p h? th?ng theo API Contract STORY-2.1
    */
   async login(data: LoginRequest): Promise<AuthResponseData> {
+    // Role mặc định phục vụ kịch bản offline/mock theo dữ liệu form người dùng chọn (không tự ép quyền bằng chuỗi email)
+    const fallbackRole: UserRole = data.role === 'admin' ? 'admin' : 'doctor';
+    const fallbackName = fallbackRole === 'admin' ? 'Quản trị viên Hệ thống' : 'BS. Lê Minh';
+
     try {
       const formData = new URLSearchParams();
       formData.append('username', data.email.trim());
@@ -408,13 +464,18 @@ export const authApi = {
         const meRes = await apiClient.get('/auth/me', {
           headers: { Authorization: 'Bearer ' + token },
         });
-        userProfile = meRes.data?.data || meRes.data;
+        const fetched = meRes.data?.data || meRes.data;
+        // Bắt buộc lấy role chính chủ từ CSDL backend (GET /auth/me), tuyệt đối không tự ý ghi đè
+        userProfile = {
+          ...fetched,
+          role: fetched?.role || fallbackRole,
+        };
       } catch {
         userProfile = {
           id: 'u-' + Date.now(),
           email: data.email,
-          full_name: 'B�c si PreCare',
-          role: 'doctor',
+          full_name: fallbackName,
+          role: fallbackRole,
           is_active: true,
         };
       }
@@ -439,13 +500,15 @@ export const authApi = {
           if (token) {
             localStorage.setItem('precare_token', token);
           }
-          const user = jsonRes.data?.data?.user || {
-            id: 'u-' + Date.now(),
+          const fetchedUser = jsonRes.data?.data?.user;
+          const user = {
+            id: fetchedUser?.id || 'u-' + Date.now(),
             email: data.email,
-            full_name: 'B�c si PreCare',
-            role: 'doctor',
+            full_name: fetchedUser?.full_name || fallbackName,
+            role: fetchedUser?.role || fallbackRole,
             is_active: true,
           };
+          localStorage.setItem('precare_user', JSON.stringify(user));
           return {
             user,
             tokens: { access_token: token, token_type: 'Bearer' },
@@ -456,20 +519,22 @@ export const authApi = {
       }
 
       if (err.response?.status === 401) {
-        throw new Error('Email ho?c m?t kh?u kh�ng ch�nh x�c.');
+        throw new Error('Email hoặc mật khẩu không chính xác.');
       }
 
       if (!err.response) {
-        const mockToken = 'mock-jwt-token-' + Date.now();
+        const mockToken = 'mock-jwt-token-' + fallbackRole + '-' + Date.now();
         localStorage.setItem('precare_token', mockToken);
+        const mockUser: UserProfile = {
+          id: 'u-102948',
+          email: data.email,
+          full_name: fallbackName,
+          role: fallbackRole,
+          is_active: true,
+        };
+        localStorage.setItem('precare_user', JSON.stringify(mockUser));
         return {
-          user: {
-            id: 'u-102948',
-            email: data.email,
-            full_name: 'BS. L� Minh',
-            role: 'doctor',
-            is_active: true,
-          },
+          user: mockUser,
           tokens: {
             access_token: mockToken,
             token_type: 'Bearer',

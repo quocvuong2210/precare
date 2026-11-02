@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Dashboard } from './pages/Dashboard';
+import { Dashboard as DoctorDashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
-import { AdminPage } from './pages/AdminPage';
+import { AdminLayout } from './layouts/AdminLayout';
+import { Dashboard, UserManagement, AuditLogs } from './pages/admin';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PatientSearchDialog } from './components/PatientSearchDialog';
@@ -22,7 +23,7 @@ import {
   Bell,
   LogOut,
   Search,
-  Building2,
+  User as UserIcon,
   X,
 } from 'lucide-react';
 
@@ -36,6 +37,34 @@ const DoctorPortal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Quản lý thông báo: chỉ hiển thị chấm đỏ badge khi có thông báo chưa đọc (unreadCount > 0)
+  interface SystemNotification {
+    id: string;
+    title: string;
+    message: string;
+    time: string;
+    read: boolean;
+  }
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Đóng dropdown thông báo khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    if (isNotificationOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isNotificationOpen]);
 
   // Phím tắt Ctrl+K hoặc Cmd+K để mở nhanh dialog tìm kiếm bệnh nhân
   useEffect(() => {
@@ -64,7 +93,13 @@ const DoctorPortal: React.FC = () => {
 
   const doctorDisplayName = user?.full_name
     ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
-    : 'BS. CKI LÊ HOÀNG';
+    : 'Bác sĩ';
+
+  const doctorInitial = (
+    user?.full_name?.replace(/^BS\.?\s*/i, '').trim().charAt(0) ||
+    user?.email?.charAt(0) ||
+    ''
+  ).toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans">
@@ -82,12 +117,7 @@ const DoctorPortal: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-[#0D8A7C] flex items-center justify-center text-white shadow-sm shadow-teal-900/10">
               <HeartPulse className="w-6 h-6 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-bold text-slate-900 tracking-tight leading-tight">PreCare</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800 tracking-wider">
-                MD
-              </span>
-            </div>
+            <span className="text-xl font-bold text-slate-900 tracking-tight leading-tight">PreCare</span>
           </div>
 
           {/* Bảng điều khiển */}
@@ -130,16 +160,12 @@ const DoctorPortal: React.FC = () => {
             title="Nhấp để chuyển tài khoản hoặc quản lý hồ sơ bác sĩ"
             className="border border-slate-200/80 rounded-xl p-2.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-2.5 shadow-2xs group"
           >
-            <div className="w-9 h-9 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center text-teal-800">
-              <img
-                src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
-                alt={doctorDisplayName}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-              <span className="font-bold text-xs text-teal-800 hidden only:block">LH</span>
+            <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-200/80 flex items-center justify-center text-teal-800 font-bold text-xs shrink-0 select-none">
+              {doctorInitial ? (
+                doctorInitial
+              ) : (
+                <UserIcon className="w-4 h-4 text-teal-700" />
+              )}
             </div>
 
             <div className="min-w-0 flex-1">
@@ -149,12 +175,11 @@ const DoctorPortal: React.FC = () => {
               >
                 {doctorDisplayName}
               </div>
-              <div className="text-[10px] text-slate-500 truncate">
-                {user?.email || 'Chuyên khoa Sản Phụ Khoa'}
-              </div>
-              <div className="text-[9.5px] text-teal-700 font-medium truncate">
-                Bệnh viện Sản Phụ Khoa PreCare
-              </div>
+              {user?.email && (
+                <div className="text-[11px] text-slate-500 truncate" title={user.email}>
+                  {user.email}
+                </div>
+              )}
             </div>
 
             <button
@@ -177,20 +202,20 @@ const DoctorPortal: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-8 py-4 sticky top-0 z-30 flex items-center justify-between gap-4">
           {/* Ô tìm kiếm bệnh nhân (Live Search) */}
-          <div className="flex-1 max-w-md relative">
+          <div className="flex-1 max-w-md relative flex items-center">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm theo tên hoặc mã bệnh nhân..."
-              className="w-full pl-11 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-2xs"
+              placeholder="Nhập mã bệnh nhân, số CCCD hoặc họ tên..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-medium text-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-2xs leading-normal"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer transition-colors flex items-center justify-center"
                 title="Hủy tìm kiếm"
               >
                 <X className="w-3.5 h-3.5" />
@@ -198,28 +223,71 @@ const DoctorPortal: React.FC = () => {
             )}
           </div>
 
-          {/* Thông tin cơ sở y tế & Thông báo */}
-          <div className="flex items-center gap-4">
-            <button
-              aria-label="Thông báo"
-              className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer shrink-0"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-2 right-2"></span>
-            </button>
+          {/* Chuông thông báo */}
+          <div className="flex items-center">
+            {/* Chuông thông báo với Popup Dropdown & Badge chấm đỏ */}
+            <div className="relative" ref={notificationRef}>
+              <button
+                type="button"
+                onClick={() => setIsNotificationOpen((prev) => !prev)}
+                aria-label="Thông báo"
+                className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer shrink-0"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute top-1.5 right-1.5 ring-2 ring-white"></span>
+                )}
+              </button>
 
-            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-              <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0">
-                <Building2 className="w-4.5 h-4.5" />
-              </div>
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-800 leading-tight">
-                  Bệnh viện Sản Phụ Khoa PreCare
+              {/* Popup Dropdown Thông báo */}
+              {isNotificationOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-88 bg-white rounded-2xl shadow-xl border border-slate-200/90 z-50 p-4 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-900">Thông báo</h4>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-600 rounded-full border border-rose-200">
+                          {unreadCount} mới
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))}
+                        className="text-xs text-teal-700 hover:text-teal-800 font-semibold cursor-pointer transition-colors"
+                      >
+                        Đánh dấu tất cả đã đọc
+                      </button>
+                    )}
+                  </div>
+
+                  {notifications.length === 0 ? (
+                    /* Trạng thái khi không có thông báo mới */
+                    <div className="py-8 flex flex-col items-center justify-center text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
+                        <Bell className="w-6 h-6 text-slate-300 stroke-[1.8]" />
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700">Hiện không có thông báo mới</p>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-[220px]">
+                        Hệ thống sẽ gửi thông báo khi có kết quả đối soát OCR hoặc cảnh báo thai chậm phát triển FGR mới.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                      {notifications.map((n) => (
+                        <div key={n.id} className="py-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-800">{n.title}</span>
+                            <span className="text-[10px] text-slate-400">{n.time}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-0.5">{n.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="text-[11px] text-slate-500">
-                  Khoa Chẩn Đoán Trước Sinh
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </header>
@@ -232,7 +300,7 @@ const DoctorPortal: React.FC = () => {
               onBack={() => setSelectedPatientId(null)}
             />
           ) : (
-            <Dashboard
+            <DoctorDashboard
               onSelectPatient={(id) => setSelectedPatientId(id)}
               searchQuery={searchQuery}
               onClearSearch={() => setSearchQuery('')}
@@ -265,23 +333,32 @@ const LoginWrapper: React.FC = () => {
   const handleLoginSuccess = (authData: { user: any; token: string }) => {
     login(authData);
     const target = (location.state as any)?.from?.pathname;
-    const role = authData.user?.role;
+    const userRole = authData.user?.role || 'doctor';
 
-    // Nếu có đường dẫn yêu cầu trước đó hợp lệ theo vai trò -> chuyển về đích đó
-    if (target && target !== '/login' && target !== '/unauthorized') {
-      if (role === 'admin' && target.startsWith('/admin')) {
+    // 1. Kiểm tra an toàn: chỉ redirect nếu target là đường dẫn nội bộ hợp lệ
+    const isValidInternalPath =
+      typeof target === 'string' &&
+      target.startsWith('/') &&
+      !target.startsWith('//') &&
+      target !== '/login' &&
+      target !== '/unauthorized';
+
+    if (isValidInternalPath) {
+      if (userRole === 'admin' && target.startsWith('/admin')) {
         navigate(target, { replace: true });
         return;
       }
-      if (role === 'doctor' && !target.startsWith('/admin')) {
+      if (userRole === 'doctor' && !target.startsWith('/admin')) {
         navigate(target, { replace: true });
         return;
       }
     }
 
-    // Điều hướng mặc định theo vai trò người dùng
-    if (role === 'admin') {
-      navigate('/admin', { replace: true });
+    // 2. Phân luồng chuyển hướng mặc định theo vai trò (user.role)
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (userRole === 'pregnant_woman') {
+      navigate('/thai-phu', { replace: true });
     } else {
       navigate('/dashboard', { replace: true });
     }
@@ -291,9 +368,6 @@ const LoginWrapper: React.FC = () => {
     <div className="relative">
       <Login
         onSuccess={handleLoginSuccess}
-        onLoginSuccess={() => {
-          // Xử lý thông qua onSuccess
-        }}
         onNavigateToRegister={() => navigate('/register')}
       />
     </div>
@@ -355,12 +429,17 @@ export const AppRoutes: React.FC = () => {
         <Route path="/" element={<DoctorPortal />} />
         <Route path="/doctor" element={<DoctorPortal />} />
         <Route path="/dashboard" element={<DoctorPortal />} />
+        <Route path="/doctor/dashboard" element={<Navigate to="/dashboard" replace />} />
       </Route>
 
       {/* 3. ADMIN PROTECTED ROUTES (Chỉ vai trò 'admin') */}
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/*" element={<AdminPage />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="logs" element={<AuditLogs />} />
+        </Route>
       </Route>
 
       {/* 4. CATCH-ALL UNKNOWN ROUTES (Fallback 404) */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   FileCheck2,
@@ -30,12 +30,23 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Biometric fields mock extracted from ultrasound report
-  const [bpd, setBpd] = useState('78.2'); // Đường kính lưỡng đỉnh (mm)
-  const [hc, setHc] = useState('284.5'); // Chu vi đầu (mm)
-  const [ac, setAc] = useState('268.0'); // Chu vi bụng (mm)
-  const [fl, setFl] = useState('56.8'); // Chiều dài xương đùi (mm)
-  const [efw, setEfw] = useState('1520'); // Cân nặng ước tính (g)
+  // Khởi tạo các trường số đo sinh trắc học (không hardcode giá trị giả)
+  const [bpd, setBpd] = useState('');
+  const [hc, setHc] = useState('');
+  const [ac, setAc] = useState('');
+  const [fl, setFl] = useState('');
+  const [efw, setEfw] = useState('');
+
+  useEffect(() => {
+    if (appointment) {
+      // Đặt lại các trường khi mở modal
+      setBpd('');
+      setHc('');
+      setAc('');
+      setFl('');
+      setEfw('');
+    }
+  }, [appointment]);
 
   if (!isOpen || !appointment) return null;
 
@@ -71,12 +82,12 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">Duyệt kết quả trích xuất OCR</h3>
+                <h3 className="text-base font-bold text-slate-900">Duyệt & Nhập số đo siêu âm</h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                  Cần xác nhận
+                  Đối soát lâm sàng
                 </span>
               </div>
-              <p className="text-xs text-slate-500">Đối soát số đo siêu âm trước khi đồng bộ bệnh án</p>
+              <p className="text-xs text-slate-500">Đối chiếu và xác nhận số đo siêu âm trước khi đồng bộ bệnh án</p>
             </div>
           </div>
 
@@ -94,43 +105,55 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-teal-100/70 text-teal-800 font-bold flex items-center justify-center text-xs">
-                {appointment.patientName.split(' ').slice(-2).map((n) => n[0]).join('')}
+                {appointment.patientName
+                  .split(' ')
+                  .slice(-2)
+                  .map((n) => n[0])
+                  .join('')}
               </div>
               <div>
                 <div className="font-bold text-slate-800">{appointment.patientName}</div>
                 <div className="text-[11px] text-slate-500 flex items-center gap-1 font-mono">
                   <span>{appointment.patientCode}</span>
                   <span>•</span>
-                  <span>{typeof appointment.gestationalAge === 'string' ? appointment.gestationalAge : appointment.gestationalAge?.formatted || ''}</span>
+                  <span>
+                    {typeof appointment.gestationalAge === 'string'
+                      ? appointment.gestationalAge
+                      : appointment.gestationalAge?.formatted || ''}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="text-right">
-              <div className="text-[11px] text-slate-400 font-medium">Giờ hẹn khám</div>
-              <div className="font-semibold text-slate-700">{appointment.appointmentTime}</div>
+              <div className="text-[11px] text-slate-400 font-medium">Ngày khám</div>
+              <div className="font-semibold text-slate-700">
+                {appointment.checkupDate || appointment.appointmentTime || '--'}
+              </div>
             </div>
           </div>
 
-          {/* OCR Confidence Banner */}
-          <div className="p-3 rounded-xl bg-teal-50/70 border border-teal-100 flex items-start gap-2.5 text-xs text-teal-900">
+          {/* Banner hướng dẫn bác sĩ nhập tay / đối soát */}
+          <div className="p-3.5 rounded-xl bg-teal-50/70 border border-teal-100 flex items-start gap-2.5 text-xs text-teal-950">
             <Sparkles className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
-              <strong className="font-semibold text-teal-950">Độ tin cậy OCR đạt 96.4%:</strong> Phiếu siêu âm đã được trích xuất tự động qua mô hình nhận dạng y khoa. Bác sĩ vui lòng đối chiếu và chỉnh sửa nếu cần.
+              <strong className="font-semibold text-teal-950">Đối soát số đo lâm sàng:</strong> Bác sĩ vui lòng kiểm tra hoặc nhập trực tiếp các chỉ số siêu âm từ phiếu kết quả để đối chiếu theo chuẩn luật lâm sàng Hadlock (ACOG).
             </div>
           </div>
 
           {/* Biometric Fields Grid */}
           <div className="space-y-3">
             <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Chỉ số sinh trắc học thai nhi (FMF Standard)
+              Chỉ số sinh trắc học thai nhi (Hadlock 4 thông số)
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1 block">BPD - ĐK Lưỡng đỉnh (mm)</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.1"
+                  placeholder="Nhập số đo BPD (mm)"
                   value={bpd}
                   onChange={(e) => setBpd(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -140,7 +163,9 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1 block">HC - Chu vi đầu (mm)</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.1"
+                  placeholder="Nhập số đo HC (mm)"
                   value={hc}
                   onChange={(e) => setHc(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -150,7 +175,9 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1 block">AC - Chu vi bụng (mm)</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.1"
+                  placeholder="Nhập số đo AC (mm)"
                   value={ac}
                   onChange={(e) => setAc(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -160,7 +187,9 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1 block">FL - Dài xương đùi (mm)</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.1"
+                  placeholder="Nhập số đo FL (mm)"
                   value={fl}
                   onChange={(e) => setFl(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -170,7 +199,9 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
               <div className="col-span-2">
                 <label className="text-xs font-medium text-slate-600 mb-1 block">EFW - Cân nặng ước tính (gram)</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="1"
+                  placeholder="Nhập cân nặng ước tính EFW (gram)"
                   value={efw}
                   onChange={(e) => setEfw(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -185,7 +216,7 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800"
+            className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 cursor-pointer"
           >
             Hủy bỏ
           </button>
@@ -197,13 +228,13 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
             className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${
               isConfirmed
                 ? 'bg-emerald-600'
-                : 'bg-[#4D7D74] hover:bg-[#3D645D]'
+                : 'bg-[#0D8A7C] hover:bg-[#0A7367]'
             }`}
           >
             {isConfirmed ? (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Đã xác nhận thành công!</span>
+                <span>Đã ghi nhận thành công!</span>
               </>
             ) : isSubmitting ? (
               <span>Đang lưu...</span>
@@ -221,4 +252,3 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
 };
 
 export default OCRReviewModal;
-

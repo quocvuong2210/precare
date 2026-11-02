@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   AlertCircle,
   FileCheck2,
+  RefreshCw,
 } from 'lucide-react';
 import { StatusFilterDropdown, StatusCounts, FilterStatus } from './StatusFilterDropdown';
 import { ClinicalPregnancyRecord, WarningLevel } from '../types';
@@ -28,155 +29,9 @@ export interface AppointmentTableProps {
   onOpenRecord?: (record: ClinicalPregnancyRecord) => void;
   onReviewOcr?: (record: ClinicalPregnancyRecord) => void;
   isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
-
-/**
- * Danh sách hồ sơ thai kỳ & cận lâm sàng chuẩn theo Database PreCare (:8000 & :8001)
- * Không chứa phòng khám hay giờ hẹn khám (theo đúng Rule Out-of-Scope PreCare)
- */
-export const mockClinicalRecords: ClinicalPregnancyRecord[] = [
-  {
-    id: 'rec-001',
-    patientId: 'pat-101',
-    patientName: 'Nguyễn Thị Minh Anh',
-    patientCode: 'PRE-8492',
-    edd: '2026-12-30',
-    eddFormatted: '30/12/2026',
-    trimester: 3,
-    trimesterName: 'Tam cá nguyệt 3',
-    gestationalAgeDays: 214,
-    gestationalAgeFormatted: '30 tuần 4 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'AC < 5th pct (1.58%) • Nghi ngờ FGR',
-    warningLevel: 'red',
-    ocrStatus: 'extracted',
-    biometricStatus: 'pending_verification',
-    hasOcrAttachment: true,
-    uploadedFileId: 'up-001',
-    appointmentTime: '29/10/2026',
-    reason: 'Theo dõi HA cao • Cờ đỏ FGR',
-    status: 'pending',
-    gestationalAge: '30 tuần 4 ngày',
-  },
-  {
-    id: 'rec-002',
-    patientId: 'pat-102',
-    patientName: 'Phạm Thanh Thảo',
-    patientCode: 'PRE-8493',
-    edd: '2027-02-14',
-    eddFormatted: '14/02/2027',
-    trimester: 2,
-    trimesterName: 'Tam cá nguyệt 2',
-    gestationalAgeDays: 169,
-    gestationalAgeFormatted: '24 tuần 1 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'Sinh trắc học đồng bộ (35th pct)',
-    warningLevel: 'yellow',
-    ocrStatus: 'extracted',
-    biometricStatus: 'pending_verification',
-    hasOcrAttachment: true,
-    uploadedFileId: 'up-002',
-    appointmentTime: '29/10/2026',
-    reason: 'Xét nghiệm sinh hóa • OGTT 2h',
-    status: 'pending',
-    gestationalAge: '24 tuần 1 ngày',
-  },
-  {
-    id: 'rec-003',
-    patientId: 'pat-103',
-    patientName: 'Trần Mỹ Duyên',
-    patientCode: 'PRE-8494',
-    edd: '2027-03-30',
-    eddFormatted: '30/03/2027',
-    trimester: 2,
-    trimesterName: 'Tam cá nguyệt 2',
-    gestationalAgeDays: 126,
-    gestationalAgeFormatted: '18 tuần 0 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'Hình thái học Q2 bình thường (48th pct)',
-    warningLevel: 'green',
-    ocrStatus: 'extracted',
-    biometricStatus: 'pending_verification',
-    hasOcrAttachment: true,
-    uploadedFileId: 'up-003',
-    appointmentTime: '29/10/2026',
-    reason: 'Khám định kỳ + Siêu âm hình thái',
-    status: 'pending',
-    gestationalAge: '18 tuần 0 ngày',
-  },
-  {
-    id: 'rec-004',
-    patientId: 'pat-104',
-    patientName: 'Lê Thị Ngọc Bích',
-    patientCode: 'PRE-8495',
-    edd: '2026-12-08',
-    eddFormatted: '08/12/2026',
-    trimester: 3,
-    trimesterName: 'Tam cá nguyệt 3',
-    gestationalAgeDays: 240,
-    gestationalAgeFormatted: '34 tuần 2 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'AC < 3rd pct (1.2%) • Severe FGR',
-    warningLevel: 'red',
-    ocrStatus: 'verified',
-    biometricStatus: 'verified',
-    hasOcrAttachment: false,
-    uploadedFileId: 'up-004',
-    appointmentTime: '29/10/2026',
-    reason: 'Đo tim thai NST • Đánh giá FGR',
-    status: 'confirmed',
-    gestationalAge: '34 tuần 2 ngày',
-  },
-  {
-    id: 'rec-005',
-    patientId: 'pat-105',
-    patientName: 'Vũ Hoàng Thục Trinh',
-    patientCode: 'PRE-8496',
-    edd: '2027-01-18',
-    eddFormatted: '18/01/2027',
-    trimester: 3,
-    trimesterName: 'Tam cá nguyệt 3',
-    gestationalAgeDays: 201,
-    gestationalAgeFormatted: '28 tuần 5 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'Chỉ số phát triển đạt chuẩn (52th pct)',
-    warningLevel: 'green',
-    ocrStatus: 'verified',
-    biometricStatus: 'verified',
-    hasOcrAttachment: false,
-    uploadedFileId: 'up-005',
-    appointmentTime: '29/10/2026',
-    reason: 'Doppler ĐM tử cung bình thường',
-    status: 'confirmed',
-    gestationalAge: '28 tuần 5 ngày',
-  },
-  {
-    id: 'rec-006',
-    patientId: 'pat-106',
-    patientName: 'Đặng Kim Ngân',
-    patientCode: 'PRE-8497',
-    edd: '2026-11-12',
-    eddFormatted: '12/11/2026',
-    trimester: 3,
-    trimesterName: 'Tam cá nguyệt 3',
-    gestationalAgeDays: 267,
-    gestationalAgeFormatted: '38 tuần 1 ngày',
-    checkupDate: '29/10/2026',
-    biometricSummary: 'Thai đủ tháng, nước ối & tim thai tốt',
-    warningLevel: 'green',
-    ocrStatus: 'verified',
-    biometricStatus: 'verified',
-    hasOcrAttachment: false,
-    uploadedFileId: 'up-006',
-    appointmentTime: '29/10/2026',
-    reason: 'Khám tiền sản đủ tháng',
-    status: 'confirmed',
-    gestationalAge: '38 tuần 1 ngày',
-  },
-];
-
-// Alias for backwards compatibility
-export const mockAppointments = mockClinicalRecords;
 
 function getPatientAvatarStyle(patientCode: string): string {
   switch (patientCode) {
@@ -190,6 +45,21 @@ function getPatientAvatarStyle(patientCode: string): string {
   }
 }
 
+/**
+ * Chuẩn hóa chuỗi tiếng Việt: loại bỏ toàn bộ dấu (accent/diacritics), chuyển thành chữ thường
+ * và xử lý các ký tự đặc biệt (đ/Đ -> d) phục vụ tìm kiếm không dấu / có dấu chuẩn xác.
+ */
+export function normalizeVietnamese(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
 export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   records,
   appointments,
@@ -198,9 +68,11 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   onOpenRecord,
   onReviewOcr,
   isLoading = false,
+  error = null,
+  onRetry,
 }) => {
-  // Ưu tiên sử dụng prop `records`, fallback sang `appointments` hoặc `mockClinicalRecords`
-  const activeRecords = records || appointments || mockClinicalRecords;
+  // Chỉ nhận dữ liệu từ props (từ API backend), không dùng fallback mock data
+  const activeRecords = records || appointments || [];
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('all');
 
   // Thống kê số lượng theo trạng thái đối soát
@@ -241,11 +113,11 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
         }
       }
 
-      // 2. Lọc theo từ khóa tìm kiếm (họ tên hoặc mã hồ sơ)
+      // 2. Lọc theo từ khóa tìm kiếm (họ tên hoặc mã hồ sơ) - Chuẩn hóa không dấu tiếng Việt
       if (searchQuery.trim()) {
-        const query = searchQuery.trim().toLowerCase();
-        const matchesName = rec.patientName.toLowerCase().includes(query);
-        const matchesCode = rec.patientCode.toLowerCase().includes(query);
+        const query = normalizeVietnamese(searchQuery);
+        const matchesName = normalizeVietnamese(rec.patientName || '').includes(query);
+        const matchesCode = normalizeVietnamese(rec.patientCode || '').includes(query);
         if (!matchesName && !matchesCode) {
           return false;
         }
@@ -289,7 +161,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
     }
   };
 
-  // Render Badge Trạng Thái Đối Soát OCR (Confirmation Barrier Pipeline)
+  // Render Badge Trạng Thái Đối Soát OCR
   const renderOcrStatusBadge = (rec: ClinicalPregnancyRecord) => {
     const isPending = rec.ocrStatus === 'extracted' || rec.biometricStatus === 'pending_verification';
     if (isPending) {
@@ -338,7 +210,9 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
             Hồ sơ thai kỳ & Đối soát cận lâm sàng
           </h3>
           <span className="bg-teal-50 text-teal-800 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-teal-100">
-            {hasActiveSearch || isCustomFilterActive
+            {error
+              ? 'Lỗi máy chủ'
+              : hasActiveSearch || isCustomFilterActive
               ? `${filteredRecords.length} kết quả`
               : `${filteredRecords.length} hồ sơ`}
           </span>
@@ -369,7 +243,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
       {/* 2. Bảng Dữ Liệu Lâm Sàng */}
       <div className="w-full overflow-x-auto rounded-b-2xl">
         <table className="w-full min-w-[1080px] text-left border-collapse">
-          {/* Colgroup giữ cố định tỷ lệ các cột bất kể số dòng thay đổi */}
+          {/* Colgroup giữ cố định tỷ lệ các cột */}
           <colgroup>
             <col style={{ width: '23%' }} />
             <col style={{ width: '13%' }} />
@@ -381,38 +255,58 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
           </colgroup>
           <thead>
             <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              {/* Cột 1: THAI PHỤ / HỒ SƠ */}
               <th className="py-3.5 px-5 text-left min-w-[220px] whitespace-nowrap">
                 THAI PHỤ / HỒ SƠ
               </th>
-              {/* Cột 2: TUỔI THAI */}
               <th className="py-3.5 px-4 text-left min-w-[130px] whitespace-nowrap">
                 TUỔI THAI
               </th>
-              {/* Cột 3: NGÀY KHÁM */}
               <th className="py-3.5 px-4 text-left min-w-[110px] whitespace-nowrap">
                 NGÀY KHÁM
               </th>
-              {/* Cột 4: ĐÁNH GIÁ SINH TRẮC HỌC */}
               <th className="py-3.5 px-4 text-left min-w-[210px] whitespace-nowrap">
                 ĐÁNH GIÁ SINH TRẮC HỌC
               </th>
-              {/* Cột 5: MỨC CẢNH BÁO */}
               <th className="py-3.5 px-4 text-center min-w-[150px] whitespace-nowrap">
                 MỨC CẢNH BÁO
               </th>
-              {/* Cột 6: TRẠNG THÁI ĐỐI SOÁT */}
               <th className="py-3.5 px-4 text-center min-w-[140px] whitespace-nowrap">
                 TRẠNG THÁI ĐỐI SOÁT
               </th>
-              {/* Cột 7: HÀNH ĐỘNG */}
               <th className="py-3.5 px-5 text-right min-w-[120px] whitespace-nowrap">
                 HÀNH ĐỘNG
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {isLoading ? (
+            {error ? (
+              /* Khối Error State thân thiện khi API trả về lỗi 404 hoặc mất kết nối */
+              <tr>
+                <td colSpan={7} className="py-16 px-6 text-center">
+                  <div className="max-w-md mx-auto flex flex-col items-center justify-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center shadow-2xs">
+                      <AlertTriangle className="w-7 h-7" />
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 tracking-tight">
+                      Không thể tải danh sách hồ sơ thai kỳ
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
+                      Dịch vụ quản lý hồ sơ trên máy chủ hiện chưa sẵn sàng hoặc đang bảo trì. Vui lòng thử lại sau hoặc sử dụng chức năng Nhập tay / Tính tuổi thai lâm sàng.
+                    </p>
+                    {onRetry && (
+                      <button
+                        type="button"
+                        onClick={onRetry}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0D8A7C] hover:bg-[#0A7367] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Thử lại</span>
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : isLoading ? (
               <tr>
                 <td colSpan={7} className="py-14 text-center text-slate-400 text-sm">
                   <div className="flex flex-col items-center justify-center gap-2.5">
@@ -426,129 +320,137 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                 <td colSpan={7} className="py-14 text-center text-slate-400 text-sm">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <p className="font-semibold text-slate-700">
-                      Không tìm thấy hồ sơ nào phù hợp
+                      {hasActiveSearch || isCustomFilterActive
+                        ? 'Không tìm thấy hồ sơ nào phù hợp'
+                        : 'Chưa có hồ sơ thai kỳ nào trong ngày hôm nay'}
                     </p>
                     <p className="text-xs text-slate-500 max-w-sm">
                       {hasActiveSearch
                         ? `Không có hồ sơ nào khớp với từ khóa "${searchQuery}". Thử nhập lại tên hoặc mã bệnh nhân.`
-                        : 'Không có hồ sơ nào khớp với tiêu chí lọc hiện tại. Thử chọn lại trạng thái khác.'}
+                        : isCustomFilterActive
+                        ? 'Không có hồ sơ nào khớp với tiêu chí lọc hiện tại. Thử chọn lại trạng thái khác.'
+                        : 'Danh sách hồ sơ lâm sàng được đồng bộ trực tiếp từ cơ sở dữ liệu bệnh án PreCare.'}
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleClearAllFilters}
-                      className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[#0D8A7C] text-white hover:bg-[#0A7367] transition-colors cursor-pointer shadow-xs"
-                    >
-                      <span>Đặt lại bộ lọc</span>
-                    </button>
+                    {(hasActiveSearch || isCustomFilterActive) && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllFilters}
+                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-[#0D8A7C] text-white hover:bg-[#0A7367] transition-colors cursor-pointer shadow-xs"
+                      >
+                        <span>Đặt lại bộ lọc</span>
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
               filteredRecords.map((rec) => {
-                const avatarStyle = getPatientAvatarStyle(rec.patientCode);
-                const initials = rec.patientName
-                  .split(' ')
-                  .slice(-2)
-                  .map((n) => n[0])
-                  .join('');
-
-                const isPendingOcr =
+                const isOcrPending =
                   rec.ocrStatus === 'extracted' || rec.biometricStatus === 'pending_verification';
 
                 return (
                   <tr
                     key={rec.id}
-                    className="hover:bg-slate-50/80 transition-colors group"
+                    className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      if (onOpenRecord) onOpenRecord(rec);
+                    }}
                   >
                     {/* Cột 1: THAI PHỤ / HỒ SƠ */}
-                    <td className="py-4 px-5 text-left whitespace-nowrap">
+                    <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-9 h-9 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${avatarStyle}`}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 ${getPatientAvatarStyle(
+                            rec.patientCode
+                          )}`}
                         >
-                          {initials}
+                          {rec.patientName
+                            .split(' ')
+                            .slice(-2)
+                            .map((n) => n[0])
+                            .join('')}
                         </div>
-                        <div className="min-w-0 max-w-[220px]">
-                          <div
-                            className="font-semibold text-slate-900 group-hover:text-teal-800 transition-colors truncate"
-                            title={rec.patientName}
-                          >
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 group-hover:text-teal-700 transition-colors truncate">
                             {rec.patientName}
                           </div>
-                          {/* Mã hồ sơ & Ngày dự sinh EDD */}
-                          <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium truncate">
-                            <span className="font-mono text-slate-600 font-semibold">
-                              {rec.patientCode}
-                            </span>
-                            <span>•</span>
-                            <span className="text-slate-500 font-medium">
-                              EDD: {rec.eddFormatted}
-                            </span>
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-600">{rec.patientCode}</span>
+                            <span className="text-slate-300">·</span>
+                            <span>EDD: {rec.eddFormatted}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
                     {/* Cột 2: TUỔI THAI */}
-                    <td className="py-4 px-4 text-left whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 text-xs font-semibold border border-teal-100">
-                        <Baby className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                        <span>{rec.gestationalAgeFormatted}</span>
+                    <td className="py-3.5 px-4">
+                      <div className="text-slate-900 font-semibold whitespace-nowrap">
+                        {rec.gestationalAgeFormatted ||
+                          (typeof rec.gestationalAge === 'string'
+                            ? rec.gestationalAge
+                            : rec.gestationalAge?.formatted || '--')}
+                      </div>
+                      <div className="text-[11px] text-teal-700 font-medium">
+                        {rec.trimesterName}
                       </div>
                     </td>
 
-                    {/* Cột 3: NGÀY KHÁM (checkups.checkup_date) */}
-                    <td className="py-4 px-4 text-left whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                        <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span>{rec.checkupDate}</span>
+                    {/* Cột 3: NGÀY KHÁM */}
+                    <td className="py-3.5 px-4">
+                      <div className="text-slate-800 font-medium whitespace-nowrap">
+                        {rec.checkupDate || rec.appointmentTime || '--'}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {rec.reason || 'Khám thai định kỳ'}
                       </div>
                     </td>
 
-                    {/* Cột 4: ĐÁNH GIÁ SINH TRẮC HỌC (analysis_results) */}
-                    <td className="py-4 px-4 text-left whitespace-nowrap">
-                      <span
-                        className="text-xs text-slate-800 font-medium whitespace-nowrap block truncate max-w-[240px]"
-                        title={rec.biometricSummary}
-                      >
-                        {rec.biometricSummary}
-                      </span>
+                    {/* Cột 4: ĐÁNH GIÁ SINH TRẮC HỌC */}
+                    <td className="py-3.5 px-4">
+                      <div className="text-xs text-slate-800 font-medium leading-relaxed max-w-xs">
+                        {rec.biometricSummary || 'Chưa ghi nhận bất thường'}
+                      </div>
                     </td>
 
                     {/* Cột 5: MỨC CẢNH BÁO */}
-                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center">
                       {renderWarningLevelBadge(rec.warningLevel)}
                     </td>
 
                     {/* Cột 6: TRẠNG THÁI ĐỐI SOÁT */}
-                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center">
                       {renderOcrStatusBadge(rec)}
                     </td>
 
                     {/* Cột 7: HÀNH ĐỘNG */}
-                    <td className="py-4 px-5 text-right whitespace-nowrap">
-                      {isPendingOcr ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onReviewOcr) onReviewOcr(rec);
-                            else if (onOpenRecord) onOpenRecord(rec);
-                          }}
-                          className="bg-[#0D8A7C] hover:bg-[#0A7367] text-white px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs hover:shadow-xs active:scale-98 whitespace-nowrap"
-                        >
-                          <FileCheck2 className="w-4 h-4 stroke-[2.2]" />
-                          <span>Đối soát OCR</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onOpenRecord && onOpenRecord(rec)}
-                          className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs hover:border-slate-300 active:scale-98 whitespace-nowrap"
-                        >
-                          <span>Mở hồ sơ</span>
-                          <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                      )}
+                    <td
+                      className="py-3.5 px-5 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        {isOcrPending && onReviewOcr ? (
+                          <button
+                            type="button"
+                            onClick={() => onReviewOcr(rec)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0D8A7C] text-white hover:bg-[#0A7367] transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
+                          >
+                            <FileCheck2 className="w-3.5 h-3.5" />
+                            <span>Duyệt OCR</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onOpenRecord) onOpenRecord(rec);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer whitespace-nowrap"
+                          >
+                            <span>Xem hồ sơ</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -565,7 +467,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
           <strong className="text-slate-800 font-bold">{activeRecords.length}</strong> hồ sơ trong ngày
         </span>
         <span className="text-[11px] text-slate-500 font-medium">
-          PreCare Digital Obstetrics • Tiêu chuẩn Hadlock & RACA-Net Safety
+          PreCare Digital Obstetrics • Tiêu chuẩn Luật lâm sàng Hadlock (ACOG)
         </span>
       </div>
     </div>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Central API Gateway Client
  * Tích hợp các service con theo từng ticket chuyên biệt (Auth, Records, Ultrasound...)
  */

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -8,7 +8,7 @@ import {
   AlertCircle,
   KeyRound,
   CheckCircle2,
-  } from 'lucide-react';
+} from 'lucide-react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { PreCareLogo } from '../components/PreCareLogo';
 import { AppStoreBadge, GooglePlayBadge } from '../components/AppBadges';
@@ -50,12 +50,6 @@ const DEMO_ACCOUNTS: Record<string, { role: 'doctor' | 'admin'; full_name: strin
     validPasswords: ['password123'],
   },
 };
-
-const envSiteKey = (import.meta as any).env?.VITE_RECAPTCHA_SITE_KEY;
-const SITE_KEY =
-  envSiteKey && envSiteKey !== '6Lcd1u0tAAAAADpcltc_RK3NClzFw1CrpQW1cd_C'
-    ? envSiteKey
-    : '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 export const Login: React.FC<LoginProps> = ({
   onSuccess,
@@ -134,6 +128,7 @@ export const Login: React.FC<LoginProps> = ({
     setPasswordError(null);
     setLoginError(null);
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -176,11 +171,12 @@ export const Login: React.FC<LoginProps> = ({
 
     try {
       let authResponse;
-﻿      try {
+     try {
         // Kết nối API POST /api/v1/auth/login xác thực với bảng users của PostgreSQL (precare_db)
         authResponse = await authApi.login({
           email: trimmedEmail,
           password: password,
+          role: role,
         });
       } catch (apiErr: any) {
         // Xử lý phản hồi từ Backend API / Database precare_db
@@ -220,11 +216,8 @@ export const Login: React.FC<LoginProps> = ({
         // Fallback kiểm tra thông tin tài khoản offline / demo khi backend không kết nối được
         const cleanEmail = trimmedEmail.toLowerCase();
 
-        // Nếu backend có response (dù lỗi) → không dùng offline fallback
-        // Chỉ fallback khi thực sự không kết nối được backend (network error)
         if (apiErr.code === 'ECONNREFUSED' || apiErr.code === 'ERR_NETWORK' ||
             apiErr.message?.includes('Network Error') || apiErr.message?.includes('timeout')) {
-          // Backend offline: thông báo rõ thay vì fallback ngầm
           setLoginError('Không thể kết nối máy chủ. Vui lòng kiểm tra backend đang chạy tại localhost:8000.');
           setIsSubmitting(false);
           return;
@@ -282,21 +275,51 @@ export const Login: React.FC<LoginProps> = ({
       setIsSubmitting(false);
 
       if (authResponse && authResponse.user) {
-        if (authResponse.user.role === 'pregnant_woman') {
+        const rawRole = authResponse.user.role;
+
+        // 1. Chặn tài khoản thai phụ trên cổng Web (yêu cầu dùng Mobile App)
+        if (rawRole === 'pregnant_woman') {
           setLoginError('Tài khoản thai phụ vui lòng đăng nhập trên ứng dụng PreCare Mobile.');
           setIsSubmitting(false);
           return;
         }
-        localStorage.setItem('precare_user', JSON.stringify(authResponse.user));
-        const userRole = (authResponse.user.role as 'doctor' | 'admin') || role;
-        if (onLoginSuccess) {
-          onLoginSuccess(userRole);
+
+        // 2. Kiểm tra tính hợp lệ của vai trò: cổng Web chỉ hỗ trợ 'doctor' hoặc 'admin'
+        if (rawRole !== 'doctor' && rawRole !== 'admin') {
+          setLoginError('Tài khoản không có quyền truy cập vào cổng thông tin này.');
+          setIsSubmitting(false);
+          return;
         }
+
+        // 3. Chặn leo quyền: Bác sĩ không được chọn tab Quản trị viên
+        if (rawRole === 'doctor' && role === 'admin') {
+          setLoginError('Tài khoản của bạn không có quyền truy cập vào khu vực Quản trị viên.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 4. Sử dụng vai trò xác thực từ Backend làm nguồn dữ liệu chính thức (Single Source of Truth)
+        // Tuyệt đối không dùng tab UI (state `role`) để tự nâng quyền
+        const userRole: 'doctor' | 'admin' = rawRole;
+
+        const finalUser = {
+          ...authResponse.user,
+          role: userRole,
+          full_name: authResponse.user.full_name,
+        };
+
+        localStorage.setItem('precare_user', JSON.stringify(finalUser));
+        if (authResponse.tokens?.access_token) {
+          localStorage.setItem('precare_token', authResponse.tokens.access_token);
+        }
+
         if (onSuccess) {
           onSuccess({
-            user: authResponse.user,
+            user: finalUser,
             token: authResponse.tokens?.access_token || localStorage.getItem('precare_token') || 'token',
           });
+        } else if (onLoginSuccess) {
+          onLoginSuccess(userRole);
         }
       }
     } catch (err: any) {
@@ -352,11 +375,7 @@ export const Login: React.FC<LoginProps> = ({
 
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#0D9488]/20 selection:text-[#0D9488] relative">
-      {/* =========================================================================
-          LEFT PANEL (SAGE TEAL WITH IMAGE BACKGROUND - EXACT SAMPLE DIMENSIONS)
-          ========================================================================= */}
       <aside className="w-full lg:w-[45%] xl:w-[44%] min-h-[360px] lg:min-h-screen bg-[#0D9488] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
-        {/* Submerged Illustration Background (image.png chìm phía sau nền xanh) */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <img
             src={loginIllustration}
@@ -370,15 +389,10 @@ export const Login: React.FC<LoginProps> = ({
           <div className="absolute inset-0 bg-gradient-to-r from-[#0D9488]/70 via-transparent to-[#0D9488]/70" />
         </div>
 
-        {/* Top: Logo PreCare đồng bộ với Register (không có subtitle chữ cổng bác sĩ) */}
         <div className="relative z-10">
-          <PreCareLogo
-            variant="dark"
-            size="md"
-          />
+          <PreCareLogo variant="dark" size="md" />
         </div>
 
-        {/* Middle Main Heading & Description */}
         <div className="relative z-10 max-w-[420px] my-auto py-8 lg:py-12">
           <h1 className="text-2xl sm:text-3xl lg:text-[34px] font-bold text-white tracking-tight leading-[1.3] drop-shadow-sm">
             Số hóa hồ sơ thai kỳ chuyên nghiệp
@@ -388,18 +402,13 @@ export const Login: React.FC<LoginProps> = ({
           </p>
         </div>
 
-        {/* Bottom subtle system watermark / copyright */}
         <div className="relative z-10 text-xs sm:text-[12px] text-teal-100/75 flex items-center justify-between border-t border-white/10 pt-4">
           <span>© 2026 PreCare Medical Systems.</span>
         </div>
       </aside>
 
-      {/* =========================================================================
-          RIGHT CONTENT PANEL (Pure White, Form Sits Directly - No Outer Card Box)
-          ========================================================================= */}
       <main className="flex-1 min-h-screen bg-white flex items-center justify-center p-6 sm:p-10 lg:p-16 overflow-y-auto">
         <div className="w-full max-w-[418px]">
-          {/* Header: Title 26px bold, 12px margin to subtitle, 32px margin to form */}
           <div className="mb-8">
             <h2 className="text-[30px] font-bold text-slate-900 tracking-tight leading-tight">
               Chào mừng trở lại
@@ -410,7 +419,6 @@ export const Login: React.FC<LoginProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} noValidate>
-            {/* Role selector */}
             <div className="mb-6">
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Vai trò người dùng
@@ -439,9 +447,7 @@ export const Login: React.FC<LoginProps> = ({
               </div>
             </div>
 
-            {/* Inputs container with 16px spacing */}
             <div className="space-y-4">
-              {/* Email input */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Email đăng nhập <span className="text-rose-500">*</span>
@@ -470,7 +476,6 @@ export const Login: React.FC<LoginProps> = ({
                 )}
               </div>
 
-              {/* Password input */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Mật khẩu <span className="text-rose-500">*</span>
@@ -510,12 +515,11 @@ export const Login: React.FC<LoginProps> = ({
               </div>
             </div>
 
-            {/* Google reCAPTCHA Widget */}
             <div className="mt-5 mb-4">
-              <div className="min-h-[78px] overflow-hidden flex justify-center">
+              <div className="min-h-[78px] overflow-hidden flex justify-start w-full">
                 <ReCAPTCHA
                   ref={recaptchaRef}
-                  sitekey={SITE_KEY}
+                  sitekey="6Ld1WQwuAAAAANwVZPpTcQ3HsBfqWaqi1u1NX-ih"
                   onChange={(token) => {
                     setCaptchaValue(token);
                     if (token) {
@@ -538,7 +542,6 @@ export const Login: React.FC<LoginProps> = ({
               )}
             </div>
 
-            {/* General Login Error Notification */}
             {loginError && (
               <div className="mb-4 flex items-center gap-2 text-xs sm:text-[12.5px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3 font-medium">
                 <AlertCircle size={16} className="shrink-0" />
@@ -546,7 +549,6 @@ export const Login: React.FC<LoginProps> = ({
               </div>
             )}
 
-            {/* Submit button: height 38px, 100% full width matching inputs */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -555,7 +557,6 @@ export const Login: React.FC<LoginProps> = ({
               {isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
             </button>
 
-            {/* Remember & Forgot password */}
             <div className="flex justify-between items-center text-xs text-slate-600 mt-3">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -578,7 +579,6 @@ export const Login: React.FC<LoginProps> = ({
               </span>
             </div>
 
-            {/* Switch to Register */}
             <div className="text-center text-xs text-slate-500 mt-4 pt-3 border-t border-slate-100">
               Chưa có tài khoản?{' '}
               <span
@@ -595,9 +595,6 @@ export const Login: React.FC<LoginProps> = ({
         </div>
       </main>
 
-
-
-      {/* Floating Error Toast Notification */}
       {showToast && (
         <div
           style={{
@@ -660,7 +657,6 @@ export const Login: React.FC<LoginProps> = ({
         </div>
       )}
 
-      {/* Modal: QR Code download for Thai phụ */}
       {showQrModal && (
         <div
           style={{
@@ -738,7 +734,6 @@ export const Login: React.FC<LoginProps> = ({
               Thai phụ theo dõi hồ sơ thai kỳ, lịch khám và nhận kết quả siêu âm trực tiếp trên điện thoại.
             </p>
 
-            {/* Simulated QR Code Canvas/Box */}
             <div
               style={{
                 padding: '16px',
@@ -771,7 +766,6 @@ export const Login: React.FC<LoginProps> = ({
               </span>
             </div>
 
-            {/* Official App Store & Google Play Badges */}
             <div
               style={{
                 display: 'flex',
@@ -795,7 +789,6 @@ export const Login: React.FC<LoginProps> = ({
         </div>
       )}
 
-      {/* Modal: Forgot Password */}
       {showForgotPasswordModal && (
         <div
           style={{

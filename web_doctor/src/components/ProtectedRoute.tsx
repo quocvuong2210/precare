@@ -11,7 +11,7 @@ export interface RouteDecision {
 
 /**
  * Hàm đánh giá quyết định điều hướng bảo vệ route thuần túy (Pure Function).
- * Dễ dàng kiểm thử tự động độc lập mọi kịch bản phân quyền.
+ * Dễ dàng kiểm thử tự động độc lập mọi kịch bản phân quyền vai trò người dùng.
  */
 export function getRouteAccessDecision({
   isAuthenticated,
@@ -26,7 +26,7 @@ export function getRouteAccessDecision({
   currentPath: string;
   redirectPath?: string;
 }): RouteDecision {
-  // 1. Chưa xác thực hoặc thiếu thông tin người dùng
+  // 1. Chưa xác thực hoặc thiếu thông tin vai trò người dùng -> chuyển hướng về /login
   if (!isAuthenticated || !userRole) {
     return {
       status: 'redirect',
@@ -35,33 +35,40 @@ export function getRouteAccessDecision({
     };
   }
 
-  // 2. Kiểm tra vai trò nếu route có ràng buộc vai trò
-  if (allowedRoles && allowedRoles.length > 0) {
-    const isAuthorized = allowedRoles.includes(userRole);
-
-    if (!isAuthorized) {
-      let fallbackTarget = redirectPath;
-
-      if (!fallbackTarget) {
-        if (userRole === 'doctor') {
-          fallbackTarget = '/dashboard';
-        } else if (userRole === 'admin') {
-          fallbackTarget = '/admin';
-        } else {
-          fallbackTarget = '/unauthorized';
-        }
-      }
-
-      // Tránh infinite redirect loop nếu fallback trùng đúng URL hiện tại
-      if (fallbackTarget === currentPath) {
-        return { status: 'redirect', target: '/unauthorized' };
-      }
-
-      return { status: 'redirect', target: fallbackTarget };
-    }
+  // 2. Kiểm tra quyền hạn theo danh sách allowedRoles của route
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    return {
+      status: 'redirect',
+      target: redirectPath || '/unauthorized',
+    };
   }
 
-  // 3. Cho phép truy cập
+  // 3. Phân luồng bảo vệ khu vực theo vai trò (Role-based area isolation):
+  // - Bác sĩ cố tình vào khu vực quản trị (/admin) -> Chặn 403 (/unauthorized)
+  if (userRole === 'doctor' && currentPath.startsWith('/admin')) {
+    return {
+      status: 'redirect',
+      target: redirectPath || '/unauthorized',
+    };
+  }
+
+  // - Quản trị viên cố tình vào khu vực lâm sàng Bác sĩ (không bắt đầu bằng /admin) -> Chặn 403 (/unauthorized)
+  if (userRole === 'admin' && !currentPath.startsWith('/admin')) {
+    return {
+      status: 'redirect',
+      target: redirectPath || '/unauthorized',
+    };
+  }
+
+  // - Thai phụ truy cập cổng Bác sĩ/Admin trên web -> Chặn 403 (/unauthorized)
+  if (userRole === 'pregnant_woman') {
+    return {
+      status: 'redirect',
+      target: redirectPath || '/unauthorized',
+    };
+  }
+
+  // 4. Hợp lệ vai trò và đường dẫn -> Cấp quyền render
   return { status: 'authorized' };
 }
 
@@ -82,7 +89,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
-  // 1. Khi đang khởi tạo phiên từ localStorage / API check: hiển thị loading mượt mà
+  // 1. Khi đang khởi tạo phiên: hiển thị loading mượt mà, không render protected content
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-3">
@@ -92,7 +99,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 2. Đánh giá quyết định truy cập
+  // 2. Đánh giá quyết định truy cập dựa trên phiên xác thực duy nhất từ AuthContext
   const decision = getRouteAccessDecision({
     isAuthenticated,
     userRole: user?.role,

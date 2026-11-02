@@ -8,7 +8,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { AppointmentTable, mockClinicalRecords } from '../components/AppointmentTable';
+import { AppointmentTable } from '../components/AppointmentTable';
 import { ClinicalDisclaimerBanner } from '../components/ClinicalDisclaimerBanner';
 import { ClinicalPregnancyRecord } from '../types';
 import { dashboardService } from '../services/dashboard.service';
@@ -31,39 +31,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
   const handleClearSearch = externalClearSearch || (() => setInternalSearchQuery(''));
 
-  // Tên bác sĩ ưu tiên lấy từ phiên người dùng đã xác thực (GET /api/v1/auth/me)
+  // Tên bác sĩ lấy trung thực từ phiên người dùng đã xác thực (GET /api/v1/auth/me)
   const doctorDisplayName = user?.full_name
     ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
-    : 'BS. CKI LÊ HOÀNG';
+    : user?.email
+    ? `Bác sĩ (${user.email})`
+    : 'Bác sĩ PreCare';
 
   // State dữ liệu lâm sàng & trạng thái API
-  const [records, setRecords] = useState<ClinicalPregnancyRecord[]>(mockClinicalRecords);
+  const [records, setRecords] = useState<ClinicalPregnancyRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [apiNotice, setApiNotice] = useState<string | null>(null);
-  const [analysisInfo, setAnalysisInfo] = useState<{ ruleVersion: string; modelVersion: string }>({
-    ruleVersion: 'Hadlock-ACOG-v1.0',
-    modelVersion: 'RACA-Net-ResNet50-v1.2',
-  });
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [ruleVersion, setRuleVersion] = useState<string>('Hadlock (ACOG)');
 
   const loadDashboardData = async () => {
     setIsLoading(true);
-    setApiNotice(null);
+    setApiError(null);
     try {
-      // 1. Lấy thông tin phiên bản luật/mô hình từ Analysis Service (:8001 GET /api/v1/health)
+      // 1. Lấy thông tin phiên bản bộ luật từ Analysis Service (:8001 GET /api/v1/health)
       const health = await dashboardService.getAnalysisHealth();
-      setAnalysisInfo({
-        ruleVersion: health.rule_version || 'Hadlock-ACOG-v1.0',
-        modelVersion: health.model_version || 'RACA-Net-ResNet50-v1.2',
-      });
+      if (health.rule_version) {
+        setRuleVersion(health.rule_version);
+      }
 
-      // 2. Tải danh sách hồ sơ thai kỳ từ API Gateway
+      // 2. Tải danh sách hồ sơ thai kỳ thực tế từ API Gateway
       const res = await dashboardService.getClinicalRecords();
       setRecords(res.data);
-      if (res.message) {
-        setApiNotice(res.message);
-      }
-    } catch {
-      setApiNotice('Không thể kết nối đến máy chủ API Gateway. Đang sử dụng dữ liệu dự phòng.');
+    } catch (err: any) {
+      const status = err.status || err.response?.status;
+      const is404 = status === 404;
+      setApiError(
+        is404
+          ? 'Dịch vụ quản lý hồ sơ thai kỳ trên máy chủ hiện chưa sẵn sàng (404 Not Found).'
+          : err.message || 'Không thể kết nối đến máy chủ API Gateway.'
+      );
+      setRecords([]);
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +75,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     loadDashboardData();
   }, []);
 
-  // Thống kê số liệu lâm sàng trong ngày
+  // Thống kê số liệu lâm sàng động từ tập records thực tế (trả về null nếu API lỗi)
   const metrics = useMemo(() => {
+    if (apiError || records.length === 0) {
+      return null;
+    }
     return dashboardService.calculateMetrics(records);
-  }, [records]);
+  }, [records, apiError]);
 
   const formatTwoDigits = (num: number) => (num < 10 ? `0${num}` : `${num}`);
 
@@ -92,56 +97,67 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-wide text-white uppercase">
               CHÀO BUỔI SÁNG, {doctorDisplayName}!
             </h1>
-            <p className="font-sans text-xs sm:text-sm text-teal-100/95 leading-relaxed">
-              Hôm nay bạn có{' '}
-              <strong className="text-white font-bold">{metrics.recordsToday} hồ sơ thai kỳ</strong> cần
-              theo dõi. Hệ thống tự động phát hiện{' '}
-              <strong className="text-white font-bold">
-                {metrics.redAlertsToday} hồ sơ có cờ đỏ lâm sàng (nghi ngờ thai chậm phát triển FGR)
-              </strong>{' '}
-              và <strong className="text-white font-bold">{metrics.pendingOcrTotal} tệp siêu âm</strong>{' '}
-              đang ở trạng thái chờ bác sĩ đối soát kết quả OCR.
-            </p>
+            {apiError ? (
+              <p className="font-sans text-xs sm:text-sm text-teal-100/90 leading-relaxed">
+                Chưa thể tải dữ liệu tổng quan trong ngày do dịch vụ Hồ sơ thai kỳ chưa phản hồi.
+              </p>
+            ) : metrics ? (
+              <p className="font-sans text-xs sm:text-sm text-teal-100/95 leading-relaxed">
+                Hôm nay bạn có{' '}
+                <strong className="text-white font-bold">{metrics.recordsToday} hồ sơ thai kỳ</strong> cần
+                theo dõi. Hệ thống tự động phát hiện{' '}
+                <strong className="text-white font-bold">
+                  {metrics.redAlertsToday} hồ sơ có cờ đỏ lâm sàng (nghi ngờ thai chậm phát triển FGR)
+                </strong>{' '}
+                và{' '}
+                <strong className="text-white font-bold">{metrics.pendingOcrTotal} tệp siêu âm</strong>{' '}
+                đang ở trạng thái chờ bác sĩ đối soát kết quả OCR.
+              </p>
+            ) : (
+              <p className="font-sans text-xs sm:text-sm text-teal-100/90 leading-relaxed">
+                Đang chuẩn bị thông tin hồ sơ thai kỳ và phân tích lâm sàng trong ngày...
+              </p>
+            )}
           </div>
 
-          <div className="shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.querySelector('[aria-label="Danh sách trạng thái hồ sơ thai kỳ"]');
-                if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-[#0C4E47] hover:bg-teal-50 text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer hover:shadow-md active:scale-95 whitespace-nowrap"
-            >
-              <span>Xem {metrics.pendingOcrTotal} tệp OCR cần duyệt</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
-          </div>
+          {metrics && metrics.pendingOcrTotal > 0 && (
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.querySelector('[aria-label="Danh sách trạng thái hồ sơ thai kỳ"]');
+                  if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-[#0C4E47] hover:bg-teal-50 text-xs sm:text-sm font-bold shadow-sm transition-all cursor-pointer hover:shadow-md active:scale-95 whitespace-nowrap"
+              >
+                <span>Xem {metrics.pendingOcrTotal} tệp OCR cần duyệt</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Thông báo trạng thái kết nối API (khi backend chưa có API danh sách hồ sơ) */}
-      {apiNotice && (
-        <div className="bg-amber-50/90 border border-amber-200/90 text-amber-900 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="truncate">{apiNotice}</span>
+      {/* Thông báo lỗi kết nối API (khi backend chưa có API danh sách hồ sơ) */}
+      {apiError && (
+        <div className="bg-amber-50/90 border border-amber-200/90 text-amber-900 px-4 py-3 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+            <span className="font-medium leading-relaxed">{apiError}</span>
           </div>
           <button
             type="button"
             onClick={loadDashboardData}
-            className="inline-flex items-center gap-1 font-bold text-teal-800 hover:text-teal-950 hover:underline shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs shrink-0 cursor-pointer transition-colors"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Thử lại</span>
           </button>
         </div>
       )}
 
-      {/* 2. Cảnh báo an toàn lâm sàng & thông tin mô hình phân tích */}
+      {/* 2. Cảnh báo an toàn lâm sàng */}
       <ClinicalDisclaimerBanner
-        rulesVersion={analysisInfo.ruleVersion}
-        modelVersion={analysisInfo.modelVersion}
         disclaimerText="LƯU Ý Y TẾ: Kết quả phân tích của PreCare chỉ mang tính chất hỗ trợ sàng lọc và tham khảo, không thay thế quyết định chẩn đoán của bác sĩ chuyên khoa."
       />
 
@@ -159,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="mt-4 flex flex-col gap-1">
             <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
-              {metrics.totalPatientsManaged.toLocaleString()}
+              {metrics ? metrics.totalPatientsManaged.toLocaleString() : '--'}
             </div>
             <div className="h-5 flex items-center text-xs font-medium text-slate-500 mt-1">
               <span>Hồ sơ trong hệ thống</span>
@@ -179,12 +195,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="mt-4 flex flex-col gap-1">
             <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
-              {formatTwoDigits(metrics.recordsToday)}
+              {metrics ? formatTwoDigits(metrics.recordsToday) : '--'}
             </div>
             <div className="h-5 flex items-center gap-1.5 text-xs font-medium text-slate-600 mt-1 truncate">
-              <span>{metrics.verifiedToday} đã xác nhận</span>
-              <span className="text-slate-400">·</span>
-              <span className="text-teal-700 font-semibold">{metrics.pendingOcrToday} chờ đối soát</span>
+              {metrics ? (
+                <>
+                  <span>{metrics.verifiedToday} đã xác nhận</span>
+                  <span className="text-slate-400">·</span>
+                  <span className="text-teal-700 font-semibold">{metrics.pendingOcrToday} chờ đối soát</span>
+                </>
+              ) : (
+                <span>Chờ kết nối dữ liệu</span>
+              )}
             </div>
           </div>
         </div>
@@ -201,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="mt-4 flex flex-col gap-1">
             <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-rose-600 tracking-tight leading-none">
-              {formatTwoDigits(metrics.redAlertsToday)}
+              {metrics ? formatTwoDigits(metrics.redAlertsToday) : '--'}
             </div>
             <div className="h-5 flex items-center text-xs text-rose-600 font-medium mt-1 truncate">
               <span>Hồ sơ cần bác sĩ xem xét</span>
@@ -221,7 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="mt-4 flex flex-col gap-1">
             <div className="h-9 flex items-center text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
-              {formatTwoDigits(metrics.pendingOcrTotal)}
+              {metrics ? formatTwoDigits(metrics.pendingOcrTotal) : '--'}
             </div>
             <div className="h-5 flex items-center text-xs text-slate-600 font-medium mt-1">
               <span>Tệp siêu âm chờ đối soát</span>
@@ -235,6 +257,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <AppointmentTable
           records={records}
           isLoading={isLoading}
+          error={apiError}
+          onRetry={loadDashboardData}
           searchQuery={searchQuery}
           clearSearch={handleClearSearch}
           onOpenRecord={(rec: ClinicalPregnancyRecord) => onSelectPatient(rec.patientId)}

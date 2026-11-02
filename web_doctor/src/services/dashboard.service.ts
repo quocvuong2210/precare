@@ -5,21 +5,20 @@ import {
   DashboardMetrics,
   AnalysisServiceHealth,
 } from '../types';
-import { mockClinicalRecords } from '../components/AppointmentTable';
 
 const ANALYSIS_API_URL =
   (import.meta as any).env?.VITE_ANALYSIS_API_URL || 'http://localhost:8001/api/v1';
 
 export interface ClinicalRecordsResponse {
   data: ClinicalPregnancyRecord[];
-  source: 'backend' | 'offline_fallback';
+  source: 'backend';
   isLiveBackend: boolean;
   message?: string;
 }
 
 export const dashboardService = {
   /**
-   * Truy vấn trạng thái và phiên bản mô hình/luật từ Analysis Microservice (Port 8001)
+   * Truy vấn trạng thái và phiên bản bộ luật lâm sàng từ Analysis Microservice (Port 8001)
    * Endpoint: GET /api/v1/health
    */
   async getAnalysisHealth(): Promise<AnalysisServiceHealth> {
@@ -27,72 +26,72 @@ export const dashboardService = {
       const response = await axios.get<AnalysisServiceHealth>(`${ANALYSIS_API_URL}/health`, {
         timeout: 4000,
       });
-      if (response.data && response.data.rule_version && response.data.model_version) {
-        return response.data;
+      if (response.data && response.data.rule_version) {
+        return {
+          status: response.data.status || 'healthy',
+          service: response.data.service || 'PreCare-Analysis-Engine',
+          rule_version: response.data.rule_version,
+          model_version: '',
+        };
       }
     } catch {
-      // Analysis service offline hoặc chưa khởi động -> sử dụng giá trị mặc định theo tài liệu thiết kế
+      // Khi Analysis service offline hoặc chưa phản hồi
     }
 
     return {
-      status: 'default',
+      status: 'offline',
       service: 'PreCare-Analysis-Engine',
-      rule_version: 'Hadlock-ACOG-v1.0',
-      model_version: 'RACA-Net-ResNet50-v1.2',
+      rule_version: 'Hadlock (ACOG)',
+      model_version: '',
     };
   },
 
   /**
-   * Lấy danh sách hồ sơ thai kỳ & lần khám lâm sàng
-   * Kiểm tra endpoint backend thực tế (GET /api/v1/pregnancy-profiles hoặc GET /api/v1/checkups).
-   * Khi backend chưa hỗ trợ endpoint truy vấn danh sách (404), trả về bộ dữ liệu lâm sàng chuẩn
-   * kèm cờ thông báo rõ ràng để UI xử lý chính xác và không làm gián đoạn trải nghiệm bác sĩ.
+   * Lấy danh sách hồ sơ thai kỳ & lần khám lâm sàng thực tế từ API Gateway
+   * Endpoint: GET /api/v1/pregnancy-profiles
+   * Tuyệt đối không fallback dữ liệu giả khi gặp lỗi 404 hoặc mất kết nối.
    */
   async getClinicalRecords(): Promise<ClinicalRecordsResponse> {
     try {
       const res = await apiClient.get('/pregnancy-profiles', { timeout: 6000 });
-      if (Array.isArray(res.data?.data)) {
-        return {
-          data: res.data.data,
-          source: 'backend',
-          isLiveBackend: true,
-        };
-      }
-      if (Array.isArray(res.data)) {
-        return {
-          data: res.data,
-          source: 'backend',
-          isLiveBackend: true,
-        };
-      }
-    } catch (err: any) {
-      // Khi backend trả về 404 (chưa triển khai API danh sách) hoặc lỗi kết nối
-      const status = err.response?.status;
-      const isEndpointMissing = status === 404 || status === 405;
+      const recordsData = Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
 
       return {
-        data: mockClinicalRecords,
-        source: 'offline_fallback',
-        isLiveBackend: false,
-        message: isEndpointMissing
-          ? 'Backend Gateway chưa cung cấp API danh sách hồ sơ (GET /api/v1/pregnancy-profiles). Đang hiển thị dữ liệu chuẩn lâm sàng dự phòng.'
-          : 'Không thể kết nối đến máy chủ API Gateway. Đang hiển thị dữ liệu dự phòng.',
+        data: recordsData,
+        source: 'backend',
+        isLiveBackend: true,
       };
+    } catch (err: any) {
+      const status = err.response?.status;
+      const detail =
+        err.response?.data?.detail ||
+        (status === 404
+          ? 'Dịch vụ quản lý hồ sơ thai kỳ trên máy chủ hiện chưa sẵn sàng (404 Not Found).'
+          : 'Không thể kết nối đến máy chủ API Gateway.');
+      const customError: any = new Error(detail);
+      customError.status = status;
+      customError.response = err.response;
+      throw customError;
     }
-
-    return {
-      data: mockClinicalRecords,
-      source: 'offline_fallback',
-      isLiveBackend: false,
-    };
   },
 
   /**
    * Thống kê số liệu lâm sàng trong ngày cho các thẻ KPI và Banner chào bác sĩ
-   * Đồng bộ chính xác theo tập dữ liệu hồ sơ lâm sàng hiện có (Single Source of Truth)
+   * Chỉ tính toán động từ mảng records thực tế truyền vào.
+   * Nếu không có dữ liệu (API lỗi), trả về null để UI hiển thị '--' hoặc '0'.
    */
-  calculateMetrics(records: ClinicalPregnancyRecord[]): DashboardMetrics {
-    const totalPatientsManaged = 1248;
+  calculateMetrics(records?: ClinicalPregnancyRecord[] | null): DashboardMetrics | null {
+    if (!records) {
+      return null;
+    }
+
+    // Đếm số lượng hồ sơ duy nhất dựa trên patientId
+    const uniquePatients = new Set(records.map((r) => r.patientId || r.id)).size;
+    const totalPatientsManaged = uniquePatients;
     const recordsToday = records.length;
     const redAlertsToday = records.filter((r) => r.warningLevel === 'red').length;
     const verifiedToday = records.filter(
@@ -101,7 +100,7 @@ export const dashboardService = {
     const pendingOcrToday = records.filter(
       (r) => r.ocrStatus === 'extracted' || r.biometricStatus === 'pending_verification'
     ).length;
-    const pendingOcrTotal = 7;
+    const pendingOcrTotal = pendingOcrToday;
 
     return {
       totalPatientsManaged,
@@ -115,4 +114,3 @@ export const dashboardService = {
 };
 
 export default dashboardService;
-
