@@ -18,14 +18,18 @@ export interface UserAccountInfo {
 // Lưu thông tin tài khoản hiện tại trong phiên
 export let currentAccessToken: string = '';
 export let currentUserProfile: UserAccountInfo | null = null;
+let sessionRevision = 0;
 
 // Khôi phục phiên đăng nhập từ bộ nhớ máy nếu có
 export async function restoreSession(): Promise<UserAccountInfo | null> {
+  const revision = sessionRevision;
   try {
     const savedToken = await AsyncStorage.getItem('precare_access_token');
     const savedUser = await AsyncStorage.getItem('precare_current_user');
-    if (savedToken) currentAccessToken = savedToken;
-    if (savedUser) {
+    if (revision !== sessionRevision) return null;
+    currentAccessToken = savedToken || '';
+    currentUserProfile = null;
+    if (savedToken && savedUser) {
       currentUserProfile = JSON.parse(savedUser);
       return currentUserProfile;
     }
@@ -35,6 +39,36 @@ export async function restoreSession(): Promise<UserAccountInfo | null> {
   return currentUserProfile;
 }
 
+// End the local session even if the server is offline. Preserve account records
+// and device preferences; only authentication data belongs to this operation.
+export async function logout(): Promise<void> {
+  sessionRevision += 1;
+  const token = currentAccessToken || await AsyncStorage.getItem('precare_access_token');
+  const refreshToken = await AsyncStorage.getItem('precare_refresh_token');
+  await AsyncStorage.multiRemove(['precare_access_token', 'precare_current_user', 'precare_refresh_token']);
+  sessionRevision += 1;
+  currentAccessToken = '';
+  currentUserProfile = null;
+
+  // Older installations may not have stored a refresh token.
+  if (!token || !refreshToken) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Local credentials have already been removed; network failure must not
+    // keep the user signed in on this device.
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 // Hàm dùng chung để xử lý response từ backend
 async function handleResponse(response: Response) {
@@ -127,6 +161,7 @@ export async function login(email: string, password: string) {
   }
 
   currentAccessToken = token;
+  sessionRevision += 1;
   currentUserProfile = {
     id: userObj.id || userObj.user_id || '',
     full_name: userObj.full_name || userObj.name || '',
@@ -139,6 +174,11 @@ export async function login(email: string, password: string) {
   try {
     await AsyncStorage.setItem('precare_access_token', token);
     await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
+    if (data.refresh_token) {
+      await AsyncStorage.setItem('precare_refresh_token', data.refresh_token);
+    } else {
+      await AsyncStorage.removeItem('precare_refresh_token');
+    }
   } catch (e) {
     console.log('Lỗi lưu phiên đăng nhập:', e);
   }
