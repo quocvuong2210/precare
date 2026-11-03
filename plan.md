@@ -1,57 +1,52 @@
-# Implementation Plan: Quản lý Hồ sơ Thai kỳ (M2) - Web Bác sĩ
+# Implementation Plan: Danh sách Bệnh nhân (PatientList) & UI Navigation
 
 ## Approach
-Xây dựng trọn vẹn tính năng Quản lý Hồ sơ Thai kỳ trên Frontend `web_doctor` tuân thủ nghiêm ngặt yêu cầu "không đụng BE".
-1. **Module Y khoa (`pregnancyCalculator.ts`)**: Tái hiện toàn bộ công thức tính toán y khoa lâm sàng theo hướng dẫn ACOG No. 700 và Robinson & Fleming / Hadlock (giống hệt logic của `backend/app/services/pregnancy_calculator.py`):
-   - Tính tuổi thai từ CRL: $GA_{days} = \text{round}(8.052 \times \sqrt{CRL} + 23.73)$.
-   - Tính ngày dự sinh theo LMP: $EDD = LMP + 280\text{ ngày}$.
-   - Tính theo siêu âm Q1: $EDD = Q1_{date} + (280 - GA_{Q1})$.
-   - Đối chiếu quy tắc ACOG: So sánh chênh lệch giữa LMP và Siêu âm Q1 (ngưỡng 5 ngày nếu $\le 8w6d$, ngưỡng 7 ngày nếu $> 8w6d$).
-   - Phân loại tam cá nguyệt: Quý 1 ($\le 13w6d$), Quý 2 ($14w0d - 27w6d$), Quý 3 ($\ge 28w0d$).
-2. **Quản lý Dữ liệu (`pregnancyProfile.service.ts`)**:
-   - Khởi tạo 6 bản ghi mặc định khớp hoàn hảo với screenshot (Lê Hoàng Hải Yến, Nguyễn Thảo Chi, Phạm Minh Thư, Trần Hồng Nhung, Nguyễn Thị Mai, Phan Thanh Thủy).
-   - Tích hợp với `localStorage` (`precare_pregnancy_records`) để thêm mới, cập nhật dữ liệu liên tục không bị mất khi reload.
-   - Thử gửi request `POST /api/v1/pregnancy-profiles/calculate` tới Backend nếu backend đang chạy, đồng thời fallback mượt mà về client engine khi backend offline.
-3. **Giao diện Danh sách & Modal (`PregnancyProfile.tsx`)**:
-   - Render table và filter card theo đúng 100% giao diện trong screenshot của người dùng.
-   - Modal Form "+ Tạo hồ sơ mới" với Tab / Section rõ ràng: Thông tin cá nhân, Phương pháp tính tuổi thai (LMP, Siêu âm Q1 hoặc EDD thủ công), Tiền sử sản khoa & bệnh nền.
-   - Live Preview thẻ tóm tắt kết quả tính toán ngay khi nhập liệu (Tuổi thai hiện tại, Quý mấy, Ngày dự sinh, Phương pháp chính).
-   - Chặn và hiển thị lỗi validation nếu chọn ngày không hợp lệ.
-4. **Tích hợp Điều hướng (`App.tsx`)**:
-   - Đồng bộ tab `records` (Hồ sơ thai kỳ), hiển thị badge chỉ mục đang chọn.
-   - Cập nhật header title động ("Danh sách Hồ sơ Thai kỳ" khi ở tab Hồ sơ thai kỳ).
-   - Kết nối "Xem chi tiết" chuyển sang `PatientDetail` với dữ liệu tương ứng và hỗ trợ nút quay lại danh sách.
+1. **Thiết kế component `PatientList.tsx`**:
+   - Dữ liệu kết hợp: Lấy danh sách bệnh nhân thai phụ (Role: `pregnant_woman`) liên kết với trạng thái từ `pregnancy_records` (lấy từ `pregnancyProfile.service.ts` hoặc mock storage).
+   - Render table bám sát thiết kế Figma/Screenshot:
+     - Avatar tròn mang chữ cái đầu của họ tên (với palette màu riêng biệt như Teal, Tím, Cam, Hồng, Xanh dương).
+     - Họ tên thai phụ (font-bold) + SĐT kèm icon `Phone`.
+     - Cột `EMAIL` thay thế cột Ngày sinh (theo đúng schema DB `users`).
+     - Badge Trạng thái thai kỳ:
+       - `● Đang mang thai (Xw)` (xanh lục pastel).
+       - `Chưa có hồ sơ hoạt động` (xám slate pastel).
+       - `⟲ Lần sinh trước: DD/MM/YYYY` (tím nhạt kèm icon rotate/clock).
+     - Nút Thao tác:
+       - Nếu có hồ sơ hoạt động: Nút `👁 Xem hồ sơ` (mở trang chi tiết bệnh nhân `PatientDetail`).
+       - Nếu chưa có hồ sơ: Nút `+ Tạo hồ sơ` (mở modal tạo hồ sơ mới hoặc điều hướng sang màn hình tạo hồ sơ thai kỳ).
+     - Phân trang ở chân bảng (Hiển thị 1 - 5 trong số X, nút trước/sau/số trang).
+2. **Loại bỏ chấm xanh trên Navigation Sidebar (`App.tsx`)**:
+   - Xóa bỏ thẻ `{isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>}` ở nav items.
+   - Kết nối tab `patients` để hiển thị `PatientList` và tab `records` hiển thị `PregnancyProfile`.
+   - Cập nhật tiêu đề Top Header ("Danh sách Bệnh nhân" khi ở tab `patients`).
+3. **Kiểm tra và xác minh**:
+   - Chạy lệnh build `npm --prefix web_doctor run build`.
+   - Kiểm tra giao diện và hoạt động của bảng bệnh nhân, bộ lọc và tìm kiếm.
+   - Cam kết: Không đụng BE, không push code.
 
 ## Files and changes
 | File/module | Thay đổi dự kiến | AC liên quan |
 |---|---|---|
-| `web_doctor/src/services/pregnancyCalculator.ts` | **Tạo mới**: Thư viện tính toán tuổi thai, EDD, CRL, phân loại tam cá nguyệt và validation ngày tháng y khoa | AC 2, 4 |
-| `web_doctor/src/services/pregnancyProfile.service.ts` | **Tạo mới**: Service quản lý danh sách hồ sơ thai kỳ (mock data screenshot, localStorage, search, filter, lưu mới) | AC 1, 2, 4 |
-| `web_doctor/src/pages/PregnancyProfile.tsx` | **Cập nhật**: Toàn bộ giao diện danh sách hồ sơ thai kỳ theo ảnh đính kèm + Modal tạo mới hồ sơ có live preview và validate | AC 1, 2, 3, 4 |
-| `web_doctor/src/App.tsx` | **Cập nhật**: Tích hợp tab `records`, hiển thị trang `PregnancyProfile`, xử lý điều hướng `PatientDetail` và header title | AC 4 |
+| `web_doctor/src/pages/PatientList.tsx` | **Tạo mới**: Toàn bộ giao diện Cơ sở dữ liệu Bệnh nhân theo ảnh mẫu, hiển thị cột EMAIL, badge trạng thái thai kỳ, phân trang | AC 1, 2, 3, 4 |
+| `web_doctor/src/App.tsx` | **Cập nhật**: Xóa chấm xanh indicator ở nav button, kết nối tab `patients` với `PatientList` | AC 5 |
+| `web_doctor/src/services/patient.service.ts` | **Tạo mới (hoặc tích hợp)**: Service cung cấp danh sách bệnh nhân thai phụ với role `pregnant_woman` | AC 1 |
 
 ## Steps
-- [x] 1. Khởi tạo module tính toán y khoa `web_doctor/src/services/pregnancyCalculator.ts`.
-- [x] 2. Xây dựng data service `web_doctor/src/services/pregnancyProfile.service.ts` với mock records khớp screenshot và cơ chế lưu trữ bền vững.
-- [x] 3. Hiện thực hóa màn hình `web_doctor/src/pages/PregnancyProfile.tsx` bao gồm:
-  - Bảng danh sách chuẩn UI PreCare: STT, Thai phụ, Bác sĩ phụ trách, Tuổi thai hiện tại, Ngày dự sinh, Trạng thái badge, Nút xem chi tiết.
-  - Thanh công cụ tìm kiếm và lọc trạng thái.
-  - Modal form "+ Tạo hồ sơ mới" đầy đủ validation và live preview tính toán.
-- [x] 4. Cập nhật `web_doctor/src/App.tsx` để hiển thị trang `PregnancyProfile` khi chọn tab "Hồ sơ thai kỳ", đồng bộ header và kết nối navigation "Xem chi tiết".
-- [x] 5. Chạy kiểm tra build `npm run build` của `web_doctor` và xác minh không có lỗi TypeScript / cú pháp.
-- [x] 6. Báo cáo kết quả và trình bày cho Dev xác nhận.
+- [x] 1. Xây dựng model và service `patient.service.ts` quản lý danh sách thai phụ.
+- [x] 2. Xây dựng giao diện `PatientList.tsx` chuẩn theo ảnh screenshot (cột EMAIL, avatar màu, badge trạng thái, nút Xem/Tạo hồ sơ, search, filter, pagination).
+- [x] 3. Chỉnh sửa `App.tsx`: Xóa chấm xanh trên sidebar, kết nối tab `patients` $\rightarrow$ `PatientList` và tab `records` $\rightarrow$ `PregnancyProfile`.
+- [x] 4. Kiểm tra build `npm run build` và test hoạt động.
+- [x] 5. Báo cáo Dev để kiểm tra và xác nhận.
 
 ## Verification
-- [x] Lệnh kiểm tra build: `npm --prefix web_doctor run build` (thành công 100%, 0 lỗi, build in 5.15s).
-- [x] Kiểm tra hiển thị khớp với ảnh chụp: Các cột bảng, typography, màu sắc badge xanh lá/xanh dương, nút bấm.
-- [x] Kiểm tra logic tính toán y khoa: 6 ca kiểm thử y khoa đạt kết quả chính xác theo ACOG No. 700.
-- [x] Kiểm tra validation: Chặn ngày tương lai, ngày LMP > 300 ngày, ngày siêu âm trước LMP, CRL ngoài 10-84mm.
-- [x] Kiểm tra thêm mới: Tạo thử hồ sơ mới, xuất hiện ngay trong bảng và lưu vào `localStorage`.
-- [x] Kiểm tra xem chi tiết: Nhấn "Xem chi tiết" liên kết sang `PatientDetail` đúng tên thai phụ và có nút quay lại.
+- [x] Lệnh build: `npm --prefix web_doctor run build` (exit code 0, không có lỗi, hoàn tất trong 7.33s).
+- [x] Giao diện so khớp với ảnh 1: Cột EMAIL thay thế Ngày sinh, avatar initials màu pastel, badge trạng thái (Đang mang thai, Chưa có hồ sơ, Lần sinh trước), phân trang.
+- [x] Sidebar so khớp với ảnh 2: Đã loại bỏ hoàn toàn chấm xanh ở nút chọn trang.
+- [x] Bấm tab "Danh sách bệnh nhân" ra đúng `PatientList`, bấm "Hồ sơ thai kỳ" ra `PregnancyProfile`.
+- [x] Bấm "Xem hồ sơ" mở chi tiết thai phụ, bấm "+ Tạo hồ sơ" mở form khởi tạo thai kỳ.
 
 ## Risks, dependencies, open questions
-- Ràng buộc: Backend không bị sửa đổi bất kỳ dòng code nào theo đúng chỉ thị ("không đụng be là giao diện web").
-- Không push code theo chỉ thị của Dev ("ko push code").
+- Ràng buộc: "không đụng be, ko push code". Mọi thay đổi giữ cục bộ.
 
 ## Progress
 - [x] Dev approved plan
@@ -59,4 +54,3 @@ Xây dựng trọn vẹn tính năng Quản lý Hồ sơ Thai kỳ trên Fronten
 - [x] Checks run: command and result
 - [x] PR prepared (local draft only, no push)
 - [ ] Dev final confirmation
-

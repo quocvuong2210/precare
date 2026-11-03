@@ -506,7 +506,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
               {/* Phần 1: Thông tin thai phụ */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#4D7D74]"></span>
+
                   1. Thông tin Thai phụ
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -570,7 +570,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#4D7D74]"></span>
+  
                     2. Căn cứ tính Tuổi thai & Ngày dự sinh (ACOG 700)
                   </h4>
                   <span className="text-[11px] text-teal-700 font-medium bg-teal-50 px-2 py-0.5 rounded-md">
@@ -795,7 +795,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
               {/* Phần 3: Tiền sử cơ bản */}
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#4D7D74]"></span>
+
                   3. Tiền sử y tế & Sản khoa cơ bản
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

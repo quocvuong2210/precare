@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
+import { PatientList } from './pages/PatientList';
 import { PregnancyProfile } from './pages/PregnancyProfile';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
@@ -184,17 +185,17 @@ export const App: React.FC = () => {
                     setActiveTab(item.id);
                     setSelectedPatientId(null);
                   }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#4D7D74] text-white shadow-sm font-semibold'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-3.5">
+
                     <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                     <span>{item.label}</span>
-                  </div>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>}
+
+
                 </button>
               );
             })}
@@ -277,6 +278,11 @@ export const App: React.FC = () => {
             <PatientDetail
               patientId={selectedPatientId}
               onBack={() => setSelectedPatientId(null)}
+            />
+          ) : activeTab === 'patients' ? (
+            <PatientList
+              onSelectPatient={(id) => setSelectedPatientId(id)}
+              onNavigateToCreateRecord={() => setActiveTab('records')}
             />
           ) : activeTab === 'records' ? (
             <PregnancyProfile onSelectPatient={(id) => setSelectedPatientId(id)} />
