@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { getStoredPregnancyRecords } from '../services/pregnancyProfile.service';
 import { TrajectoryChart } from '../components/TrajectoryChart';
 import { ArrowLeft, Download, ShieldCheck, Cpu, BookOpen, AlertCircle } from 'lucide-react';
 
@@ -8,6 +9,15 @@ interface PatientDetailProps {
 }
 
 export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack }) => {
+  const currentRecord = useMemo(() => {
+    const list = getStoredPregnancyRecords();
+    return list.find((r) => r.id === patientId);
+  }, [patientId]);
+
+  const patientName = currentRecord?.patientName || 'Nguyễn Thảo Chi';
+  const doctorName = currentRecord?.doctorName || 'BS. Lê Minh';
+  const gaDisplay = currentRecord?.gestationalAgeDisplay || '32 tuần 0 ngày';
+  const eddDisplay = currentRecord?.displayEdd || '30/10/2026';
   const [selectedBiometric, setSelectedBiometric] = useState<'EFW' | 'AC' | 'BPD' | 'FL' | 'HC'>('EFW');
 
   // Mock timeline of biometric measurements
@@ -25,11 +35,11 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
           onClick={onBack}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm"
         >
-          <ArrowLeft className="w-4 h-4" /> Quay lại Tổng quan
+          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
         </button>
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Hồ Sơ Thai Kỳ: Nguyễn Thảo Chi</h2>
-          <p className="text-xs text-slate-500">Mã Hồ Sơ: {patientId} | Bác Sĩ Phụ Trách: BS. Lê Minh</p>
+          <h2 className="text-xl font-bold text-slate-800">Hồ Sơ Thai Kỳ: {patientName}</h2>
+          <p className="text-xs text-slate-500">Mã Hồ Sơ: {patientId} | Bác Sĩ Phụ Trách: {doctorName}</p>
         </div>
       </div>
 
@@ -37,13 +47,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
           <div className="text-xs font-medium text-slate-500">Tuổi Thai Hiện Tại</div>
-          <div className="text-2xl font-bold text-teal-700 mt-1">32 tuần 0 ngày</div>
+          <div className="text-2xl font-bold text-teal-700 mt-1">{gaDisplay}</div>
           <div className="text-xs text-slate-400 mt-1">Ưu tiên Siêu Âm Quý 1</div>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
           <div className="text-xs font-medium text-slate-500">Ngày Dự Sinh (EDD)</div>
-          <div className="text-2xl font-bold text-slate-800 mt-1">30/10/2026</div>
+          <div className="text-2xl font-bold text-slate-800 mt-1">{eddDisplay}</div>
           <div className="text-xs text-slate-400 mt-1">Tính từ Siêu âm Q1</div>
         </div>
 

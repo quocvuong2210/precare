@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
+import { PregnancyProfile } from './pages/PregnancyProfile';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -183,14 +184,17 @@ export const App: React.FC = () => {
                     setActiveTab(item.id);
                     setSelectedPatientId(null);
                   }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                     isActive
                       ? 'bg-[#4D7D74] text-white shadow-sm font-semibold'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                  <span>{item.label}</span>
+                  <div className="flex items-center gap-3.5">
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                    <span>{item.label}</span>
+                  </div>
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>}
                 </button>
               );
             })}
@@ -236,7 +240,17 @@ export const App: React.FC = () => {
         {/* Top Header Bar */}
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-5 sticky top-0 z-30 flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-            {selectedPatientId ? 'Hồ sơ chi tiết thai phụ' : 'Tổng quan hoạt động'}
+            {selectedPatientId
+              ? 'Hồ sơ chi tiết thai phụ'
+              : activeTab === 'records'
+              ? 'Danh sách Hồ sơ Thai kỳ'
+              : activeTab === 'patients'
+              ? 'Danh sách bệnh nhân'
+              : activeTab === 'reports'
+              ? 'Báo cáo thống kê'
+              : activeTab === 'settings'
+              ? 'Cài đặt hệ thống'
+              : 'Tổng quan hoạt động'}
           </h1>
 
           {/* Right Header Info */}
@@ -264,6 +278,8 @@ export const App: React.FC = () => {
               patientId={selectedPatientId}
               onBack={() => setSelectedPatientId(null)}
             />
+          ) : activeTab === 'records' ? (
+            <PregnancyProfile onSelectPatient={(id) => setSelectedPatientId(id)} />
           ) : (
             <Dashboard onSelectPatient={(id) => setSelectedPatientId(id)} />
           )}
