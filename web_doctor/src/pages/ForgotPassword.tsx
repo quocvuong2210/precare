@@ -85,8 +85,10 @@ const OtpCell: React.FC<{
       type="tel"
       pattern="[0-9]*"
       autoComplete="one-time-code"
+      autoCorrect="off"
+      autoCapitalize="off"
+      spellCheck={false}
       inputMode="numeric"
-      maxLength={1}
       value={value}
       onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
       onKeyDown={onKeyDown}
@@ -234,30 +236,73 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
     }, 30_000);
   };
 
-  // ── Step 3: OTP cell handlers ─────────────────────────────────────────────────
+  // ── Step 3: OTP cell handlers (khắc phục lỗi bộ gõ tiếng Việt) ───────────────
   const handleOtpChange = (index: number, val: string) => {
     setOtpError(null);
-    if (val.length > 1) {
-      // paste nhiều ký tự
-      const digits = val.replace(/\D/g, '').slice(0, 6).split('');
+    const digitsOnly = val.replace(/\D/g, '');
+    if (digitsOnly.length > 1) {
+      const digits = digitsOnly.slice(0, 6).split('');
       const next = [...otp];
       digits.forEach((d, i) => { next[i] = d; });
       setOtp(next);
       const focusIdx = Math.min(digits.length, 5);
-      inputRefs.current[focusIdx].current?.focus();
+      requestAnimationFrame(() => inputRefs.current[focusIdx].current?.focus());
       if (digits.length === 6) triggerVerify(next.join(''));
       return;
     }
+    const digit = digitsOnly.slice(-1);
     const next = [...otp];
-    next[index] = val;
+    next[index] = digit;
     setOtp(next);
-    if (val && index < 5) inputRefs.current[index + 1].current?.focus();
-    if (val && index === 5) triggerVerify(next.join(''));
+    if (digit && index < 5) requestAnimationFrame(() => inputRefs.current[index + 1].current?.focus());
+    if (digit && index === 5) {
+      const full = next.join('');
+      if (full.length === 6 && !next.includes('')) triggerVerify(full);
+    }
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    // 1. Phím số 0-9: Chủ động ngắt IME composition
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      setOtpError(null);
+      const digit = e.key;
+      const next = [...otp];
+      next[index] = digit;
+      setOtp(next);
+      if (index < 5) {
+        requestAnimationFrame(() => inputRefs.current[index + 1].current?.focus());
+      }
+      const full = next.join('');
+      if (full.length === 6 && !next.includes('')) {
+        triggerVerify(full);
+      }
+      return;
+    }
+
+    // 2. Phím Backspace
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      setOtpError(null);
+      const next = [...otp];
+      if (next[index]) {
+        next[index] = '';
+        setOtp(next);
+      } else if (index > 0) {
+        next[index - 1] = '';
+        setOtp(next);
+        requestAnimationFrame(() => inputRefs.current[index - 1].current?.focus());
+      }
+      return;
+    }
+
+    // 3. Phím mũi tên Trái / Phải
+    if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
       inputRefs.current[index - 1].current?.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      inputRefs.current[index + 1].current?.focus();
     }
   };
 
@@ -269,7 +314,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
     text.split('').forEach((d, i) => { next[i] = d; });
     setOtp(next);
     const focusIdx = Math.min(text.length, 5);
-    inputRefs.current[focusIdx].current?.focus();
+    requestAnimationFrame(() => inputRefs.current[focusIdx].current?.focus());
     if (text.length === 6) triggerVerify(text);
   };
 

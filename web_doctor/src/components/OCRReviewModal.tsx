@@ -30,7 +30,7 @@ export const OCRReviewModal: React.FC<OCRReviewModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Khởi tạo các trường số đo sinh trắc học (không hardcode giá trị giả)
+  // Khởi tạo các trường số đo sinh trắc học thai nhi
   const [bpd, setBpd] = useState('');
   const [hc, setHc] = useState('');
   const [ac, setAc] = useState('');

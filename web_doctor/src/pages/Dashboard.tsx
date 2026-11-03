@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Calendar,
@@ -24,19 +25,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
   searchQuery: externalSearchQuery,
   onClearSearch: externalClearSearch,
 }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   // Quản lý internal search query nếu không được truyền từ props ngoài
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
   const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
   const handleClearSearch = externalClearSearch || (() => setInternalSearchQuery(''));
 
-  // Tên bác sĩ lấy trung thực từ phiên người dùng đã xác thực (GET /api/v1/auth/me)
-  const doctorDisplayName = user?.full_name
-    ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
-    : user?.email
-    ? `Bác sĩ (${user.email})`
-    : 'Bác sĩ PreCare';
+  // Khôi phục nghiêm ngặt Auth Guard: Nếu chưa xác thực qua Backend thật, lập tức chuyển hướng về /login
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !user)) {
+      navigate('/login', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
+
+  // Cập nhật câu chào tự động theo thời gian thực (0h-11h59: Sáng, 12h-17h59: Chiều, 18h-23h59: Tối)
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour >= 0 && hour < 12) {
+      return 'CHÀO BUỔI SÁNG';
+    }
+    if (hour >= 12 && hour < 18) {
+      return 'CHÀO BUỔI CHIỀU';
+    }
+    return 'CHÀO BUỔI TỐI';
+  };
+
+  // Định dạng tên Bác sĩ chỉ lấy trực tiếp từ user?.full_name, xử lý tiền tố tránh lặp
+  const formatDoctorName = (name?: string | null): string | null => {
+    if (!name) return null;
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    if (/^(BS\.?|Bác\s*sĩ)\s*/i.test(trimmed)) {
+      return trimmed;
+    }
+    return `BS. ${trimmed}`;
+  };
+
+  const doctorName = formatDoctorName(user?.full_name);
 
   // State dữ liệu lâm sàng & trạng thái API
   const [records, setRecords] = useState<ClinicalPregnancyRecord[]>([]);
@@ -94,8 +121,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-1.5 max-w-3xl">
-            <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-wide text-white uppercase">
-              CHÀO BUỔI SÁNG, {doctorDisplayName}!
+            <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-wide text-white">
+              {doctorName ? (
+                <span className="uppercase">
+                  {getGreeting()}, {doctorName}!
+                </span>
+              ) : (
+                'Chào Bác sĩ! (Không thể tải thông tin định danh)'
+              )}
             </h1>
             {apiError ? (
               <p className="font-sans text-xs sm:text-sm text-teal-100/90 leading-relaxed">

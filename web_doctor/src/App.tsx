@@ -29,7 +29,7 @@ import {
  * Giao diện Bác sĩ (Doctor Portal)
  */
 const DoctorPortal: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'patients' | 'records' | 'reports' | 'settings'>('overview');
@@ -76,6 +76,13 @@ const DoctorPortal: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Khôi phục nghiêm ngặt quy trình Xác thực: Nếu chưa đăng nhập qua Backend thật, lập tức chuyển hướng về /login
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user)) {
+      navigate('/login', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, user, navigate]);
+
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: Home },
     { id: 'patients', label: 'Danh sách bệnh nhân', icon: Users },
@@ -89,15 +96,22 @@ const DoctorPortal: React.FC = () => {
     navigate('/login');
   };
 
-  const doctorDisplayName = user?.full_name
-    ? (user.full_name.startsWith('BS.') ? user.full_name : `BS. ${user.full_name}`)
-    : 'Bác sĩ';
+  // Định dạng tên Bác sĩ chỉ lấy trực tiếp từ user?.full_name, xử lý tiền tố tránh lặp "BS. Bác sĩ"
+  const formatDoctorName = (name?: string | null): string | null => {
+    if (!name) return null;
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    if (/^(BS\.?|Bác\s*sĩ)\s*/i.test(trimmed)) {
+      return trimmed;
+    }
+    return `BS. ${trimmed}`;
+  };
 
-  const doctorInitial = (
-    user?.full_name?.replace(/^BS\.?\s*/i, '').trim().charAt(0) ||
-    user?.email?.charAt(0) ||
-    ''
-  ).toUpperCase();
+  const doctorDisplayName = formatDoctorName(user?.full_name) || 'Chưa xác định danh tính';
+
+  const doctorInitial = user?.full_name?.trim()
+    ? user.full_name.replace(/^(BS\.?|Bác\s*sĩ)\s*/i, '').trim().charAt(0).toUpperCase()
+    : '';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 font-sans">

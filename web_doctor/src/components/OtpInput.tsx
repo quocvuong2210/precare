@@ -55,14 +55,13 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   }, [autoFocus, disabled]);
 
   /**
-   * Xử lý thay đổi giá trị từng ô (được bảo vệ bởi Regex lọc bỏ ký tự Unikey)
+   * Xử lý thay đổi giá trị từng ô (hỗ trợ nhập số và ngắt xung đột IME)
    */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    // 1. Dùng Regex loại bỏ toàn bộ ký tự không phải số (kể cả chữ cái do Unikey tạo ra)
-    const value = e.target.value.replace(/[^0-9]/g, '');
+    const rawVal = e.target.value.replace(/\D/g, '');
 
-    // Trường hợp người dùng xóa hoặc Unikey xóa trắng
-    if (!value) {
+    // Trường hợp xóa ô
+    if (!rawVal) {
       const newOtp = [...otp];
       newOtp[index] = '';
       setOtp(newOtp);
@@ -70,9 +69,9 @@ export const OtpInput: React.FC<OtpInputProps> = ({
       return;
     }
 
-    // 2. Xử lý khi người dùng Paste hoặc nhập nhiều số cùng lúc
-    if (value.length > 1) {
-      const digits = value.slice(0, length).split('');
+    // Trường hợp dán hoặc autofill nhiều chữ số
+    if (rawVal.length > 1) {
+      const digits = rawVal.slice(0, length).split('');
       const newOtp = [...otp];
       for (let i = 0; i < length; i++) {
         if (i >= index && digits[i - index]) {
@@ -84,16 +83,16 @@ export const OtpInput: React.FC<OtpInputProps> = ({
       onChange?.(fullValue);
 
       const nextFocus = Math.min(index + digits.length, length - 1);
-      inputRefs.current[nextFocus]?.focus();
+      requestAnimationFrame(() => inputRefs.current[nextFocus]?.focus());
 
-      if (fullValue.length === length) {
+      if (fullValue.length === length && !newOtp.includes('')) {
         onComplete?.(fullValue);
       }
       return;
     }
 
-    // 3. Nhập 1 chữ số thông thường: lấy ký tự số cuối cùng
-    const singleDigit = value.slice(-1);
+    // Nhập 1 chữ số thông thường: trích xuất lấy duy nhất ký tự số cuối cùng
+    const singleDigit = rawVal.slice(-1);
     const newOtp = [...otp];
     newOtp[index] = singleDigit;
     setOtp(newOtp);
@@ -103,25 +102,59 @@ export const OtpInput: React.FC<OtpInputProps> = ({
 
     // Tự động nhảy sang ô tiếp theo
     if (singleDigit && index < length - 1) {
-      inputRefs.current[index + 1]?.focus();
+      requestAnimationFrame(() => inputRefs.current[index + 1]?.focus());
     }
 
     // Kích hoạt onComplete khi đã nhập đủ tất cả các ô
-    if (fullValue.length === length) {
+    if (fullValue.length === length && !newOtp.includes('')) {
       onComplete?.(fullValue);
     }
   };
 
   /**
-   * Xử lý phím Backspace và mũi tên di chuyển
+   * Xử lý phím số (ngắt IME), Backspace và mũi tên di chuyển
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === 'Backspace') {
-      if (!otp[index] && index > 0) {
-        // Nếu ô hiện tại rỗng, nhảy về ô trước đó và focus
-        inputRefs.current[index - 1]?.focus();
+    // 1. Phím số 0-9: Chủ động ngắt IME composition
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      const digit = e.key;
+      const newOtp = [...otp];
+      newOtp[index] = digit;
+      setOtp(newOtp);
+
+      const fullValue = newOtp.join('');
+      onChange?.(fullValue);
+
+      if (index < length - 1) {
+        requestAnimationFrame(() => inputRefs.current[index + 1]?.focus());
       }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
+
+      if (fullValue.length === length && !newOtp.includes('')) {
+        onComplete?.(fullValue);
+      }
+      return;
+    }
+
+    // 2. Phím Backspace
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      const newOtp = [...otp];
+      if (newOtp[index]) {
+        newOtp[index] = '';
+        setOtp(newOtp);
+        onChange?.(newOtp.join(''));
+      } else if (index > 0) {
+        newOtp[index - 1] = '';
+        setOtp(newOtp);
+        onChange?.(newOtp.join(''));
+        requestAnimationFrame(() => inputRefs.current[index - 1]?.focus());
+      }
+      return;
+    }
+
+    // 3. Phím mũi tên Trái / Phải
+    if (e.key === 'ArrowLeft' && index > 0) {
       e.preventDefault();
       inputRefs.current[index - 1]?.focus();
     } else if (e.key === 'ArrowRight' && index < length - 1) {
@@ -135,8 +168,8 @@ export const OtpInput: React.FC<OtpInputProps> = ({
    */
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text/plain');
-    const value = pastedData.replace(/[^0-9]/g, '').slice(0, length);
+    const pastedData = e.clipboardData.getData('text');
+    const value = pastedData.replace(/\D/g, '').slice(0, length);
     if (!value) return;
 
     const digits = value.split('');
@@ -150,9 +183,9 @@ export const OtpInput: React.FC<OtpInputProps> = ({
     onChange?.(fullValue);
 
     const nextIndex = Math.min(digits.length, length - 1);
-    inputRefs.current[nextIndex]?.focus();
+    requestAnimationFrame(() => inputRefs.current[nextIndex]?.focus());
 
-    if (fullValue.length === length) {
+    if (fullValue.length === length && !newOtp.includes('')) {
       onComplete?.(fullValue);
     }
   };
@@ -168,8 +201,10 @@ export const OtpInput: React.FC<OtpInputProps> = ({
             type="tel"
             inputMode="numeric"
             pattern="[0-9]*"
-            maxLength={1}
             autoComplete="one-time-code"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             disabled={disabled}
             value={digit}
             onChange={(e) => handleChange(e, index)}

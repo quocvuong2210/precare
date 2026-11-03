@@ -23,34 +23,6 @@ export interface LoginProps {
   defaultRole?: 'doctor' | 'admin';
 }
 
-const DEMO_ACCOUNTS: Record<string, { role: 'doctor' | 'admin'; full_name: string; validPasswords: string[] }> = {
-  'bacsi.leminh@phusantw.org': {
-    role: 'doctor',
-    full_name: 'BS. Lê Minh',
-    validPasswords: ['password123', 'Bacsileminh2026@'],
-  },
-  'quantri.nam@phusantw.org': {
-    role: 'admin',
-    full_name: 'Nguyễn Hoàng Nam',
-    validPasswords: ['password123', 'Admin123@'],
-  },
-  'bacsi.nguyen@precare.vn': {
-    role: 'doctor',
-    full_name: 'BS. Nguyễn Văn',
-    validPasswords: ['password123'],
-  },
-  'nguyenminhhoang@precare.vn': {
-    role: 'doctor',
-    full_name: 'ThS. BS. Nguyễn Minh Hoàng',
-    validPasswords: ['password123'],
-  },
-  'admin@precare.vn': {
-    role: 'admin',
-    full_name: 'Quản trị viên Hệ thống',
-    validPasswords: ['password123'],
-  },
-};
-
 export const Login: React.FC<LoginProps> = ({
   onSuccess,
   onLoginSuccess,
@@ -171,104 +143,33 @@ export const Login: React.FC<LoginProps> = ({
 
     try {
       let authResponse;
-     try {
+      try {
         // Kết nối API POST /api/v1/auth/login xác thực với bảng users của PostgreSQL (precare_db)
         authResponse = await authApi.login({
           email: trimmedEmail,
           password: password,
         });
       } catch (apiErr: any) {
+        setIsSubmitting(false);
         // Xử lý phản hồi từ Backend API / Database precare_db
         if (apiErr.response) {
           const status = apiErr.response.status;
           const detail = apiErr.response.data?.detail || apiErr.message;
 
           if (status === 401) {
-            // Phân biệt: tài khoản chưa kích hoạt vs sai mật khẩu
-            if (typeof detail === 'string' && (
-              detail.includes('kích hoạt') ||
-              detail.includes('xét duyệt') ||
-              detail.includes('inactive') ||
-              detail.includes('not active')
-            )) {
-              setLoginError('Tài khoản đang chờ xét duyệt hồ sơ chuyên môn. Vui lòng chờ thông báo qua email.');
-            } else {
-              setPasswordError('Mật khẩu không chính xác hoặc email không tồn tại.');
-              setLoginError('Email hoặc mật khẩu không chính xác.');
-            }
+            setPasswordError('Mật khẩu không chính xác hoặc email không tồn tại.');
+            setLoginError('Email hoặc mật khẩu không chính xác.');
           } else if (status === 400 && typeof detail === 'string') {
-            // Backend có thể trả 400 cho tài khoản chưa kích hoạt
-            if (detail.includes('kích hoạt') || detail.includes('xét duyệt')) {
-              setLoginError(detail);
-            } else {
-              setLoginError(detail);
-            }
+            setLoginError(detail);
           } else if (typeof detail === 'string') {
             setLoginError(detail);
           } else {
             setLoginError('Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
           }
-          setIsSubmitting(false);
-          return;
+        } else {
+          setLoginError(apiErr.message || 'Không thể kết nối máy chủ Backend. Vui lòng kiểm tra Backend Gateway đang chạy tại localhost:8000.');
         }
-
-        // Fallback kiểm tra thông tin tài khoản offline / demo khi backend không kết nối được
-        const cleanEmail = trimmedEmail.toLowerCase();
-
-        if (apiErr.code === 'ECONNREFUSED' || apiErr.code === 'ERR_NETWORK' ||
-            apiErr.message?.includes('Network Error') || apiErr.message?.includes('timeout')) {
-          setLoginError('Không thể kết nối máy chủ. Vui lòng kiểm tra backend đang chạy tại localhost:8000.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        let registeredUsers: Array<{ email: string; password?: string; full_name?: string }> = [];
-        try {
-          const raw = localStorage.getItem('precare_registered_users');
-          if (raw) registeredUsers = JSON.parse(raw);
-        } catch {
-          // ignore
-        }
-
-        const known = DEMO_ACCOUNTS[cleanEmail];
-        const registered = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-
-        if (!known && !registered) {
-          setEmailError('Email không tồn tại trong hệ thống.');
-          setLoginError('Email không tồn tại trong hệ thống.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Kiểm tra mật khẩu
-        const isValidPassword =
-          (known && known.validPasswords.includes(password)) ||
-          (registered && (registered.password === password || password === 'password123'));
-
-        if (!isValidPassword) {
-          setPasswordError('Mật khẩu không chính xác.');
-          setLoginError('Mật khẩu không chính xác.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const resolvedRole = known ? known.role : (role || 'doctor');
-        const userObj = {
-          id: 'u-' + Date.now(),
-          email: cleanEmail,
-          full_name: known ? known.full_name : registered?.full_name || 'Bác sĩ PreCare',
-          role: resolvedRole,
-          is_active: true,
-        };
-
-        const mockToken = 'mock_jwt_' + resolvedRole + '_' + Date.now();
-        localStorage.setItem('precare_token', mockToken);
-        localStorage.setItem('precare_user', JSON.stringify(userObj));
-
-        authResponse = {
-          user: userObj,
-          tokens: { access_token: mockToken, token_type: 'Bearer' },
-        };
+        return;
       }
 
       setIsSubmitting(false);

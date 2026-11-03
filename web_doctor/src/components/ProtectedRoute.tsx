@@ -99,7 +99,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 2. Đánh giá quyết định truy cập dựa trên phiên xác thực duy nhất từ AuthContext
+  // 2. Bắt buộc: Nếu chưa đăng nhập hoặc không có user hợp lệ -> Chuyển hướng ngay lập tức về /login
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // 3. Đánh giá quyết định truy cập dựa trên phiên xác thực duy nhất từ AuthContext
   const decision = getRouteAccessDecision({
     isAuthenticated,
     userRole: user?.role,

@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile, UserRole, AuthResponseData } from '../types/auth.types';
 import { authApi } from '../services/auth.service';
 
@@ -16,62 +16,65 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const stored = localStorage.getItem('precare_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('precare_token') || null;
-  });
-
+  // Bắt đầu với null để đảm bảo không bypass trước khi xác thực với Backend thật
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize session on mount
+  // Khởi tạo và kiểm tra tính hợp lệ của phiên đăng nhập với Backend thật
   useEffect(() => {
     const initAuth = async () => {
-      const currentToken = localStorage.getItem('precare_token');
-      const storedUser = localStorage.getItem('precare_user');
+      const currentToken =
+        localStorage.getItem('precare_token') ||
+        localStorage.getItem('precare_access_token') ||
+        localStorage.getItem('token');
 
-      if (currentToken && storedUser) {
-        try {
-          const parsedUser: UserProfile = JSON.parse(storedUser);
-          setUser(parsedUser);
-          setToken(currentToken);
+      // 1. Kiểm tra tính hợp lệ của token trước khi xác thực với Backend
+      const isFakeToken =
+        !currentToken ||
+        currentToken === 'token_gia_de_test_ui' ||
+        currentToken.startsWith('mock-') ||
+        currentToken.startsWith('mock_') ||
+        currentToken.startsWith('dev_');
 
-          // Asynchronously verify/refresh profile with backend if online
-          try {
-            const freshUser = await authApi.getMe();
-            if (freshUser && freshUser.role) {
-              setUser(freshUser);
-              localStorage.setItem('precare_user', JSON.stringify(freshUser));
-            }
-          } catch (err: any) {
-            // If token expired or invalid (401), clear invalid credentials
-            if (err.response?.status === 401) {
-              console.warn('[PreCare Auth] Session expired (401). Clearing stored auth.');
-              localStorage.removeItem('precare_token');
-              localStorage.removeItem('precare_user');
-              localStorage.removeItem('precare_refresh_token');
-              setUser(null);
-              setToken(null);
-            }
-            // For network errors / offline dev mode, keep local user session
-          }
-        } catch {
-          localStorage.removeItem('precare_user');
-          setUser(null);
-        }
-      } else {
+      if (isFakeToken) {
+        localStorage.removeItem('precare_token');
+        localStorage.removeItem('precare_access_token');
+        localStorage.removeItem('precare_user');
+        localStorage.removeItem('precare_refresh_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
         setToken(null);
+        setIsLoading(false);
+        return;
       }
 
-      setIsLoading(false);
+      // 2. BẮT BUỘC gọi API GET /api/v1/auth/me để xác thực token đó với Backend thật
+      try {
+        const freshUser = await authApi.getMe();
+        if (freshUser && freshUser.id && freshUser.role) {
+          setUser(freshUser);
+          setToken(currentToken);
+          localStorage.setItem('precare_user', JSON.stringify(freshUser));
+          localStorage.setItem('precare_token', currentToken);
+        } else {
+          throw new Error('Thông tin người dùng trả về từ Backend không hợp lệ.');
+        }
+      } catch (err: any) {
+        // Token hết hạn, không hợp lệ (401) hoặc Backend từ chối: Lập tức xóa sạch localStorage
+        console.warn('[PreCare Auth] Xác thực token với Backend thất bại. Xóa sạch phiên đăng nhập.');
+        localStorage.removeItem('precare_token');
+        localStorage.removeItem('precare_access_token');
+        localStorage.removeItem('precare_user');
+        localStorage.removeItem('precare_refresh_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+        setToken(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     initAuth();
@@ -107,8 +110,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('[PreCare Auth] Error during logout API call:', err);
     } finally {
       localStorage.removeItem('precare_token');
+      localStorage.removeItem('precare_access_token');
       localStorage.removeItem('precare_user');
       localStorage.removeItem('precare_refresh_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       setUser(null);
       setToken(null);
     }

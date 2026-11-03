@@ -85,32 +85,6 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Danh sách tài khoản đã đăng ký mẫu (kiểm tra trùng lặp offline / demo)
-// Đồng bộ với dữ liệu thực trong precare_db (users table)
-const DEFAULT_EXISTING_EMAILS = [
-  // Demo accounts (DEMO_ACCOUNTS trong Login.tsx)
-  'admin@precare.vn',
-  'bacsi.leminh@phusantw.org',
-  'bacsi.nguyen@precare.vn',
-  'me.bau@gmail.com',
-  'nguyenminhhoang@precare.vn',
-  // Accounts thực từ DB (precare_db.public.users)
-  'user@example.com',
-  'bacsi.choaduyet@phusant.vn',
-  'haiyen.le@gmail.com',
-  'thaochi.nguyen@gmail.com',
-  'bacsi.leminh@phusantw.org',
-  'quantri.nam@phusantw.org',
-  'yennhi5033@gmail.com',
-];
-
-const DEFAULT_EXISTING_PHONES = [
-  '0903123456',
-  '0912345678',
-  '0987654321',
-  '0933221100',
-];
-
 // Tự động dọn dẹp cache tài khoản cũ trong localStorage để không xung đột với Database PostgreSQL
 try {
   if (typeof window !== 'undefined') {
@@ -119,10 +93,6 @@ try {
 } catch {
   // ignore
 }
-
-const getRegisteredUsersStore = (): Array<{ email: string; phone_number?: string }> => {
-  return [];
-};
 
 const saveUserToStore = (_user: { email: string; phone_number?: string; full_name?: string }) => {
   // Không lưu tài khoản vào localStorage để việc kiểm tra luôn do Database PostgreSQL quyết định
@@ -397,40 +367,13 @@ export const authApi = {
         const detail = err.response?.data?.detail;
         throw new Error(
           typeof detail === 'string' && detail.includes('already exists')
-            ? 'Email n�y d� t?n t?i tr�n h? th?ng.'
-            : detail || '�ang k� th?t b?i. Vui l�ng ki?m tra l?i th�ng tin.'
+            ? 'Email này đã tồn tại trên hệ thống.'
+            : detail || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.'
         );
       }
 
-      // Fallback offline mock khi backend chua ch?y
       if (!err.response) {
-        saveUserToStore({
-          email: payload.email,
-          phone_number: payload.phone_number,
-          full_name: payload.full_name,
-        });
-
-        const mockUser = {
-          id: 'u-' + Date.now(),
-          email: payload.email,
-          full_name: payload.full_name,
-          phone_number: payload.phone_number,
-          role: payload.role,
-          is_active: false,
-          created_at: new Date().toISOString(),
-        };
-
-        return {
-          success: true,
-          data: {
-            user: mockUser,
-            tokens: {
-              access_token: 'mock-jwt-token-' + Date.now(),
-              token_type: 'Bearer',
-            },
-          },
-          message: '�ang k� t�i kho?n th�nh c�ng (Offline Mode)',
-        };
+        throw new Error('Không thể kết nối đến máy chủ Backend. Vui lòng kiểm tra Backend Gateway đang chạy tại localhost:8000.');
       }
 
       throw err;
@@ -438,112 +381,42 @@ export const authApi = {
   },
 
   /**
-   * 6. POST /api/v1/auth/login � �ang nh?p h? th?ng theo API Contract STORY-2.1
+   * 6. POST /api/v1/auth/login — Đăng nhập hệ thống theo API Contract STORY-2.1
    */
   async login(data: LoginRequest): Promise<AuthResponseData> {
-    // Role mặc định phục vụ kịch bản offline/fallback
-    const fallbackRole: UserRole = 'doctor';
-    const fallbackName = 'BS. Lê Minh';
+    const formData = new URLSearchParams();
+    formData.append('username', data.email.trim());
+    formData.append('password', data.password);
 
-    try {
-      const formData = new URLSearchParams();
-      formData.append('username', data.email.trim());
-      formData.append('password', data.password);
+    const res = await apiClient.post('/auth/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
 
-      const res = await apiClient.post('/auth/login', formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
-
-      const token = res.data?.access_token || res.data?.data?.tokens?.access_token;
-      if (token) {
-        localStorage.setItem('precare_token', token);
-      }
-
-      let userProfile: UserProfile;
-      try {
-        const meRes = await apiClient.get('/auth/me', {
-          headers: { Authorization: 'Bearer ' + token },
-        });
-        const fetched = meRes.data?.data || meRes.data;
-        // Bắt buộc lấy role chính chủ từ CSDL backend (GET /auth/me), tuyệt đối không tự ý ghi đè
-        userProfile = {
-          ...fetched,
-          role: fetched?.role || fallbackRole,
-        };
-      } catch {
-        userProfile = {
-          id: 'u-' + Date.now(),
-          email: data.email,
-          full_name: fallbackName,
-          role: fallbackRole,
-          is_active: true,
-        };
-      }
-
-      localStorage.setItem('precare_user', JSON.stringify(userProfile));
-
-      return {
-        user: userProfile,
-        tokens: {
-          access_token: token,
-          token_type: 'Bearer',
-        },
-      };
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        try {
-          const jsonRes = await apiClient.post('/auth/login', {
-            email: data.email.trim(),
-            password: data.password,
-          });
-          const token = jsonRes.data?.data?.tokens?.access_token || jsonRes.data?.access_token;
-          if (token) {
-            localStorage.setItem('precare_token', token);
-          }
-          const fetchedUser = jsonRes.data?.data?.user;
-          const user = {
-            id: fetchedUser?.id || 'u-' + Date.now(),
-            email: data.email,
-            full_name: fetchedUser?.full_name || fallbackName,
-            role: fetchedUser?.role || fallbackRole,
-            is_active: true,
-          };
-          localStorage.setItem('precare_user', JSON.stringify(user));
-          return {
-            user,
-            tokens: { access_token: token, token_type: 'Bearer' },
-          };
-        } catch (jsonErr: any) {
-          throw jsonErr;
-        }
-      }
-
-      if (err.response?.status === 401) {
-        throw new Error('Email hoặc mật khẩu không chính xác.');
-      }
-
-      if (!err.response) {
-        const mockToken = 'mock-jwt-token-' + fallbackRole + '-' + Date.now();
-        localStorage.setItem('precare_token', mockToken);
-        const mockUser: UserProfile = {
-          id: 'u-102948',
-          email: data.email,
-          full_name: fallbackName,
-          role: fallbackRole,
-          is_active: true,
-        };
-        localStorage.setItem('precare_user', JSON.stringify(mockUser));
-        return {
-          user: mockUser,
-          tokens: {
-            access_token: mockToken,
-            token_type: 'Bearer',
-          },
-        };
-      }
-
-      throw err;
+    const token = res.data?.access_token || res.data?.data?.tokens?.access_token;
+    if (!token) {
+      throw new Error('Máy chủ Backend không trả về Access Token hợp lệ.');
     }
+
+    localStorage.setItem('precare_token', token);
+
+    // Bắt buộc xác thực và lấy UserProfile chính thức từ Backend qua GET /auth/me
+    const meRes = await apiClient.get('/auth/me', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const userProfile = meRes.data?.data || meRes.data;
+    if (!userProfile || !userProfile.id) {
+      throw new Error('Dữ liệu hồ sơ người dùng trả về từ Backend không hợp lệ.');
+    }
+
+    localStorage.setItem('precare_user', JSON.stringify(userProfile));
+
+    return {
+      user: userProfile,
+      tokens: {
+        access_token: token,
+        token_type: 'Bearer',
+      },
+    };
   },
 
   /**
@@ -556,7 +429,6 @@ export const authApi = {
 
   /**
    * 8. POST /api/v1/auth/forgot-password — Yêu cầu OTP khôi phục mật khẩu
-   * Fallback offline: giả lập thành công để không block UX khi backend chưa chạy
    */
   async forgotPassword(data: ForgotPasswordRequest): Promise<any> {
     try {
@@ -584,7 +456,6 @@ export const authApi = {
 
   /**
    * 9. POST /api/v1/auth/reset-password — Đặt lại mật khẩu với OTP
-   * Fallback offline: giả lập thành công để dev test UX bước 4 → success
    */
   async resetPassword(data: ResetPasswordRequest): Promise<any> {
     const payload = {
@@ -592,18 +463,8 @@ export const authApi = {
       otp_code: data.otp_code || data.otpCode,
       new_password: data.new_password || data.newPassword,
     };
-    try {
-      const res = await apiClient.post('/auth/reset-password', payload);
-      return res.data;
-    } catch (err: any) {
-      // Nếu backend có response (400, 422...) → throw để caller xử lý (OTP sai, hết hạn...)
-      if (err.response) {
-        throw err;
-      }
-      // Backend offline → giả lập đổi mật khẩu thành công
-      console.warn('[PreCare offline] resetPassword fallback — backend không chạy');
-      return { success: true, message: 'Offline mode: giả lập đặt lại mật khẩu thành công' };
-    }
+    const res = await apiClient.post('/auth/reset-password', payload);
+    return res.data;
   },
 
   /**

@@ -103,7 +103,6 @@ export const PatientSearchDialog: React.FC<PatientSearchDialogProps> = ({
     };
   }, [isOpen]);
 
-  // Tạm thời trả về mảng rỗng để không bị lỗi, tính năng search gọi API sẽ gắn sau
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   if (!isOpen) return null;
