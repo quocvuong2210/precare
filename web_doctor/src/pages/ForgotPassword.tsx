@@ -82,11 +82,13 @@ const OtpCell: React.FC<{
   return (
     <input
       ref={inputRef}
-      type="text"
+      type="tel"
+      pattern="[0-9]*"
+      autoComplete="one-time-code"
       inputMode="numeric"
       maxLength={1}
       value={value}
-      onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+      onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
       onKeyDown={onKeyDown}
       onPaste={onPaste}
       onFocus={() => setFocused(true)}

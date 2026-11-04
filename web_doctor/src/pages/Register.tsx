@@ -385,7 +385,8 @@ export const Register: React.FC<RegisterProps> = ({
       return;
     }
 
-    const cleanVal = val.replace(/\D/g, '');
+    const value = val.replace(/[^0-9]/g, '');
+    const cleanVal = value ? value.slice(-1) : '';
     const newOtp = [...otp];
     newOtp[index] = cleanVal;
     setOtp(newOtp);
@@ -875,7 +876,9 @@ export const Register: React.FC<RegisterProps> = ({
                     <input
                       key={idx}
                       ref={(el) => (otpInputRefs.current[idx] = el)}
-                      type="text"
+                      type="tel"
+                      pattern="[0-9]*"
+                      autoComplete="one-time-code"
                       inputMode="numeric"
                       maxLength={1}
                       value={val}
