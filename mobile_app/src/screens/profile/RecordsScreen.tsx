@@ -10,9 +10,9 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { MainTabParamList } from '../navigation/MainTabs';
-import { colors } from '../theme/colors';
-import EmergencyContacts, { type EmergencyContact } from '../components/EmergencyContacts';
+import type { MainTabParamList } from '../../navigation/MainTabs';
+import { colors } from '../../theme/colors';
+import EmergencyContacts, { type EmergencyContact } from '../../components/EmergencyContacts';
 import {
   calculatePregnancyProfile,
   currentUserProfile,
@@ -20,7 +20,7 @@ import {
   restoreSession,
   savePregnancyProfileToDB,
   type PregnancyCalculateRequest,
-} from '../services/api';
+} from '../../services/api';
 
 type Editor = 'personal' | 'medical' | 'history' | null;
 type Profile = {
@@ -433,7 +433,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
       <View style={styles.header}><Text style={styles.headerTitle}>Hồ sơ mẹ bầu</Text></View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.identity}>
-          <Image source={require('../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
+          <Image source={require('../../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
           <View style={styles.identityText}>
             <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
             <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
