@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
     deleted_at TIMESTAMP WITH TIME ZONE,
     is_anonymized BOOLEAN DEFAULT FALSE,
     is_purged_from_research BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME  ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_gestational_days CHECK (q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)),
     CONSTRAINT chk_gestational_weeks CHECK (q1_gestational_weeks IS NULL OR (q1_gestational_weeks >= 0 AND q1_gestational_weeks <= 42)),

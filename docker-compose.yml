@@ -33,14 +33,13 @@ services:
       retries: 5
 
   minio:
-    image: ubuntu:22.04
+    image: pgsty/silo:latest
     container_name: precare_minio
     restart: always
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-precare_minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-precare_minio_secret}
-    command: >
-      bash -c "apt-get update -qq && apt-get install -y wget && wget -q -O /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio && chmod +x /usr/local/bin/minio && /usr/local/bin/minio server /data --console-address ':9001'"
+    command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -74,11 +73,6 @@ services:
     restart: always
     ports:
       - "8000:8000"
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    env_file:
-      - .env
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-123456}@db:5432/${POSTGRES_DB:-precare}
       - REDIS_URL=redis://redis:6379/0
@@ -92,8 +86,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # analysis_service:
-      #   condition: service_healthy
+      analysis_service:
+        condition: service_healthy
 
   celery_worker:
     build:
