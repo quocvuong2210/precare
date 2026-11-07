@@ -2,6 +2,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -73,7 +77,7 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
   processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
   done:       { label: 'Đã lưu hồ sơ',      bg: '#CCFBF1', color: colors.primaryDark },
-  pending:    { label: 'Chờ xác nhận',      bg: '#FEE2E2', color: '#DC2626' },
+  pending:    { label: 'Chờ đối chiếu',     bg: '#FEE2E2', color: '#DC2626' },
 };
 
 const SEVERITY_THEME: Record<
@@ -124,11 +128,11 @@ const SEVERITY_THEME: Record<
 type RangePair = [number, number];
 
 type WeeklyFetalStandard = {
-  bpd: RangePair; // Đường kính lưỡng đỉnh (mm)
-  hc: RangePair;  // Chu vi đầu (mm)
-  ac: RangePair;  // Chu vi bụng (mm)
-  fl: RangePair;  // Chiều dài xương đùi (mm)
-  efw: RangePair; // Cân nặng thai ước tính (g)
+  bpd: RangePair;
+  hc: RangePair;
+  ac: RangePair;
+  fl: RangePair;
+  efw: RangePair;
 };
 
 const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
@@ -164,7 +168,6 @@ const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
   41: { bpd: [91, 100], hc: [328, 360], ac: [340, 382], fl: [73, 80], efw: [3300, 4200] },
 };
 
-// Hàm quy đổi Tuần thai sang Tháng thai kỳ & Tam cá nguyệt
 export function getPregnancyStageInfo(week: number) {
   const clampedWeek = Math.max(12, Math.min(41, Math.round(week || 24)));
   const month = Math.min(9, Math.max(3, Math.ceil(clampedWeek / 4.3)));
@@ -177,7 +180,6 @@ export function getPregnancyStageInfo(week: number) {
   };
 }
 
-// Hàm lấy ngưỡng Bình thường (P10-P90) và Nguy hiểm (P3-P97) theo đúng tuần thai
 export function getFetalMetricBoundsByWeek(
   key: 'bpd' | 'hc' | 'ac' | 'fl' | 'efw',
   week: number,
@@ -187,7 +189,6 @@ export function getFetalMetricBoundsByWeek(
   const std = FETAL_GROWTH_BY_WEEK[clampedWeek] || FETAL_GROWTH_BY_WEEK[24];
   const [minNormal, maxNormal] = std[key];
   const span = Math.max(4, maxNormal - minNormal);
-  // Ngưỡng báo Đỏ (Dưới bách phân vị thứ 3 hoặc trên bách phân vị thứ 97)
   const margin = key === 'efw' ? Math.round(span * 0.55) : Math.max(3, Math.round(span * 0.5));
   const dangerLow = Math.max(1, minNormal - margin);
   const dangerHigh = maxNormal + margin;
@@ -234,7 +235,6 @@ export function evaluateMetricByWeek(
   const lower = clean.toLowerCase();
   const { clampedWeek, month, trimester } = getPregnancyStageInfo(gestationalWeek);
 
-  // 1. Nhóm 5 chỉ số sinh trắc học thai nhi thay đổi trực tiếp theo từng tuần thai
   if (key === 'bpd' || key === 'hc' || key === 'ac' || key === 'fl' || key === 'efw') {
     const unit = key === 'efw' ? 'g' : 'mm';
     const bounds = getFetalMetricBoundsByWeek(key, clampedWeek, unit);
@@ -288,9 +288,8 @@ export function evaluateMetricByWeek(
     };
   }
 
-  // 2. Hemoglobin máu mẹ (HGB) — Thay đổi ngưỡng theo Tam cá nguyệt (WHO / Bộ Y tế)
   if (key === 'hgb') {
-    const minHgb = trimester === 2 ? 10.5 : 11.0; // Tam cá nguyệt 2 pha loãng máu sinh lý: chuẩn >= 10.5 g/dL
+    const minHgb = trimester === 2 ? 10.5 : 11.0;
     const refText = `${minHgb.toFixed(1)} – 14.5 g/dL (Tam cá nguyệt ${trimester})`;
     const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
     const num = numMatch ? parseFloat(numMatch[0]) : NaN;
@@ -306,7 +305,7 @@ export function evaluateMetricByWeek(
       if (num < minHgb) {
         return {
           severity: 'warning',
-          clinicalNote: `CẢNH BÁO VÀNG: Thiếu máu nhẹ so với ngưỡng Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Cần tăng cường bổ sung sắt và thực phẩm giàu sắt.`,
+          clinicalNote: `CẢNH BÁO VÀNG: Thiếu máu nhẹ so với ngưỡng Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Cần tăng cường bổ sung sắt.`,
           refRange: refText,
         };
       }
@@ -318,7 +317,6 @@ export function evaluateMetricByWeek(
     }
   }
 
-  // 3. Protein niệu (Urine Protein)
   if (key === 'pro') {
     const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
     const num = numMatch ? parseFloat(numMatch[0]) : NaN;
@@ -349,7 +347,6 @@ export function evaluateMetricByWeek(
     return { severity: 'normal', clinicalNote: 'Âm tính (Negative) — Bình thường' };
   }
 
-  // 4. Đường huyết lúc đói (Fasting Glucose)
   if (key === 'glu') {
     const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
     const num = numMatch ? parseFloat(numMatch[0]) : NaN;
@@ -379,7 +376,6 @@ export function evaluateMetricByWeek(
     }
   }
 
-  // 5. Huyết áp mẹ (BP)
   if (key === 'bp') {
     const parts = clean.split('/');
     const sys = parseFloat(parts[0]);
@@ -401,7 +397,6 @@ export function evaluateMetricByWeek(
     return { severity: 'normal', clinicalNote: 'Huyết áp ổn định (< 130/85 mmHg).' };
   }
 
-  // 6. Bạch cầu niệu
   if (key === 'leu') {
     if (lower.includes('dương') || lower.includes('+') || (parseFloat(clean) || 0) > 25) {
       return { severity: 'warning', clinicalNote: 'Bạch cầu niệu dương tính — Theo dõi nhiễm khuẩn tiết niệu' };
@@ -505,7 +500,6 @@ function buildMetricByWeek(
   };
 }
 
-// Nhận diện số tuần thai từ tên file nếu có (VD: "sieu_am_32_tuan.pdf" -> 32 tuần; mặc định 24 tuần theo PDF mẫu)
 function detectWeekFromFileName(fileName: string): number {
   const lower = fileName.toLowerCase();
   const match =
@@ -518,7 +512,6 @@ function detectWeekFromFileName(fileName: string): number {
   return 24;
 }
 
-/* ================= HÀM PHÂN TÍCH FILE PDF THEO ĐÚNG TUẦN THAI ================= */
 const simulateMedicalAnalysis = (fileName: string): MedicalAnalysisResult => {
   const detectedWeek = detectWeekFromFileName(fileName);
   const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
@@ -575,13 +568,30 @@ const nowLabel = () => {
   return `Hôm nay, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+function isImageItem(item: UploadItem): boolean {
+  const lowerName = item.name.toLowerCase();
+  const lowerMime = (item.mimeType || '').toLowerCase();
+  return (
+    lowerMime.startsWith('image/') ||
+    lowerName.endsWith('.jpg') ||
+    lowerName.endsWith('.jpeg') ||
+    lowerName.endsWith('.png') ||
+    lowerName.endsWith('.webp')
+  );
+}
+
 export default function UploadScreen({ navigation }: Props) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(true);
 
+  // State phục vụ chỉnh sửa & đối chiếu (Sub-task 4.3.2 - PRC-57)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftWeek, setDraftWeek] = useState<string>('24');
   const [draftMetrics, setDraftMetrics] = useState<Record<string, string>>({});
+
+  // Modal Đối chiếu song song với ảnh phiếu khám gốc (Split-Screen Verification Modal)
+  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
+  const [zoomSlipImage, setZoomSlipImage] = useState(false);
 
   const isPickingFileRef = useRef(false);
 
@@ -616,8 +626,20 @@ export default function UploadScreen({ navigation }: Props) {
     });
   }, []);
 
-  /* ================= BẮT ĐẦU CHỈNH SỬA TUẦN THAI & CHỈ SỐ ================= */
-  const startEditing = (item: UploadItem) => {
+  /* ================= MỞ MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (PRC-57) ================= */
+  const openVerificationModal = (item: UploadItem) => {
+    if (!item.analysis) return;
+    const initialDraft: Record<string, string> = {};
+    item.analysis.metrics.forEach((m) => {
+      initialDraft[m.key] = m.value;
+    });
+    setDraftWeek(String(item.analysis.gestationalWeek || 24));
+    setDraftMetrics(initialDraft);
+    setZoomSlipImage(false);
+    setVerifyModalItem(item);
+  };
+
+  const startEditingInline = (item: UploadItem) => {
     if (!item.analysis) return;
     const initialDraft: Record<string, string> = {};
     item.analysis.metrics.forEach((m) => {
@@ -628,11 +650,12 @@ export default function UploadScreen({ navigation }: Props) {
     setEditingId(item.id);
   };
 
-  // Khi lưu chỉnh sửa: đối chiếu lại toàn bộ chỉ số theo đúng tuần thai vừa chọn!
-  const applyEditedMetricsToItem = (item: UploadItem): UploadItem => {
+  const applyEditedMetricsToItem = (item: UploadItem, markConfirmed: boolean = false): UploadItem => {
     if (!item.analysis) return item;
     const parsedWeek = parseInt(draftWeek, 10);
-    const weekToUse = !isNaN(parsedWeek) ? Math.max(12, Math.min(41, parsedWeek)) : item.analysis.gestationalWeek || 24;
+    const weekToUse = !isNaN(parsedWeek)
+      ? Math.max(12, Math.min(41, parsedWeek))
+      : item.analysis.gestationalWeek || 24;
     const { stageLabel } = getPregnancyStageInfo(weekToUse);
 
     const updatedMetrics = item.analysis.metrics.map((m) => {
@@ -651,6 +674,7 @@ export default function UploadScreen({ navigation }: Props) {
 
     return {
       ...item,
+      status: markConfirmed ? 'done' : item.status,
       analysis: {
         ...item.analysis,
         gestationalWeek: weekToUse,
@@ -658,16 +682,33 @@ export default function UploadScreen({ navigation }: Props) {
         metrics: updatedMetrics,
         overallSeverity: summaryState.overallSeverity,
         doctorConclusion: summaryState.doctorConclusion,
+        savedToProfile: markConfirmed ? true : item.analysis.savedToProfile,
       },
     };
   };
 
   const saveEditedMetrics = (id: string) => {
     updateItemsAndPersist((prev) =>
-      prev.map((item) => (item.id === id ? applyEditedMetricsToItem(item) : item))
+      prev.map((item) => (item.id === id ? applyEditedMetricsToItem(item, false) : item))
     );
     setEditingId(null);
     setDraftMetrics({});
+  };
+
+  // Xác nhận hoàn tất từ Màn hình Đối chiếu & Xác nhận dữ liệu (PRC-57)
+  const confirmFromVerificationModal = () => {
+    if (!verifyModalItem) return;
+    const targetId = verifyModalItem.id;
+    updateItemsAndPersist((prev) =>
+      prev.map((item) => (item.id === targetId ? applyEditedMetricsToItem(item, true) : item))
+    );
+    setVerifyModalItem(null);
+    setEditingId(null);
+    setDraftMetrics({});
+    Alert.alert(
+      'Đã đối chiếu & Lưu hồ sơ',
+      'Các chỉ số đã được xác nhận khớp với phiếu khám và ghi vĩnh viễn vào hồ sơ sức khỏe của mẹ!'
+    );
   };
 
   const cancelEditing = () => {
@@ -728,13 +769,16 @@ export default function UploadScreen({ navigation }: Props) {
       }
 
       if (analysisResult) {
+        const analyzedItem: UploadItem = {
+          ...newItem,
+          status: 'pending',
+          analysis: analysisResult,
+        };
         updateItemsAndPersist((prev) =>
-          prev.map((item) =>
-            item.id === newItemId
-              ? { ...item, status: 'pending', analysis: analysisResult! }
-              : item
-          )
+          prev.map((item) => (item.id === newItemId ? analyzedItem : item))
         );
+        // Tự động bật màn hình "Đối chiếu với phiếu khám & Xác nhận dữ liệu" ngay sau khi trích xuất xong
+        openVerificationModal(analyzedItem);
       }
     } catch {
       Alert.alert('Lỗi tải lên', 'Không thể phân tích tài liệu này.');
@@ -746,7 +790,7 @@ export default function UploadScreen({ navigation }: Props) {
     updateItemsAndPersist((prev) =>
       prev.map((item) => {
         if (item.id !== id || !item.analysis) return item;
-        const baseItem = editingId === id ? applyEditedMetricsToItem(item) : item;
+        const baseItem = editingId === id ? applyEditedMetricsToItem(item, true) : item;
         return {
           ...baseItem,
           status: 'done',
@@ -761,7 +805,7 @@ export default function UploadScreen({ navigation }: Props) {
       setEditingId(null);
       setDraftMetrics({});
     }
-    Alert.alert('Thành công', 'Đã ghi kết quả vào hồ sơ sức khỏe và lưu vĩnh viễn vào tài khoản!');
+    Alert.alert('Thành công', 'Đã xác nhận và ghi các chỉ số vào hồ sơ sức khỏe!');
   };
 
   const deleteItem = (id: string, name: string) => {
@@ -775,6 +819,7 @@ export default function UploadScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: () => {
             if (editingId === id) cancelEditing();
+            if (verifyModalItem?.id === id) setVerifyModalItem(null);
             updateItemsAndPersist((prev) => prev.filter((item) => item.id !== id));
           },
         },
@@ -790,12 +835,12 @@ export default function UploadScreen({ navigation }: Props) {
         Alert.alert('Chưa cấp quyền', 'Hãy cho phép ứng dụng dùng camera trong Cài đặt.');
         return;
       }
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
       if (result.canceled) return;
       const asset = result.assets[0];
       await uploadAndAnalyzeFile(
         asset.uri,
-        asset.fileName ?? `Phieu_${Date.now()}.jpg`,
+        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
         asset.fileSize,
         asset.mimeType ?? 'image/jpeg'
       );
@@ -807,12 +852,12 @@ export default function UploadScreen({ navigation }: Props) {
   const pickImage = async () => {
     try {
       isPickingFileRef.current = true;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
       if (result.canceled) return;
       const asset = result.assets[0];
       await uploadAndAnalyzeFile(
         asset.uri,
-        asset.fileName ?? `Anh_${Date.now()}.jpg`,
+        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
         asset.fileSize,
         asset.mimeType ?? 'image/jpeg'
       );
@@ -843,8 +888,8 @@ export default function UploadScreen({ navigation }: Props) {
 
   const openChooser = () => {
     Alert.alert('Chọn tài liệu', 'Bạn muốn tải lên bằng cách nào?', [
-      { text: 'Chụp ảnh', onPress: takePhoto },
-      { text: 'Chọn từ thư viện ảnh', onPress: pickImage },
+      { text: 'Chụp ảnh phiếu khám', onPress: takePhoto },
+      { text: 'Chọn ảnh từ thư viện', onPress: pickImage },
       { text: 'Chọn file PDF', onPress: pickPdf },
       { text: 'Huỷ', style: 'cancel' },
     ]);
@@ -859,7 +904,7 @@ export default function UploadScreen({ navigation }: Props) {
           <Ionicons name="arrow-back" size={18} color={colors.navy} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>Hồ sơ phiếu khám & xét nghiệm</Text>
+        <Text style={styles.headerTitle}>Tải lên & Đối chiếu phiếu khám</Text>
 
         <Pressable style={styles.headerButton} onPress={openChooser}>
           <Ionicons name="add" size={20} color={colors.navy} />
@@ -876,9 +921,9 @@ export default function UploadScreen({ navigation }: Props) {
             <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
           </View>
 
-          <Text style={styles.dropTitle}>Chụp ảnh hoặc chọn file PDF</Text>
+          <Text style={styles.dropTitle}>Chụp ảnh phiếu khám hoặc chọn file PDF</Text>
           <Text style={styles.dropSub}>
-            Đối chiếu chỉ số chính xác theo từng Tuần thai / Tháng thai kỳ (Tuần 12 – 41)
+            Tự động trích xuất chỉ số, hỗ trợ đối chiếu trực tiếp với ảnh chụp phiếu khám và xác nhận lưu hồ sơ
           </Text>
 
           <View style={styles.chooseButton}>
@@ -914,13 +959,14 @@ export default function UploadScreen({ navigation }: Props) {
           <View style={styles.emptyBox}>
             <Ionicons name="document-outline" size={32} color="#94A3B8" />
             <Text style={styles.emptyText}>
-              Chưa có phiếu khám nào. Hãy tải file PDF hoặc bấm "Nhập kết quả thủ công" bên dưới.
+              Chưa có phiếu khám nào. Hãy chụp ảnh phiếu khám, tải file PDF hoặc bấm "Nhập kết quả thủ công".
             </Text>
           </View>
         ) : (
           items.map((item) => {
             const s = STATUS_STYLE[item.status];
             const isPdf = item.name.toLowerCase().endsWith('.pdf');
+            const hasImagePreview = Boolean(item.uri) && isImageItem(item);
             const isEditingThis = editingId === item.id;
             const overallTheme = item.analysis
               ? SEVERITY_THEME[item.analysis.overallSeverity]
@@ -934,9 +980,15 @@ export default function UploadScreen({ navigation }: Props) {
                 <View style={styles.itemHeaderRow}>
                   <View style={[styles.fileIcon, isPdf && { backgroundColor: '#FEF2F2' }]}>
                     <Ionicons
-                      name={isPdf ? 'document-attach-outline' : 'document-text-outline'}
+                      name={
+                        hasImagePreview
+                          ? 'image-outline'
+                          : isPdf
+                          ? 'document-attach-outline'
+                          : 'document-text-outline'
+                      }
                       size={18}
-                      color={isPdf ? '#EF4444' : '#475569'}
+                      color={isPdf ? '#EF4444' : colors.primary}
                     />
                   </View>
 
@@ -971,12 +1023,66 @@ export default function UploadScreen({ navigation }: Props) {
 
                 {item.analysis && (
                   <View style={styles.analysisBox}>
+                    {/* KHUNG ĐỐI CHIẾU VỚI ẢNH CHỤP PHIẾU KHÁM / FILE GỐC (Chuẩn Sub-task 4.3.2) */}
+                    {item.uri && (
+                      <View style={styles.slipPreviewContainer}>
+                        <View style={styles.slipPreviewHeader}>
+                          <View style={styles.slipPreviewTitleRow}>
+                            <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
+                            <Text style={styles.slipPreviewTitle}>
+                              {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
+                            </Text>
+                          </View>
+                          <Pressable
+                            style={styles.compareSplitBtn}
+                            onPress={() => openVerificationModal(item)}
+                          >
+                            <Ionicons name="git-compare-outline" size={14} color={colors.white} />
+                            <Text style={styles.compareSplitBtnText}>
+                              Mở màn hình Đối chiếu
+                            </Text>
+                          </Pressable>
+                        </View>
+
+                        {hasImagePreview ? (
+                          <Pressable onPress={() => openVerificationModal(item)}>
+                            <Image
+                              source={{ uri: item.uri }}
+                              style={styles.slipThumbnail}
+                              resizeMode="cover"
+                            />
+                            <View style={styles.slipOverlayHint}>
+                              <Ionicons name="expand-outline" size={14} color={colors.white} />
+                              <Text style={styles.slipOverlayHintText}>
+                                Chạm vào ảnh để phóng to & đối chiếu từng chỉ số
+                              </Text>
+                            </View>
+                          </Pressable>
+                        ) : (
+                          <Pressable
+                            style={styles.pdfSlipPreviewBox}
+                            onPress={() => openVerificationModal(item)}
+                          >
+                            <Ionicons name="document-text" size={24} color="#EF4444" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.pdfSlipName} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              <Text style={styles.pdfSlipSub}>
+                                Bấm để mở chế độ Đối chiếu song song & Xác nhận từng chỉ số
+                              </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+
                     <View style={styles.analysisHeader}>
                       <Ionicons name="medkit-outline" size={16} color={colors.primary} />
                       <Text style={styles.analysisTitle}>{item.analysis.recordType}</Text>
                     </View>
 
-                    {/* Thanh hiển thị / chỉnh sửa Tuần thai & Tháng thai kỳ để đối chiếu chuẩn */}
                     <View style={styles.stageBadgeBox}>
                       <Ionicons name="calendar-outline" size={15} color="#0F766E" />
                       <Text style={styles.stageBadgeText}>
@@ -1021,7 +1127,6 @@ export default function UploadScreen({ navigation }: Props) {
                       </View>
                     )}
 
-                    {/* Khung tổng kết của bác sĩ */}
                     <View
                       style={[
                         styles.doctorBanner,
@@ -1061,10 +1166,8 @@ export default function UploadScreen({ navigation }: Props) {
                       </Text>
                     </View>
 
-                    {/* Danh sách từng chỉ số (Đã đối chiếu trực tiếp với tuần thai) */}
                     <View style={styles.metricsGrid}>
                       {item.analysis.metrics.map((m) => {
-                        // Nếu đang ở chế độ chỉnh sửa, tính trực tiếp mức độ theo tuần thai nháp (draftWeek) và giá trị nháp (draftMetrics)
                         const liveEval = isEditingThis
                           ? evaluateMetricByWeek(
                               m.key,
@@ -1164,19 +1267,19 @@ export default function UploadScreen({ navigation }: Props) {
 
                         <Pressable
                           style={styles.editRecordBtn}
-                          onPress={() => startEditing(item)}
+                          onPress={() => openVerificationModal(item)}
                         >
-                          <Text style={styles.editRecordBtnText}>Chỉnh sửa</Text>
+                          <Text style={styles.editRecordBtnText}>Đối chiếu & Sửa</Text>
                         </Pressable>
                       </View>
                     ) : (
                       <View style={styles.savedRow}>
                         <View style={styles.savedTag}>
                           <Ionicons name="checkmark-done" size={14} color={colors.primaryDark} />
-                          <Text style={styles.savedTagText}>Đã lưu vĩnh viễn vào hồ sơ tài khoản</Text>
+                          <Text style={styles.savedTagText}>Đã đối chiếu & lưu vào hồ sơ</Text>
                         </View>
 
-                        <Pressable onPress={() => startEditing(item)} hitSlop={6}>
+                        <Pressable onPress={() => startEditingInline(item)} hitSlop={6}>
                           <Text style={styles.reEditText}>Chỉnh sửa / Đổi tuần</Text>
                         </Pressable>
                       </View>
@@ -1197,6 +1300,213 @@ export default function UploadScreen({ navigation }: Props) {
           <Text style={styles.manualButtonText}>Nhập kết quả thủ công</Text>
         </Pressable>
       </ScrollView>
+
+      {/* =========================================================================
+          MODAL MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (ĐÚNG CHUẨN JIRA PRC-57)
+          Nửa trên: Xem ảnh chụp phiếu khám gốc (có phóng to)
+          Nửa dưới: Kiểm tra, sửa lại từng chỉ số đã trích xuất & Bấm Xác nhận lưu hồ sơ
+         ========================================================================= */}
+      <Modal
+        visible={verifyModalItem !== null}
+        animationType="slide"
+        onRequestClose={() => setVerifyModalItem(null)}
+      >
+        <SafeAreaView style={styles.modalScreen} edges={['top', 'bottom']}>
+          <View style={styles.modalHeader}>
+            <Pressable
+              style={styles.headerButton}
+              onPress={() => setVerifyModalItem(null)}
+            >
+              <Ionicons name="close" size={20} color={colors.navy} />
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={styles.modalHeaderTitle}>Đối chiếu & Xác nhận dữ liệu</Text>
+              <Text style={styles.modalHeaderSub}>
+                Kiểm tra các chỉ số trích xuất với phiếu khám trước khi lưu
+              </Text>
+            </View>
+            <View style={{ width: 32 }} />
+          </View>
+
+          {verifyModalItem && verifyModalItem.analysis && (
+            <KeyboardAvoidingView
+              style={styles.flex}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+              {/* KHUNG 1 (TRÊN): ẢNH CHỤP PHIẾU KHÁM GỐC ĐỂ THAI PHỤ NHÌN ĐỐI CHIẾU */}
+              <View style={[styles.splitTopPane, zoomSlipImage && styles.splitTopPaneExpanded]}>
+                <View style={styles.splitTopBar}>
+                  <View style={styles.slipPreviewTitleRow}>
+                    <Ionicons name="document-text-outline" size={15} color={colors.white} />
+                    <Text style={styles.splitTopBarTitle} numberOfLines={1}>
+                      Phiếu khám gốc: {verifyModalItem.name}
+                    </Text>
+                  </View>
+                  {isImageItem(verifyModalItem) && (
+                    <Pressable
+                      style={styles.zoomToggleBtn}
+                      onPress={() => setZoomSlipImage((z) => !z)}
+                    >
+                      <Ionicons
+                        name={zoomSlipImage ? 'contract-outline' : 'expand-outline'}
+                        size={14}
+                        color={colors.white}
+                      />
+                      <Text style={styles.zoomToggleText}>
+                        {zoomSlipImage ? 'Thu nhỏ ảnh' : 'Phóng to ảnh'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {verifyModalItem.uri && isImageItem(verifyModalItem) ? (
+                  <ScrollView
+                    maximumZoomScale={3}
+                    minimumZoomScale={1}
+                    contentContainerStyle={styles.slipImageScroll}
+                  >
+                    <Image
+                      source={{ uri: verifyModalItem.uri }}
+                      style={[
+                        styles.modalSlipImage,
+                        zoomSlipImage && { height: 320 },
+                      ]}
+                      resizeMode="contain"
+                    />
+                  </ScrollView>
+                ) : (
+                  <View style={styles.modalPdfSummaryPane}>
+                    <Ionicons name="document-attach" size={28} color="#F87171" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalPdfTitle} numberOfLines={1}>
+                        {verifyModalItem.name}
+                      </Text>
+                      <Text style={styles.modalPdfHint}>
+                        Hãy kiểm tra các chỉ số bên dưới khớp với tờ phiếu khám của bạn. Bạn có thể bấm vào bất kỳ ô nào để sửa lại nếu cần.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* KHUNG 2 (DƯỚI): DANH SÁCH CHỈ SỐ TRÍCH XUẤT CHO PHÉP SỬA & ĐỐI CHIẾU */}
+              <ScrollView
+                style={styles.flex}
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.weekEditorRow}>
+                  <Text style={styles.weekEditorLabel}>
+                    Tuần thai trên phiếu khám (12–41 tuần):
+                  </Text>
+                  <View style={styles.weekStepper}>
+                    <Pressable
+                      style={styles.weekStepBtn}
+                      onPress={() =>
+                        setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
+                      }
+                    >
+                      <Ionicons name="remove" size={16} color={colors.navy} />
+                    </Pressable>
+                    <TextInput
+                      style={styles.weekInput}
+                      value={draftWeek}
+                      onChangeText={setDraftWeek}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                    <Pressable
+                      style={styles.weekStepBtn}
+                      onPress={() =>
+                        setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
+                      }
+                    >
+                      <Ionicons name="add" size={16} color={colors.navy} />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Text style={styles.modalSectionLabel}>
+                  Các chỉ số đã trích xuất ({verifyModalItem.analysis.metrics.length} chỉ số) — Chạm vào ô để sửa nếu lệch so với phiếu:
+                </Text>
+
+                {verifyModalItem.analysis.metrics.map((m) => {
+                  const currentVal = draftMetrics[m.key] ?? m.value;
+                  const liveEval = evaluateMetricByWeek(
+                    m.key,
+                    currentVal,
+                    parseInt(draftWeek, 10) || 24
+                  );
+                  const mTheme = SEVERITY_THEME[liveEval.severity];
+
+                  return (
+                    <View
+                      key={m.key}
+                      style={[
+                        styles.verifyMetricCard,
+                        {
+                          backgroundColor: mTheme.cardBg,
+                          borderColor: mTheme.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.metricTopRow}>
+                        <Text style={styles.verifyMetricLabel}>{m.label}</Text>
+                        <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
+                          <Text style={[styles.severityPillText, { color: mTheme.badgeColor }]}>
+                            {mTheme.badgeLabel}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.verifyInputRow}>
+                        <TextInput
+                          style={[styles.verifyInput, { color: mTheme.valueColor }]}
+                          value={currentVal}
+                          onChangeText={(text) =>
+                            setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
+                          }
+                          placeholder="Nhập giá trị..."
+                          placeholderTextColor="#94A3B8"
+                        />
+                        {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
+                      </View>
+
+                      <Text style={styles.refRangeText}>
+                        Ngưỡng chuẩn: {liveEval.refRange || m.refRange}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.clinicalNoteText,
+                          liveEval.severity !== 'normal' && {
+                            color: mTheme.valueColor,
+                            fontWeight: '700',
+                          },
+                        ]}
+                      >
+                        {liveEval.clinicalNote}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              {/* THANH NÚT XÁC NHẬN DƯỚI CÙNG */}
+              <View style={styles.modalFooter}>
+                <Pressable
+                  style={styles.confirmModalBtn}
+                  onPress={confirmFromVerificationModal}
+                >
+                  <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  <Text style={styles.confirmModalBtnText}>
+                    Xác nhận đúng với phiếu khám & Lưu vào hồ sơ
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1335,6 +1645,94 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+
+  /* Khung đối chiếu ảnh phiếu khám gốc trên thẻ */
+  slipPreviewContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 10,
+    marginBottom: 12,
+  },
+  slipPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  slipPreviewTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  slipPreviewTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.navy,
+  },
+  compareSplitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  compareSplitBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  slipThumbnail: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+  },
+  slipOverlayHint: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    left: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  slipOverlayHintText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  pdfSlipPreviewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pdfSlipName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.navy,
+  },
+  pdfSlipSub: {
+    fontSize: 10.5,
+    color: '#0F766E',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
   analysisHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   analysisTitle: { fontSize: 13, fontWeight: '800', color: colors.navy, flex: 1 },
   stageBadgeBox: {
@@ -1492,4 +1890,148 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   manualButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+
+  /* Styles cho Modal Đối chiếu & Xác nhận dữ liệu (Sub-task 4.3.2) */
+  modalScreen: { flex: 1, backgroundColor: '#F5F8FA' },
+  modalHeader: {
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalHeaderTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
+  modalHeaderSub: { fontSize: 10.5, color: '#64748B', marginTop: 2 },
+  splitTopPane: {
+    backgroundColor: '#0F172A',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+  },
+  splitTopPaneExpanded: {
+    maxHeight: 360,
+  },
+  splitTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#1E293B',
+  },
+  splitTopBarTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: colors.white,
+    flex: 1,
+  },
+  zoomToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  zoomToggleText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  slipImageScroll: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  modalSlipImage: {
+    width: '100%',
+    height: 175,
+    borderRadius: 8,
+  },
+  modalPdfSummaryPane: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    backgroundColor: '#1E293B',
+  },
+  modalPdfTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.white,
+  },
+  modalPdfHint: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  modalScrollContent: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  modalSectionLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 10,
+  },
+  verifyMetricCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  verifyMetricLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.navy,
+    flex: 1,
+  },
+  verifyInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  verifyInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  verifyUnitText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginLeft: 8,
+  },
+  modalFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  confirmModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingVertical: 13,
+    borderRadius: 10,
+  },
+  confirmModalBtnText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: colors.white,
+  },
 });

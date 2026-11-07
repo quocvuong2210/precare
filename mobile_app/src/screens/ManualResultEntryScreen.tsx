@@ -89,18 +89,20 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
   const parsedDate = parseDate(examDate);
   const calculatedAge = getGestationalAge(parsedDate);
   const age = autoAge ? calculatedAge ?? { weeks: '', days: '' } : manualAge;
-  const ageValid =
-    /^\d{1,2}$/.test(age.weeks) &&
-    /^\d$/.test(age.days) &&
-    Number(age.weeks) >= 12 &&
-    Number(age.weeks) <= 42 &&
-    Number(age.days) <= 6;
 
-  // Tuần thai hiện tại dùng để tra bảng chuẩn WHO/Hadlock
+  // Nếu để trống ô "ngày" thì mặc định hiểu là 0 ngày (tròn tuần)
+  const effectiveDays = age.days.trim() === '' ? '0' : age.days.trim();
+  const ageValid =
+    /^\d{1,2}$/.test(age.weeks.trim()) &&
+    /^\d$/.test(effectiveDays) &&
+    Number(age.weeks) >= 12 &&
+    Number(age.weeks) <= 41 &&
+    Number(effectiveDays) >= 0 &&
+    Number(effectiveDays) <= 6;
+
   const activeWeek = ageValid ? Number(age.weeks) : 24;
   const stageInfo = getPregnancyStageInfo(activeWeek);
 
-  // Đánh giá từng chỉ số dựa trên đúng activeWeek (Tuần thai hiện tại)
   const evaluatedMetrics = METRICS_META.map((meta) => {
     const rawVal = values[meta.key].trim();
     const bounds = getFetalMetricBoundsByWeek(meta.key, activeWeek, meta.unit);
@@ -174,7 +176,6 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
     setAutoAge(enabled);
   };
 
-  /* ================= BẤM LƯU -> GHI HỒ SƠ & CHUYỂN THẲNG SANG UPLOADSCREEN ================= */
   const handleSaveManualResult = async () => {
     if (!canSave) return;
 
@@ -205,9 +206,9 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
         time: `Ngày khám: ${examDate} · ${stageInfo.stageLabel}`,
         status: 'done',
         analysis: {
-          recordType: `Kết quả siêu âm (${age.weeks} tuần ${age.days} ngày · Tháng thứ ${stageInfo.month})`,
+          recordType: `Kết quả siêu âm (${age.weeks.trim()} tuần ${effectiveDays} ngày · Tháng thứ ${stageInfo.month})`,
           gestationalWeek: activeWeek,
-          gestationalDays: Number(age.days) || 0,
+          gestationalDays: Number(effectiveDays) || 0,
           gestationalAge: stageInfo.stageLabel,
           summary: `Đã đối chiếu chuẩn sinh trắc học theo ${stageInfo.stageLabel}.`,
           doctorConclusion: summaryState.doctorConclusion,
@@ -325,6 +326,8 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                     value={age.days}
                     onChangeText={(days) => setManualAge((prev) => ({ ...prev, days }))}
                     editable={!autoAge}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
                     keyboardType="number-pad"
                     maxLength={1}
                     selectTextOnFocus
@@ -338,11 +341,10 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
               <Text style={styles.dangerErrorText}>
                 {autoAge
                   ? 'Ngày khám không khớp tuổi thai 12–41 tuần. Hãy tắt “Tự tính” để nhập số tuần trực tiếp.'
-                  : 'Vui lòng nhập tuần thai từ 12–41 và ngày từ 0–6.'}
+                  : 'Vui lòng nhập tuần thai từ 12–41 (ô ngày từ 0–6, nếu để trống sẽ tính là 0 ngày).'}
               </Text>
             )}
 
-            {/* Banner hiển thị rõ Mốc Tuần & Tháng thai kỳ đang dùng để so sánh */}
             <View style={styles.stageBanner}>
               <Ionicons name="analytics-outline" size={16} color="#0F766E" />
               <Text style={styles.stageBannerText}>
