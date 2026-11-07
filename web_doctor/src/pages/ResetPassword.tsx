@@ -202,10 +202,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onNavigateToLogin 
       } else if (status === 404) {
         setApiError('Không tìm thấy tài khoản. Vui lòng liên hệ hỗ trợ.');
       } else if (!err?.response) {
-        // Backend offline → vẫn cho qua (offline / demo mode)
-        sessionStorage.removeItem('precare_forgot_email');
-        sessionStorage.removeItem('precare_reset_otp');
-        setView('success');
+        setApiError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.');
       } else {
         setApiError('Cập nhật mật khẩu không thành công. Vui lòng thử lại.');
       }

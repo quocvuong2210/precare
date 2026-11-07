@@ -4,7 +4,8 @@
  */
 
 import { apiClient, authApi } from './auth.service';
+import { dashboardService } from './dashboard.service';
 
 export const api = apiClient;
-export { authApi };
+export { authApi, dashboardService };
 export default api;

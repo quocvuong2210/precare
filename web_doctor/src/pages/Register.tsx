@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Eye,
   EyeOff,
@@ -18,7 +19,6 @@ import {
   Info,
 } from 'lucide-react';
 import { PreCareLogo } from '../components/PreCareLogo';
-import { RegistrationStatusCard } from '../components/RegistrationStatusCard';
 import { authApi } from '../services/auth.service';
 import { ExternalLink } from 'lucide-react';
 
@@ -45,22 +45,27 @@ export const Register: React.FC<RegisterProps> = ({
   onRegisterSuccess,
   initialStep,
 }) => {
+  const navigate = useNavigate();
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+
   const handleNavigateToLogin = () => {
     if (onLoginClick) onLoginClick();
     else if (onGoToLogin) onGoToLogin();
+    else navigate('/login');
   };
 
   const handleCompleteRegistration = (userData?: any) => {
     if (onRegisterSuccess) onRegisterSuccess(userData);
     else if (onSuccess) onSuccess(userData);
+    else navigate('/login');
   };
 
   const getInitialStep = (): number => {
-    if (initialStep && initialStep >= 1 && initialStep <= 5) return initialStep;
+    if (initialStep && initialStep >= 1 && initialStep <= 4) return initialStep;
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const s = parseInt(urlParams.get('step') || '1', 10);
-      if (s >= 1 && s <= 5) return s;
+      if (s >= 1 && s <= 4) return s;
     } catch {
       // fallback
     }
@@ -210,46 +215,39 @@ export const Register: React.FC<RegisterProps> = ({
 
   const strength = getPasswordStrength();
 
-  // Sidebar text matching Figma
+  // Sidebar text matching Figma (Quy trình 4 bước kích hoạt ngay)
   const stepMeta = [
     {
       step: 1,
       stepLabel: 'Email đăng ký',
       leftTitle: 'Đồng hành cùng bác sĩ trong hành trình chăm sóc thai sản',
       leftDesc:
-        'Tạo hồ sơ bác sĩ để gửi xét duyệt chuyên môn. Quyền truy cập chỉ được cấp sau khi hồ sơ được phê duyệt.',
+        'Tạo tài khoản bác sĩ để truy cập và đồng hành cùng hệ thống chăm sóc thai sản PreCare.',
     },
     {
       step: 2,
       stepLabel: 'Xác minh email',
       leftTitle: 'Một bước xác minh, thêm niềm tin kết nối',
       leftDesc:
-        'Xác minh email để tiếp tục hoàn thiện hồ sơ. Đây chưa phải là bước kích hoạt tài khoản hoặc cấp quyền truy cập.',
+        'Xác minh mã OTP qua email để bảo vệ quyền riêng tư và dữ liệu y tế.',
     },
     {
       step: 3,
       stepLabel: 'Thông tin bác sĩ',
       leftTitle: 'Hoàn thiện hồ sơ bác sĩ',
       leftDesc:
-        'Cung cấp thông tin và tài liệu chuyên môn để PreCare xét duyệt hồ sơ. Xác minh email không đồng nghĩa với phê duyệt.',
+        'Cung cấp họ tên và số điện thoại liên hệ để thiết lập thông tin bác sĩ trên hệ thống.',
     },
     {
       step: 4,
       stepLabel: 'Thiết lập bảo mật',
       leftTitle: 'Bảo mật tài khoản, an tâm đồng hành',
       leftDesc:
-        'Sau khi gửi, hồ sơ của bác sĩ sẽ được xét duyệt chuyên môn. PreCare sẽ thông báo kết quả qua email trước khi cấp quyền truy cập.',
-    },
-    {
-      step: 5,
-      stepLabel: 'Chờ xét duyệt',
-      leftTitle: 'Đăng ký đang chờ duyệt',
-      leftDesc:
-        'Hệ thống PreCare đang tiến hành xác minh thông tin chứng chỉ hành nghề và hồ sơ chuyên môn của bạn. Quá trình này thường mất từ 24 - 48 giờ làm việc.',
+        'Thiết lập mật khẩu an toàn. Sau khi hoàn tất, bạn có thể đăng nhập và sử dụng hệ thống ngay lập tức.',
     },
   ];
 
-  const currentMeta = stepMeta[Math.min(step - 1, 4)];
+  const currentMeta = stepMeta[Math.min(step - 1, stepMeta.length - 1)];
 
   // Helper kiểm tra email hợp lệ
   const validateEmailFormat = (val: string): boolean => {
@@ -359,7 +357,7 @@ export const Register: React.FC<RegisterProps> = ({
   };
 
   // =========================================================================
-  // HANDLERS BƯỚC 2: OTP
+  // HANDLERS BƯỚC 2: OTP (KHẮC PHỤC TRIỆT ĐỂ LỖI BỘ GÕ TIẾNG VIỆT IME/TELEX/VNI)
   // =========================================================================
   const handleOtpChange = (index: number, val: string) => {
     setOtpError('');
@@ -368,45 +366,134 @@ export const Register: React.FC<RegisterProps> = ({
       setMaxStepReached(2);
     }
 
-    // Xử lý dán nhiều chữ số (paste)
-    if (val.length > 1) {
-      const digits = val.replace(/\D/g, '').slice(0, 6).split('');
+    // Xử lý dán nhiều chữ số (paste hoặc autofill)
+    const digitsOnly = val.replace(/\D/g, '');
+    if (digitsOnly.length > 1) {
+      const digits = digitsOnly.slice(0, 6);
       const newOtp = [...otp];
       for (let i = 0; i < 6; i++) {
         newOtp[i] = digits[i] || '';
       }
       setOtp(newOtp);
       const nextFocus = Math.min(digits.length, 5);
-      otpInputRefs.current[nextFocus]?.focus();
+      requestAnimationFrame(() => {
+        otpInputRefs.current[nextFocus]?.focus();
+      });
 
       if (digits.length === 6) {
-        verifyEnteredOtp(newOtp.join(''));
+        verifyEnteredOtp(digits);
       }
       return;
     }
 
-    const cleanVal = val.replace(/\D/g, '');
+    // Trích xuất lấy duy nhất ký tự số cuối cùng vừa nhập
+    const digit = digitsOnly.slice(-1);
     const newOtp = [...otp];
-    newOtp[index] = cleanVal;
+    newOtp[index] = digit;
     setOtp(newOtp);
 
-    // Tự động nhảy ô tiếp theo
-    if (cleanVal && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
+    // Tự động nhảy sang ô tiếp theo
+    if (digit && index < 5) {
+      requestAnimationFrame(() => {
+        otpInputRefs.current[index + 1]?.focus();
+      });
     }
 
     // Tự động kiểm tra khi nhập đủ 6 ô
-    if (cleanVal && index === 5) {
+    if (digit && index === 5) {
       const fullOtp = newOtp.join('');
-      if (fullOtp.length === 6) {
+      if (fullOtp.length === 6 && !newOtp.includes('')) {
         verifyEnteredOtp(fullOtp);
       }
     }
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    // 1. Phím số 0-9: Chủ động e.preventDefault(), cập nhật trực tiếp state và chuyển focus bằng requestAnimationFrame để ngắt IME composition
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      setOtpError('');
+      setOtpSuccess(false);
+      if (maxStepReached > 2) {
+        setMaxStepReached(2);
+      }
+
+      const digit = e.key;
+      const newOtp = [...otp];
+      newOtp[index] = digit;
+      setOtp(newOtp);
+
+      if (index < 5) {
+        requestAnimationFrame(() => {
+          otpInputRefs.current[index + 1]?.focus();
+        });
+      }
+
+      const fullOtp = newOtp.join('');
+      if (fullOtp.length === 6 && !newOtp.includes('')) {
+        verifyEnteredOtp(fullOtp);
+      }
+      return;
+    }
+
+    // 2. Phím Backspace: Nếu ô hiện tại có ký tự -> xóa ô hiện tại; nếu rỗng -> lùi focus về ô trước đó và xóa ký tự ô trước đó
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      setOtpError('');
+      setOtpSuccess(false);
+      const newOtp = [...otp];
+
+      if (newOtp[index]) {
+        newOtp[index] = '';
+        setOtp(newOtp);
+      } else if (index > 0) {
+        newOtp[index - 1] = '';
+        setOtp(newOtp);
+        requestAnimationFrame(() => {
+          otpInputRefs.current[index - 1]?.focus();
+        });
+      }
+      return;
+    }
+
+    // 3. Phím mũi tên Trái / Phải để di chuyển giữa các ô
+    if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
       otpInputRefs.current[index - 1]?.focus();
+      return;
+    }
+    if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      otpInputRefs.current[index + 1]?.focus();
+      return;
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const digits = pastedData.replace(/\D/g, '').slice(0, 6);
+    if (!digits) return;
+
+    setOtpError('');
+    setOtpSuccess(false);
+    if (maxStepReached > 2) {
+      setMaxStepReached(2);
+    }
+
+    const newOtp = [...otp];
+    for (let i = 0; i < 6; i++) {
+      newOtp[i] = digits[i] || '';
+    }
+    setOtp(newOtp);
+
+    const targetFocus = Math.min(digits.length, 5);
+    requestAnimationFrame(() => {
+      otpInputRefs.current[targetFocus]?.focus();
+    });
+
+    if (digits.length === 6) {
+      verifyEnteredOtp(digits);
     }
   };
 
@@ -548,7 +635,7 @@ export const Register: React.FC<RegisterProps> = ({
     setIsSubmitting(true);
     try {
       // Kết nối API POST /api/v1/auth/register dựa trên API_Contract_STORY-2.1_Auth.md
-      await authApi.register({
+      const regResponse = await authApi.register({
         email: email.trim(),
         password,
         full_name: doctorName.trim(),
@@ -557,8 +644,18 @@ export const Register: React.FC<RegisterProps> = ({
       });
 
       setIsSubmitting(false);
-      setMaxStepReached((prev) => Math.max(prev, 5));
-      setStep(5); // Chuyển sang màn hình Chờ duyệt
+      setShowSuccessModal(true);
+
+      if (onRegisterSuccess) {
+        onRegisterSuccess(regResponse);
+      } else if (onSuccess) {
+        onSuccess(regResponse);
+      }
+
+      // Tự động chuyển hướng về trang Đăng nhập sau 2.5 giây
+      setTimeout(() => {
+        handleNavigateToLogin();
+      }, 2500);
     } catch (err: any) {
       setIsSubmitting(false);
       setSubmitError(err.message || 'Đăng ký không thành công. Vui lòng thử lại sau.');
@@ -587,13 +684,6 @@ export const Register: React.FC<RegisterProps> = ({
 
         {/* Lower Content matching Figma screenshot */}
         <div className="my-auto max-w-[420px] relative z-10 py-6">
-          {step === 5 && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#447C72]/20 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[11px] font-bold tracking-wider uppercase mb-4">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Đang xét duyệt hồ sơ</span>
-            </div>
-          )}
-
           <h1 className="text-2xl sm:text-3xl lg:text-[30px] font-bold text-white leading-[1.3] tracking-tight">
             {currentMeta.leftTitle}
           </h1>
@@ -605,7 +695,7 @@ export const Register: React.FC<RegisterProps> = ({
 
         {/* Bottom subtle system watermark / copyright */}
         <div className="relative z-10 pt-4 border-t border-white/5 text-[11px] text-slate-500 hidden sm:block">
-          PreCare Doctor Portal • Cổng tiếp nhận hồ sơ xét duyệt chuyên môn Sản khoa
+          PreCare Doctor Portal • Nền tảng chăm sóc và quản lý thai sản chuyên sâu
         </div>
       </aside>
 
@@ -673,7 +763,7 @@ export const Register: React.FC<RegisterProps> = ({
                   Đăng ký tài khoản bác sĩ
                 </h2>
                 <p className="mt-1 text-xs sm:text-[13px] text-slate-500 leading-relaxed">
-                  Nhập email để bắt đầu đăng ký và gửi hồ sơ xét duyệt chuyên môn.
+                  Nhập email để bắt đầu đăng ký tài khoản bác sĩ.
                 </p>
               </div>
 
@@ -875,12 +965,17 @@ export const Register: React.FC<RegisterProps> = ({
                     <input
                       key={idx}
                       ref={(el) => (otpInputRefs.current[idx] = el)}
-                      type="text"
+                      type="tel"
+                      pattern="[0-9]*"
+                      autoComplete="one-time-code"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
                       inputMode="numeric"
-                      maxLength={1}
                       value={val}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                      onPaste={handleOtpPaste}
                       className={`w-full h-13 sm:h-14 rounded-lg border-1.5 bg-white text-center text-xl sm:text-2xl font-bold focus:outline-none focus:ring-2 shadow-2xs transition-all border-[#447C72] text-[#447C72] focus:ring-[#447C72]/30 ${
                         isErr ? 'border-rose-500! text-rose-600! focus:ring-rose-500/30!' : ''
                       }`}
@@ -926,18 +1021,6 @@ export const Register: React.FC<RegisterProps> = ({
                   </span>
                 )}
               </div>
-
-              {/* Callout Notice Box */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-xl p-3.5 space-y-1">
-                <div className="text-xs font-semibold text-slate-900">
-                  Hồ sơ sẽ được xét duyệt chuyên môn
-                </div>
-                <div className="text-[11.5px] text-slate-500 leading-relaxed">
-                  Xác minh email không kích hoạt tài khoản. Bác sĩ chỉ được truy cập sau khi hồ sơ được phê duyệt.
-                </div>
-              </div>
-
-
 
               {/* Quay lại Bước 1 */}
               <div className="text-center">
@@ -1199,16 +1282,6 @@ export const Register: React.FC<RegisterProps> = ({
                 </div>
               )}
 
-              {/* Callout Notice Box */}
-              <div className="bg-[#F8FAFC] border border-slate-100 rounded-xl p-3.5 space-y-1">
-                <div className="text-xs font-semibold text-slate-900">
-                  Hồ sơ sẽ được xét duyệt chuyên môn
-                </div>
-                <div className="text-[11.5px] text-slate-500 leading-relaxed">
-                  Xác minh email không kích hoạt tài khoản. Bác sĩ chỉ được truy cập sau khi hồ sơ được phê duyệt.
-                </div>
-              </div>
-
               {/* Submit Button */}
               <button
                 type="button"
@@ -1219,10 +1292,10 @@ export const Register: React.FC<RegisterProps> = ({
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Đang kết nối API gửi hồ sơ...</span>
+                    <span>Đang tạo tài khoản...</span>
                   </>
                 ) : (
-                  <span>Gửi hồ sơ xét duyệt</span>
+                  <span>Hoàn tất đăng ký</span>
                 )}
               </button>
 
@@ -1238,76 +1311,43 @@ export const Register: React.FC<RegisterProps> = ({
               </div>
             </div>
           )}
-
-          {/* ========================================================
-              STEP 5: HOÀN TẤT & CHỜ DUYỆT (PENDING APPROVAL STATE)
-              ======================================================== */}
-          {step === 5 && (
-            <div className="space-y-3.5 text-center py-1">
-              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
-                <Clock className="w-6 h-6 stroke-[2.2]" />
-              </div>
-
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
-                  Hồ sơ đang chờ duyệt
-                </h2>
-                <p className="mt-1 text-[11.5px] sm:text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                  Cảm ơn Bác sĩ <b className="text-slate-900">{doctorName}</b> đã gửi hồ sơ đăng ký. Ban chuyên môn PreCare đang tiến hành thẩm định và đối chiếu thông tin chứng chỉ hành nghề.
-                </p>
-              </div>
-
-              {/* Bảng theo dõi tiến độ thẩm định */}
-              <RegistrationStatusCard
-                emailStatus={{
-                  label: 'Email xác thực',
-                  sublabel: email,
-                  statusText: 'Đã xác minh',
-                  tone: 'green',
-                }}
-                profileStatus={{
-                  label: 'Hồ sơ bác sĩ',
-                  statusText: 'Chờ duyệt',
-                  tone: 'amber',
-                }}
-                accountStatus={{
-                  label: 'Trạng thái tài khoản',
-                  sublabel: 'Quyền truy cập cổng y tế Sản khoa',
-                  statusText: 'Chưa kích hoạt',
-                  tone: 'gray',
-                }}
-              />
-
-              {/* Thông tin tóm tắt đã nộp (đã bỏ Nơi công tác và Tài liệu đính kèm) */}
-              <div className="bg-[#F8FAFC] border border-slate-200/90 rounded-xl p-3 text-left text-xs space-y-1.5">
-                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
-                  <span className="text-slate-500">Bác sĩ đăng ký:</span>
-                  <span className="font-semibold text-slate-800">{doctorName}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
-                  <span className="text-slate-500">Số điện thoại:</span>
-                  <span className="font-semibold text-slate-800">{phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Thời gian phản hồi dự kiến:</span>
-                  <span className="font-semibold text-amber-700">24 - 48 giờ làm việc</span>
-                </div>
-              </div>
-
-              {/* Nút duy nhất: Về trang Đăng nhập (không có nút demo, không có link đăng ký lại) */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={handleNavigateToLogin}
-                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer"
-                >
-                  Về trang Đăng nhập
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
+
+      {/* =========================================================================
+          MODAL: THÔNG BÁO ĐĂNG KÝ THÀNH CÔNG (TỰ ĐỘNG CHUYỂN HƯỚNG VỀ LOGIN)
+          ========================================================================= */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200 shadow-2xs">
+              <CheckCircle2 className="w-7 h-7 stroke-[2.2]" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                Đăng ký thành công!
+              </h3>
+              <p className="text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg py-2 px-3">
+                Bạn có thể đăng nhập ngay bây giờ.
+              </p>
+              <p className="text-xs text-slate-500 pt-1 leading-relaxed">
+                Tài khoản bác sĩ đã sẵn sàng hoạt động. Đang chuyển hướng về trang Đăng nhập...
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleNavigateToLogin}
+                className="w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold text-white bg-[#447C72] hover:bg-[#38675F] active:scale-[0.99] transition-all shadow-xs cursor-pointer"
+              >
+                Đăng nhập ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           TERMS & PRIVACY POLICY MODAL
@@ -1336,13 +1376,13 @@ export const Register: React.FC<RegisterProps> = ({
 
             <div className="text-xs text-slate-600 space-y-3 leading-relaxed">
               <p>
-                <b>1. Mục đích xét duyệt:</b> PreCare là nền tảng số hỗ trợ theo dõi hồ sơ thai sản chuyên sâu. Để bảo vệ dữ liệu y tế của thai phụ và đảm bảo tính chính xác trong chẩn đoán, chỉ các bác sĩ có chứng chỉ hành nghề hợp lệ được cấp quyền truy cập vào portal.
+                <b>1. Mục đích sử dụng:</b> PreCare là nền tảng số hỗ trợ theo dõi hồ sơ thai sản chuyên sâu. Nền tảng phục vụ các y bác sĩ trong việc theo dõi thai kỳ, tính toán chỉ số sinh trắc học và quản lý lịch khám.
               </p>
               <p>
-                <b>2. Bảo mật thông tin:</b> Mọi tài liệu và chứng chỉ hành nghề của bạn được mã hóa an toàn theo tiêu chuẩn HIPAA/GDPR y tế và chỉ sử dụng cho mục đích thẩm định hồ sơ.
+                <b>2. Bảo mật thông tin:</b> Mọi dữ liệu tài khoản và thông tin y tế được mã hóa an toàn theo tiêu chuẩn bảo mật dữ liệu y tế.
               </p>
               <p>
-                <b>3. Thời gian xử lý:</b> Ban chuyên môn PreCare thẩm định hồ sơ trong vòng 24 - 48 giờ làm việc. Thông báo chấp thuận hoặc yêu cầu bổ sung sẽ được gửi trực tiếp tới email đăng ký của bạn.
+                <b>3. Trách nhiệm chuyên môn:</b> Bác sĩ chịu trách nhiệm đối với các nhận định lâm sàng và việc bảo mật tài khoản cá nhân trong quá trình sử dụng hệ thống.
               </p>
             </div>
 
