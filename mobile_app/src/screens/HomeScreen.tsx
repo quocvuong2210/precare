@@ -7,81 +7,54 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { colors } from '../theme/colors';
+import { currentUserProfile } from '../services/api';
 
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
+  const displayName = currentUserProfile?.full_name || 'Nguyễn Thị Lan';
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
-        
         <View style={styles.userInfo}>
-
           <View style={styles.avatar}>
-            <Ionicons
-              name="person"
-              size={25}
-              color={colors.primaryDark}
-            />
+            <Ionicons name="person" size={25} color={colors.primaryDark} />
           </View>
 
           <View>
-            <Text style={styles.hello}>
-              Xin chào,
-            </Text>
-
-            <Text style={styles.userName}>
-              Nguyễn Thị Lan
-            </Text>
+            <Text style={styles.hello}>Xin chào,</Text> 
+            <Text style={styles.userName}>{displayName}</Text>
           </View>
-
         </View>
 
         <View style={styles.weekBadge}>
-          <Text style={styles.weekText}>
-            Tuần thứ 28
-          </Text>
+          <Text style={styles.weekText}>Tuần thứ 24</Text>
         </View>
-
       </View>
-
 
       {/* ================= CONTENT ================= */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-
         {/* ================= PREGNANCY CARD ================= */}
         <View style={styles.pregnancyCard}>
-
           <View style={styles.pregnancyInfo}>
-
-            <Text style={styles.smallWhite}>
-              TUỔI THAI HIỆN TẠI
-            </Text>
-
-            <Text style={styles.weekNumber}>
-              32 tuần 4 ngày
-            </Text>
-
-            <Text style={styles.dueDate}>
-              Dự sinh: 15/12/2024 • Tam cá nguyệt 3
-            </Text>
+            <Text style={styles.smallWhite}>TUỔI THAI HIỆN TẠI</Text>
+            <Text style={styles.weekNumber}>24 tuần 2 ngày</Text>
+            <Text style={styles.dueDate}>Dự sinh: 22/09/2026 • Tam cá nguyệt 2</Text>
 
             <View style={styles.progressBackground}>
               <View style={styles.progress} />
             </View>
 
-            <Text style={styles.progressText}>
-              Tuần 32 trên hành trình 40 tuần
-            </Text>
-
+            <Text style={styles.progressText}>Tuần 24 trên hành trình 40 tuần</Text>
           </View>
 
           <View style={styles.pregnancyImageContainer}>
@@ -91,130 +64,82 @@ export default function HomeScreen() {
               resizeMode="cover"
             />
           </View>
-
         </View>
 
-
         {/* ================= QUICK ACCESS ================= */}
-        <Text style={styles.sectionTitle}>
-          Lối tắt nhanh
-        </Text>
+        <Text style={styles.sectionTitle}>Lối tắt nhanh</Text>
 
         <View style={styles.quickGrid}>
-
           <QuickButton
             icon="add-circle-outline"
             title="Tải phiếu khám"
+            onPress={() => navigation.navigate('Upload')}
           />
 
           <QuickButton
             icon="analytics-outline"
             title="Lịch sử kết quả"
+            onPress={() => navigation.navigate('HistoryResults')}
           />
 
           <QuickButton
             icon="pulse-outline"
             title="Biểu đồ thai"
+            onPress={() => navigation.navigate('Charts')}
           />
 
           <QuickButton
             icon="calendar-outline"
             title="Lịch hẹn khám"
+            onPress={() => navigation.navigate('Appointments')}
           />
-
         </View>
 
-
         {/* ================= APPOINTMENT ================= */}
-        <Text style={styles.sectionTitle}>
-          Lịch khám sắp tới
-        </Text>
+        <Text style={styles.sectionTitle}>Lịch khám sắp tới</Text>
 
-        <View style={styles.appointmentCard}>
-
+        <TouchableOpacity
+          style={styles.appointmentCard}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Appointments')}
+        >
           <View style={styles.dateBox}>
-
-            <Text style={styles.dateMonth}>
-              T06
-            </Text>
-
-            <Text style={styles.dateNumber}>
-              15
-            </Text>
-
+            <Text style={styles.dateMonth}>T06</Text>
+            <Text style={styles.dateNumber}>15</Text>
           </View>
 
           <View style={styles.appointmentInfo}>
-
-            <Text style={styles.appointmentTitle}>
-              Khám định kỳ lúc 08:30 AM
-            </Text>
-
-            <Text style={styles.doctor}>
-              BS. Lê Minh
-            </Text>
-
-            <Text style={styles.location}>
-              Phòng khám 402 - BV Phụ sản TW
-            </Text>
-
+            <Text style={styles.appointmentTitle}>Khám định kỳ lúc 08:30 AM</Text>
+            <Text style={styles.doctor}>BS. Lê Minh</Text>
+            <Text style={styles.location}>Phòng khám 402 - BV Phụ sản TW</Text>
           </View>
-
-        </View>
-
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-
-/* =====================================================
-   QUICK BUTTON
-===================================================== */
-
 function QuickButton({
   icon,
   title,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
+  onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity
-      style={styles.quickButton}
-      activeOpacity={0.8}
-    >
-
+    <TouchableOpacity style={styles.quickButton} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.quickIcon}>
-        <Ionicons
-          name={icon}
-          size={21}
-          color={colors.primary}
-        />
+        <Ionicons name={icon} size={21} color={colors.primary} />
       </View>
-
-      <Text style={styles.quickTitle}>
-        {title}
-      </Text>
-
+      <Text style={styles.quickTitle}>{title}</Text>
     </TouchableOpacity>
   );
 }
 
-
-/* =====================================================
-   STYLES
-===================================================== */
-
 const styles = StyleSheet.create({
-
-  container: {
-    flex: 1,
-    backgroundColor: '#F7FBFC',
-  },
-
-  /* ================= HEADER ================= */
-
+  container: { flex: 1, backgroundColor: '#F7FBFC' },
   header: {
     height: 75,
     paddingHorizontal: 20,
@@ -223,12 +148,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#F7FBFC',
   },
-
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
+  userInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     width: 43,
     height: 43,
@@ -238,43 +158,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-
-  hello: {
-    fontSize: 11,
-    color: '#7C8B98',
-  },
-
-  userName: {
-    marginTop: 2,
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.navy,
-  },
-
+  hello: { fontSize: 11, color: '#7C8B98' },
+  userName: { marginTop: 2, fontSize: 14, fontWeight: '800', color: colors.navy },
   weekBadge: {
     paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#D9FAF4',
   },
-
-  weekText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primaryDark,
-  },
-
-
-  /* ================= SCROLL ================= */
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-
-
-  /* ================= PREGNANCY CARD ================= */
-
+  weekText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
   pregnancyCard: {
     minHeight: 113,
     borderRadius: 16,
@@ -283,42 +176,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     overflow: 'hidden',
-
     shadowColor: '#087F77',
-    shadowOpacity: 0.20,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
+    shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
-
-  pregnancyInfo: {
-    flex: 1,
-    paddingRight: 10,
-  },
-
-  smallWhite: {
-    fontSize: 9,
-    color: '#D8F7F2',
-    letterSpacing: 0.5,
-  },
-
-  weekNumber: {
-    marginTop: 3,
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.white,
-  },
-
-  dueDate: {
-    marginTop: 3,
-    fontSize: 9,
-    color: '#D8F7F2',
-  },
-
+  pregnancyInfo: { flex: 1, paddingRight: 10 },
+  smallWhite: { fontSize: 9, color: '#D8F7F2', letterSpacing: 0.5 },
+  weekNumber: { marginTop: 3, fontSize: 22, fontWeight: '800', color: colors.white },
+  dueDate: { marginTop: 3, fontSize: 9, color: '#D8F7F2' },
   progressBackground: {
     marginTop: 10,
     width: '100%',
@@ -327,19 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#2B918A',
     overflow: 'hidden',
   },
-
-  progress: {
-    width: '80%',
-    height: '100%',
-    backgroundColor: colors.white,
-  },
-
-  progressText: {
-    marginTop: 5,
-    fontSize: 8,
-    color: '#D8F7F2',
-  },
-
+  progress: { width: '60%', height: '100%', backgroundColor: colors.white },
+  progressText: { marginTop: 5, fontSize: 8, color: '#D8F7F2' },
   pregnancyImageContainer: {
     width: 54,
     height: 72,
@@ -347,15 +203,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.white,
   },
-
-  pregnancyImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-
-  /* ================= SECTION ================= */
-
+  pregnancyImage: { width: '100%', height: '100%' },
   sectionTitle: {
     marginTop: 18,
     marginBottom: 10,
@@ -363,16 +211,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.navy,
   },
-
-
-  /* ================= QUICK GRID ================= */
-
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-
   quickButton: {
     width: '48%',
     height: 65,
@@ -384,18 +227,12 @@ const styles = StyleSheet.create({
     borderColor: '#E1EAF0',
     flexDirection: 'row',
     alignItems: 'center',
-
     shadowColor: '#0F172A',
     shadowOpacity: 0.04,
     shadowRadius: 4,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-
+    shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-
   quickIcon: {
     width: 32,
     height: 32,
@@ -405,17 +242,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
-
-  quickTitle: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: colors.navy,
-  },
-
-
-  /* ================= APPOINTMENT ================= */
-
+  quickTitle: { flex: 1, fontSize: 10.5, fontWeight: '600', color: colors.navy },
   appointmentCard: {
     minHeight: 66,
     padding: 10,
@@ -426,7 +253,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   dateBox: {
     width: 39,
     height: 45,
@@ -435,42 +261,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  dateMonth: {
-    fontSize: 8,
-    color: colors.white,
-    fontWeight: '600',
-  },
-
-  dateNumber: {
-    marginTop: 1,
-    fontSize: 18,
-    color: colors.white,
-    fontWeight: '800',
-  },
-
-  appointmentInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-
-  appointmentTitle: {
-    fontSize: 10.5,
-    color: colors.primaryDark,
-    fontWeight: '700',
-  },
-
-  doctor: {
-    marginTop: 2,
-    fontSize: 10.5,
-    color: colors.navy,
-    fontWeight: '600',
-  },
-
-  location: {
-    marginTop: 2,
-    fontSize: 8.5,
-    color: '#7B8C99',
-  },
-
+  dateMonth: { fontSize: 8, color: colors.white, fontWeight: '600' },
+  dateNumber: { marginTop: 1, fontSize: 18, color: colors.white, fontWeight: '800' },
+  appointmentInfo: { flex: 1, marginLeft: 10 },
+  appointmentTitle: { fontSize: 10.5, color: colors.primaryDark, fontWeight: '700' },
+  doctor: { marginTop: 2, fontSize: 10.5, color: colors.navy, fontWeight: '600' },
+  location: { marginTop: 2, fontSize: 8.5, color: '#7B8C99' },
 });
