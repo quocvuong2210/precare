@@ -45,5 +45,5 @@ class PregnancyProfile(Base):
         CheckConstraint("q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)", name="chk_gestational_days"),
         CheckConstraint("q1_gestational_weeks IS NULL OR (q1_gestational_weeks >= 0 AND q1_gestational_weeks <= 42)", name="chk_gestational_weeks"),
         CheckConstraint("crl_mm IS NULL OR crl_mm > 0", name="chk_crl_positive"),
-        Index("uq_active_pregnancy_per_patient", "patient_id", unique=True, postgresql_where=(status == 'active')),
+        Index("uq_active_pregnancy_per_patient", "patient_id", unique=True, postgresql_where=(status == 'active'), sqlite_where=(status == 'active')),
     )

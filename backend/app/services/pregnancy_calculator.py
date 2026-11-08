@@ -15,7 +15,7 @@ def calculate_ga_from_crl(crl_mm: float) -> int:
     Công thức Robinson & Fleming / Hadlock:
     GA_days = 8.052 * sqrt(crl_mm * 1.037) + 23.73
     """
-    days = 8.052 * math.sqrt(crl_mm) + 23.73
+    days = 8.052 * math.sqrt(float(crl_mm) * 1.037) + 23.73
     return round(days)
 
 def format_gestational_age(ga_days: int, target_date: date, edd: date) -> GestationalAgeDetail:
