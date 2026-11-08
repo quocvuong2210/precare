@@ -27,7 +27,12 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const handleContinue = async () => {
     const email = identifier.trim().toLowerCase();
-    const role = "doctor";
+    const role = "pregnant_woman";
+
+    if (!email) {
+      Alert.alert("Thông báo", "Vui lòng nhập email.");
+      return;
+    }
 
     // 1. Kiểm tra email
     if (!email) {
@@ -52,7 +57,7 @@ export default function RegisterScreen({ navigation }: Props) {
       console.log("Gửi OTP thành công:", result.message);
 
       // 4. Chuyển màn hình nếu API thành công
-      navigation.navigate("OtpVerification", {
+      navigation.navigate("RegisterOtpVerification", {
         email: email,
         role: role,
         retryAfter: result.retry_after,

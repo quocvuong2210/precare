@@ -5,7 +5,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/HomeScreen';
-import RecordsScreen from '../screens/RecordsScreen';
+import RecordsScreen from '../screens/profile/RecordsScreen';
 import ChartsScreen from '../screens/ChartsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import { useAppSettings } from '../context/AppSettingsContext';

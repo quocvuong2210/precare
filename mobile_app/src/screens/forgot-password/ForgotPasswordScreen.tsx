@@ -38,34 +38,25 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       return;
     }
 
-    try {
-      setLoading(true);
-      setError('');
+     try {
+    setLoading(true);
+    setError('');
 
-      const result = await forgotPassword(email.trim());
+    const result = await forgotPassword(email.trim());
+    console.log('1. API OK:', result);
 
-      Alert.alert(
-        'Thông báo',
-        result.message || 'Vui lòng kiểm tra email để nhận OTP.',
-        [
-          {
-            text: 'Tiếp tục',
-            onPress: () =>
-              navigation.navigate('OtpVerification', {
-                email: email.trim(),
-              }),
-          },
-        ],
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error.message || 'Không thể gửi OTP. Vui lòng thử lại.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('2. Chuẩn bị navigate');
+    navigation.navigate('ForgotOtpVerification', {
+      email: email.trim(),
+    });
+    console.log('3. Đã gọi navigate');
+  } catch (err: any) {
+    console.log('FAIL:', err?.message);
+    setError(err?.message || 'Không thể gửi OTP. Vui lòng thử lại.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <LinearGradient
