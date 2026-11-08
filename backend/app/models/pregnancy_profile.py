@@ -38,6 +38,7 @@ class PregnancyProfile(Base):
     checkups = relationship("Checkup", back_populates="pregnancy_profile", cascade="all, delete-orphan", order_by="Checkup.checkup_date")
     biometric_records = relationship("BiometricData", back_populates="pregnancy_profile", cascade="all, delete-orphan")
     deletion_requests = relationship("DeletionRequest", back_populates="pregnancy_profile", cascade="all, delete-orphan")
+    uploaded_files = relationship("UploadedFile", back_populates="pregnancy_profile", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed', 'terminated')", name="chk_pregnancy_status"),

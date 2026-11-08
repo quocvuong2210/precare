@@ -32,6 +32,7 @@ class Checkup(Base):
     pregnancy_profile = relationship("PregnancyProfile", back_populates="checkups")
     doctor = relationship("User", foreign_keys=[doctor_id])
     biometrics = relationship("BiometricData", back_populates="checkup", cascade="all, delete-orphan", uselist=False)
+    uploaded_files = relationship("UploadedFile", back_populates="checkup")
 
     __table_args__ = (
         CheckConstraint("gestational_age_days >= 0 AND gestational_age_days <= 315", name="chk_gestational_age_range"),

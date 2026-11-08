@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS pregnancy_profiles (
     deleted_at TIMESTAMP WITH TIME ZONE,
     is_anonymized BOOLEAN DEFAULT FALSE,
     is_purged_from_research BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME  ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_gestational_days CHECK (q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)),
     CONSTRAINT chk_gestational_weeks CHECK (q1_gestational_weeks IS NULL OR (q1_gestational_weeks >= 0 AND q1_gestational_weeks <= 42)),
@@ -94,20 +94,31 @@ CREATE INDEX IF NOT EXISTS idx_checkups_date ON checkups(checkup_date);
 CREATE INDEX IF NOT EXISTS idx_checkups_gt ON checkups(gestational_age_days);
 CREATE INDEX IF NOT EXISTS idx_checkups_not_deleted ON checkups(pregnancy_profile_id) WHERE is_deleted = FALSE;
 
--- 5. Bảng Uploaded Files
+-- 5. Bảng Uploaded Files (Đồng bộ chuẩn Story 4.1 & API Contract)
 CREATE TABLE IF NOT EXISTS uploaded_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     pregnancy_profile_id UUID NOT NULL REFERENCES pregnancy_profiles(id) ON DELETE CASCADE,
-    checkup_id UUID REFERENCES checkups(id) ON DELETE SET NULL,
-    file_url VARCHAR(512) NOT NULL,
-    file_type VARCHAR(50) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'extracted', 'verified', 'failed')),
-    ocr_raw_payload JSONB,
-    uploaded_by UUID REFERENCES users(id),
+    checkup_id UUID REFERENCES checkups(id) ON DELETE SET NULL, -- Gắn với lần khám nếu tải lên trong buổi khám
+    file_url VARCHAR(512) NOT NULL,                           -- Đường dẫn Object Storage (S3/MinIO key)
+    file_type VARCHAR(50) NOT NULL,                           -- Loại file: 'application/pdf', 'image/jpeg', 'image/png'
+    file_name VARCHAR(255),                                   -- Tên file gốc người dùng tải lên
+    file_size_bytes BIGINT,                                   -- Dung lượng file (bytes)
+    document_type VARCHAR(50) DEFAULT 'ultrasound_report'     -- 'ultrasound_report', 'blood_test', 'urinalysis', 'other'
+        CHECK (document_type IN ('ultrasound_report', 'blood_test', 'urinalysis', 'other')),
+    status VARCHAR(50) DEFAULT 'pending' 
+        CHECK (status IN ('pending', 'processing', 'extracted', 'verified', 'failed')),
+    celery_task_id VARCHAR(100),                              -- ID của Celery Task xử lý ngầm trong Redis
+    error_message TEXT,                                       -- Lưu thông báo lỗi nếu quá trình OCR/Extract thất bại
+    ocr_raw_payload JSONB,                                    -- Kết quả bóc tách thô (sẽ do Celery worker ghi)
+    uploaded_by UUID REFERENCES users(id),                    -- Người tải lên (Bác sĩ hoặc Thai phụ)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
 CREATE INDEX IF NOT EXISTS idx_uploaded_files_profile ON uploaded_files(pregnancy_profile_id);
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_checkup ON uploaded_files(checkup_id);
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_status ON uploaded_files(status);
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_task ON uploaded_files(celery_task_id);
 
 -- 6. Bảng Biometric Data
 CREATE TABLE IF NOT EXISTS biometric_data (
