@@ -7,6 +7,9 @@ import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
+// ============================================================================
+import { ShieldAlert } from 'lucide-react';
+import { DeletionRequestsReview } from './components/DeletionRequestsReview';
 import {
   HeartPulse,
   LayoutDashboard,
@@ -21,7 +24,7 @@ import {
 } from 'lucide-react';
 
 type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
-type TabType = 'overview' | 'records' | 'reports' | 'settings';
+type TabType = 'overview' | 'records' | 'deletions' | 'reports' | 'settings';
 
 interface ParsedRoute {
   view: AppView;
@@ -79,6 +82,10 @@ function parseLocation(pathname: string): ParsedRoute {
     return { view: 'app', tab: 'records', patientId: null };
   }
 
+  if (path.startsWith('/deletions') || path.startsWith('/deletion-requests')) {
+  return { view: 'app', tab: 'deletions', patientId: null };
+  }
+
   // Tab Báo cáo: /reports
   if (path === '/reports' || path.startsWith('/reports')) {
     return { view: 'app', tab: 'reports', patientId: null };
@@ -112,7 +119,9 @@ export const App: React.FC = () => {
       targetPath = '/reports';
     } else if (tab === 'settings') {
       targetPath = '/settings';
-    } else {
+    } else if (tab === 'deletions') {
+      targetPath = '/deletions';
+    }else {
       targetPath = '/dashboard';
     }
 
@@ -250,10 +259,11 @@ export const App: React.FC = () => {
 
   // VIEW 3: GIAO DIỆN BÁC SĨ (DASHBOARD)
   const navItems = [
-    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
-    { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+  { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+  { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
+  { id: 'deletions', label: 'Xét duyệt xóa hồ sơ', icon: ShieldAlert }, // <--- THÊM MỤC NÀY
+  { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
+  { id: 'settings', label: 'Cài đặt', icon: Settings },
   ] as const;
 
   return (
@@ -346,6 +356,8 @@ export const App: React.FC = () => {
               ? 'Hồ sơ chi tiết thai phụ'
               : activeTab === 'records'
               ? 'Quản lý Hồ sơ Thai kỳ'
+              : activeTab === 'deletions'
+              ? 'Thẩm định Yêu cầu Xóa Hồ sơ Y tế'
               : activeTab === 'reports'
               ? 'Báo cáo thống kê'
               : activeTab === 'settings'
@@ -379,6 +391,8 @@ export const App: React.FC = () => {
             />
           ) : activeTab === 'records' ? (
             <PregnancyProfile onSelectPatient={(id) => syncRoute('records', id)} />
+          ) : activeTab === 'deletions' ? (
+            <DeletionRequestsReview />
           ) : (
             <Dashboard onSelectPatient={(id) => syncRoute('records', id)} />
           )}
