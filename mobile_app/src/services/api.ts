@@ -670,5 +670,4 @@ export async function retryIngestFile(fileId: string) {
   const data = await handleResponse(response);
   console.log(`Thử lại trích xuất tài liệu (${fileId}) thành công!`);
   return data;
-
 }
