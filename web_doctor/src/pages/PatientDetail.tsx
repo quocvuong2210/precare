@@ -193,21 +193,20 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
   const currentGaFormatted =
     clinicalCalc?.gestationalAge?.formatted ||
     currentRecord?.gestationalAgeFormatted ||
-    '---';
+    'Chưa có dữ liệu';
   const currentGaDays =
     clinicalCalc?.gestationalAge?.days ??
-    currentRecord?.gestationalAgeDays ??
-    0;
+    currentRecord?.gestationalAgeDays;
   const currentGaWeeks =
-    clinicalCalc?.gestationalAge?.weeks ?? Math.floor(currentGaDays / 7);
+    clinicalCalc?.gestationalAge?.weeks ??
+    (currentGaDays != null ? Math.floor(currentGaDays / 7) : null);
   const currentEdd =
     clinicalCalc?.formattedEdd ||
     currentRecord?.displayEdd ||
     (currentRecord?.edd ? formatDateToDisplay(currentRecord.edd) : 'Chưa có dữ liệu');
   const currentDaysUntilEdd =
     clinicalCalc?.daysUntilEdd ??
-    currentRecord?.daysUntilEdd ??
-    0;
+    currentRecord?.daysUntilEdd;
 
   // Xác định tam cá nguyệt chuẩn y khoa:
   // Quý 1: 0 - 97 ngày (0w - 13w6d)
@@ -215,7 +214,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
   // Quý 3: >= 196 ngày (>= 28w)
   const currentTrimester =
     clinicalCalc?.gestationalAge?.trimester ??
-    (currentGaDays <= 97 ? 1 : currentGaDays <= 195 ? 2 : 3);
+    (currentGaDays == null
+      ? null
+      : currentGaDays <= 97
+      ? 1
+      : currentGaDays <= 195
+      ? 2
+      : 3);
 
   const trimesterBadge =
     currentTrimester === 1
@@ -228,39 +233,47 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
           label: 'TAM CÁ NGUYỆT THỨ 2 (3 THÁNG GIỮA)',
           className: 'bg-[#F3E8FF] text-[#6B21A8] border-purple-200',
         }
-      : {
+      : currentTrimester === 3
+      ? {
           label: 'TAM CÁ NGUYỆT THỨ 3 (3 THÁNG CUỐI)',
           className: 'bg-amber-50 text-amber-800 border-amber-200',
-        };
+        }
+      : null;
 
   // Tỷ lệ % tiến trình thai kỳ (chuẩn 280 ngày)
-  const progressPercent = Math.min(
-    100,
-    Math.max(0, Number(((currentGaDays / 280) * 100).toFixed(1)))
-  );
+  const progressPercent =
+    currentGaDays != null
+      ? Math.min(100, Math.max(0, Number(((currentGaDays / 280) * 100).toFixed(1))))
+      : 0;
 
   // Tính toán tỷ lệ fill (%) cho từng phân đoạn sao cho màu chỉ chạy đến đúng mốc hôm nay:
   // Phân đoạn 1 (Quý 1: 0% - 33.33% tổng tiến trình)
   const q1FillWidth =
-    progressPercent <= 33.33
-      ? Math.min(100, Math.max(0, (progressPercent / 33.33) * 100))
-      : 100;
+    currentGaDays != null
+      ? progressPercent <= 33.33
+        ? Math.min(100, Math.max(0, (progressPercent / 33.33) * 100))
+        : 100
+      : 0;
   const q1IsActive = currentTrimester === 1;
 
   // Phân đoạn 2 (Quý 2: 33.33% - 66.66% tổng tiến trình)
   const q2FillWidth =
-    progressPercent <= 33.33
-      ? 0
-      : progressPercent <= 66.66
-      ? Math.min(100, Math.max(0, ((progressPercent - 33.33) / 33.33) * 100))
-      : 100;
+    currentGaDays != null
+      ? progressPercent <= 33.33
+        ? 0
+        : progressPercent <= 66.66
+        ? Math.min(100, Math.max(0, ((progressPercent - 33.33) / 33.33) * 100))
+        : 100
+      : 0;
   const q2IsActive = currentTrimester === 2;
 
   // Phân đoạn 3 (Quý 3: 66.66% - 100% tổng tiến trình)
   const q3FillWidth =
-    progressPercent <= 66.66
-      ? 0
-      : Math.min(100, Math.max(0, ((progressPercent - 66.66) / 33.34) * 100));
+    currentGaDays != null
+      ? progressPercent <= 66.66
+        ? 0
+        : Math.min(100, Math.max(0, ((progressPercent - 66.66) / 33.34) * 100))
+      : 0;
   const q3IsActive = currentTrimester === 3;
 
   // Dữ liệu lâm sàng đầu vào (Chuẩn PostgreSQL 16 schema)
@@ -475,11 +488,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
             )}
 
             {/* Badge tam cá nguyệt */}
-            <span
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${trimesterBadge.className}`}
-            >
-              {trimesterBadge.label}
-            </span>
+            {trimesterBadge && (
+              <span
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${trimesterBadge.className}`}
+              >
+                {trimesterBadge.label}
+              </span>
+            )}
           </div>
         </div>
 
@@ -493,12 +508,14 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
                 {currentGaFormatted}
               </div>
               <div className="text-xs text-slate-500 mt-1 font-medium">
-                Tương đương: {currentGaDays} ngày liên tục
+                {currentGaDays != null ? `Tương đương: ${currentGaDays} ngày liên tục` : 'Chưa có dữ liệu tuổi thai'}
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-[#FFE4E8] flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Tốc độ phát triển chuẩn FTS</span>
+              <span>
+                {currentGaDays != null ? 'Tốc độ phát triển chuẩn FTS' : 'Đang chờ cập nhật dữ liệu khám'}
+              </span>
             </div>
           </div>
 
@@ -507,7 +524,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
             <div>
               <div className="text-xs font-bold text-slate-600">Đếm ngược Dự sinh (EDD)</div>
               <div className="text-4xl font-black text-slate-900 tracking-tight mt-2">
-                {currentDaysUntilEdd} <span className="text-lg font-semibold text-slate-600">ngày</span>
+                {currentDaysUntilEdd != null ? (
+                  <>
+                    {currentDaysUntilEdd} <span className="text-lg font-semibold text-slate-600">ngày</span>
+                  </>
+                ) : (
+                  '---'
+                )}
               </div>
               <div className="text-xs text-slate-500 mt-1 font-medium">
                 Hạn dự kiến: {currentEdd}
@@ -526,22 +549,24 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
               Lược đồ Tiến trình Thai kỳ (3 Giai đoạn)
             </span>
             <span className="font-extrabold text-[#9F1239] text-sm">
-              {progressPercent}% Thai kỳ
+              {currentGaDays != null ? `${progressPercent}% Thai kỳ` : 'Chưa có dữ liệu'}
             </span>
           </div>
 
           {/* Marker 'Hôm nay: gt' + Progress Bar */}
           <div className="relative pt-6 pb-1">
             {/* Tooltip marker chỉ vị trí chính xác */}
-            <div
-              className="absolute -top-1 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-10"
-              style={{ left: `${Math.min(96, Math.max(4, progressPercent))}%` }}
-            >
-              <div className="px-2.5 py-1 bg-[#9F1239] text-white text-[11px] font-bold rounded-lg shadow-sm whitespace-nowrap">
-                {targetDate === getTodayISO() ? 'Hôm nay' : 'Mốc khám'}: {currentGaFormatted}
+            {currentGaDays != null && (
+              <div
+                className="absolute -top-1 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-10"
+                style={{ left: `${Math.min(96, Math.max(4, progressPercent))}%` }}
+              >
+                <div className="px-2.5 py-1 bg-[#9F1239] text-white text-[11px] font-bold rounded-lg shadow-sm whitespace-nowrap">
+                  {targetDate === getTodayISO() ? 'Hôm nay' : 'Mốc khám'}: {currentGaFormatted}
+                </div>
+                <div className="w-2 h-1 bg-[#9F1239] [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
               </div>
-              <div className="w-2 h-1 bg-[#9F1239] [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
-            </div>
+            )}
 
             {/* Segmented Progress Bar: Chỉ tô màu đến đúng điểm marker */}
             <div className="grid grid-cols-3 gap-1.5 h-3">
@@ -583,8 +608,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
               <div className="text-xs font-bold text-slate-800">Quý 1 (0w - 13w6d)</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {currentTrimester === 1
-                  ? `Giai đoạn hiện tại (Tuần ${currentGaWeeks})`
-                  : 'Đã hoàn thành'}
+                  ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
+                  : currentTrimester != null && currentTrimester > 1
+                  ? 'Đã hoàn thành'
+                  : '---'}
               </div>
             </div>
 
@@ -592,10 +619,12 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
               <div className="text-xs font-bold text-slate-800">Quý 2 (14w - 27w6d)</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {currentTrimester === 2
-                  ? `Giai đoạn hiện tại (Tuần ${currentGaWeeks})`
-                  : currentTrimester > 2
+                  ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
+                  : currentTrimester != null && currentTrimester > 2
                   ? 'Đã hoàn thành'
-                  : 'Sắp tới'}
+                  : currentTrimester != null && currentTrimester < 2
+                  ? 'Sắp tới'
+                  : '---'}
               </div>
             </div>
 
@@ -603,8 +632,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
               <div className="text-xs font-bold text-slate-800">Quý 3 (28w - 40w)</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {currentTrimester === 3
-                  ? `Giai đoạn hiện tại (Tuần ${currentGaWeeks})`
-                  : 'Sắp tới'}
+                  ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
+                  : currentTrimester != null && currentTrimester < 3
+                  ? 'Sắp tới'
+                  : '---'}
               </div>
             </div>
           </div>
