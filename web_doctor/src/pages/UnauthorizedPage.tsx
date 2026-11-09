@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ShieldAlert, ArrowLeft, LogOut, Home } from 'lucide-react';
@@ -9,7 +9,7 @@ export const UnauthorizedPage: React.FC = () => {
 
   const handleReturnToDashboard = () => {
     if (user?.role === 'admin') {
-      navigate('/admin');
+      navigate('/admin/dashboard');
     } else {
       navigate('/');
     }

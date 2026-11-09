@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { UploadedFileReview } from '../types';
 import { CheckCircle, AlertTriangle, Edit3, Eye, FileText } from 'lucide-react';
 

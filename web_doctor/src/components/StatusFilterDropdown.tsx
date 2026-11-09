@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Filter, ChevronDown, ChevronUp, Check } from 'lucide-react';
 
 export type FilterStatus = 'all' | 'pending_ocr' | 'verified' | 'red_warning' | 'confirmed' | 'pending' | 'completed';

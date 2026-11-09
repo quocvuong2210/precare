@@ -1,4 +1,4 @@
-﻿/**
+/**
  * STORY-2.1: Quản lý Tài khoản & Xác thực Người dùng (M-AUTH)
  * Chuẩn CSDL & API Contract theo tài liệu API_Contract_STORY-2.1_Auth.md
  */
@@ -73,6 +73,7 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string;
   password: string;
+  role?: UserRole;
 }
 
 // Request Body cho POST /api/v1/auth/forgot-password

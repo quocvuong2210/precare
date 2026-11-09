@@ -1,31 +1,32 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   MappingItem,
   StandardBiomarkerMetric,
 } from '../../types/admin.types';
+import { PreviewUltrasoundModal } from './PreviewUltrasoundModal';
 import {
   Layers,
   CheckCircle2,
   AlertCircle,
   Clock,
-  ExternalLink,
-  Loader2,
   FileText,
   Sparkles,
+  Eye,
+  CheckCheck,
 } from 'lucide-react';
 
 export interface MappingQueueProps {
   items: MappingItem[];
   isLoading: boolean;
-  onConfirmMapping: (itemId: string, targetMetric: StandardBiomarkerMetric, rawLabel: string) => Promise<void>;
+  onConfirmMapping: (itemId: string, targetMetric: StandardBiomarkerMetric, rawLabel: string, note?: string) => Promise<void>;
 }
 
-const CLINICAL_METRICS: { value: StandardBiomarkerMetric; label: string; desc: string }[] = [
-  { value: 'bpd', label: 'BPD (Đường kính lưỡng đỉnh)', desc: 'Biparietal Diameter' },
-  { value: 'hc', label: 'HC (Chu vi vòng đầu)', desc: 'Head Circumference' },
-  { value: 'ac', label: 'AC (Chu vi vòng bụng)', desc: 'Abdominal Circumference' },
-  { value: 'fl', label: 'FL (Chiều dài xương đùi)', desc: 'Femur Length' },
-  { value: 'efw', label: 'EFW (Cân nặng thai ước tính)', desc: 'Estimated Fetal Weight' },
+const CLINICAL_METRICS: { value: StandardBiomarkerMetric; label: string }[] = [
+  { value: 'bpd', label: 'BPD (Đường kính lưỡng đỉnh)' },
+  { value: 'hc', label: 'HC (Chu vi vòng đầu)' },
+  { value: 'ac', label: 'AC (Chu vi vòng bụng)' },
+  { value: 'fl', label: 'FL (Chiều dài xương đùi)' },
+  { value: 'efw', label: 'EFW (Cân nặng ước tính)' },
 ];
 
 export const MappingQueue: React.FC<MappingQueueProps> = ({
@@ -33,7 +34,6 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
   isLoading,
   onConfirmMapping,
 }) => {
-  // Quản lý metric được chọn cho từng dòng
   const [selectedTargets, setSelectedTargets] = useState<Record<string, StandardBiomarkerMetric>>(() => {
     const initial: Record<string, StandardBiomarkerMetric> = {};
     items.forEach((item) => {
@@ -45,6 +45,7 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
   });
 
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<MappingItem | null>(null);
 
   const handleSelectMetric = (itemId: string, metric: StandardBiomarkerMetric) => {
     setSelectedTargets((prev) => ({
@@ -70,48 +71,38 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Thông tin nghiệp vụ */}
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div className="text-xs text-amber-900 space-y-1">
-          <div className="font-bold text-sm text-amber-950 flex items-center gap-1.5">
-            <span>Hàng đợi Chuẩn hóa & Ánh xạ Nhãn Siêu âm OCR (Biomarker Mapping Queue)</span>
-            <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-amber-200 text-amber-800">
-              Epic 8
-            </span>
-          </div>
-          <p className="leading-relaxed">
-            Hệ thống OCR tự động phát hiện các từ khóa lạ hoặc ký hiệu viết tắt không đồng nhất trên phiếu siêu âm (VD:
-            <strong className="text-amber-950"> "ĐKLĐ", "B.P.D", "Vòng bụng"</strong>). Admin tiến hành ánh xạ sang 1 trong 5
-            chỉ số chuẩn (BPD, HC, AC, FL, EFW) để mô hình <strong>RACA-Net</strong> và <strong>Luật Hadlock</strong> tự động nhận diện chính xác ở các lần sau.
-          </p>
-        </div>
+      {/* Clinical Warning Banner */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2.5 text-xs text-amber-900">
+        <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+        <p className="leading-relaxed">
+          <strong className="font-semibold text-amber-950">Lưu ý lâm sàng:</strong> Việc chuẩn hóa từ điển nhãn OCR do Quản trị viên thiết lập mang tính hệ thống, không thay thế bước kiểm tra và xác nhận giá trị đo cuối cùng của Bác sĩ trực tiếp điều trị.
+        </p>
       </div>
 
-      {/* Bảng Hàng đợi */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+      {/* Main Table Container */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#345C59]" />
-            <h2 className="text-sm font-bold text-slate-800">
-              Hàng đợi xử lý nhãn OCR ({items.length} nhãn đang chờ)
+            <Layers className="w-4 h-4 text-[#117366]" />
+            <h2 className="text-sm font-semibold text-slate-800">
+              Hàng đợi xử lý nhãn OCR ({items.length} nhãn chờ ánh xạ)
             </h2>
           </div>
           <span className="text-xs text-slate-500">
-            Trạng thái: <strong className="text-teal-700">Tự động học máy (Active Learning)</strong>
+            Cơ chế: <strong className="text-[#117366] font-medium">Tự động cập nhật từ điển toàn cục</strong>
           </span>
         </div>
 
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[940px]">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-6">Từ khóa lạ trích xuất (OCR)</th>
-                <th className="py-3.5 px-4">Giá trị đo mẫu</th>
-                <th className="py-3.5 px-4">File siêu âm gốc</th>
-                <th className="py-3.5 px-4">Tần suất</th>
-                <th className="py-3.5 px-6">Ánh xạ sang chỉ số chuẩn</th>
-                <th className="py-3.5 px-6 text-right">Thao tác</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4 w-[220px] min-w-[200px]">Từ khóa trích xuất (OCR)</th>
+                <th className="py-3 px-4 w-[120px] min-w-[110px]">Giá trị đo</th>
+                <th className="py-3 px-4 w-[230px] min-w-[210px]">Tài liệu nguồn & Đối chiếu</th>
+                <th className="py-3 px-4 w-[90px] min-w-[80px] text-center">Tần suất</th>
+                <th className="py-3 px-4 w-[210px] min-w-[200px]">Ánh xạ sang chỉ số chuẩn</th>
+                <th className="py-3 px-4 w-[110px] min-w-[100px] text-right">Thao tác</th>
               </tr>
             </thead>
 
@@ -119,12 +110,12 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {[1, 2, 3].map((i) => (
                   <tr key={i} className="animate-pulse">
-                    <td className="py-4 px-6"><div className="h-4 w-32 bg-slate-200 rounded"></div></td>
-                    <td className="py-4 px-4"><div className="h-4 w-20 bg-slate-200 rounded"></div></td>
-                    <td className="py-4 px-4"><div className="h-4 w-36 bg-slate-200 rounded"></div></td>
-                    <td className="py-4 px-4"><div className="h-4 w-12 bg-slate-200 rounded"></div></td>
-                    <td className="py-4 px-6"><div className="h-8 w-48 bg-slate-200 rounded-xl"></div></td>
-                    <td className="py-4 px-6 text-right"><div className="h-8 w-28 bg-slate-200 rounded-xl ml-auto"></div></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-32 bg-slate-200 rounded"></div></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-16 bg-slate-200 rounded"></div></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-36 bg-slate-200 rounded"></div></td>
+                    <td className="py-3.5 px-4"><div className="h-4 w-12 bg-slate-200 rounded mx-auto"></div></td>
+                    <td className="py-3.5 px-4"><div className="h-8 w-44 bg-slate-200 rounded-lg"></div></td>
+                    <td className="py-3.5 px-4 text-right"><div className="h-8 w-20 bg-slate-200 rounded-lg ml-auto"></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -132,15 +123,15 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
               <tbody className="divide-y divide-slate-100 text-xs">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center">
-                      <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-                        <CheckCircle2 className="w-6 h-6" />
+                    <td colSpan={6} className="py-12 text-center">
+                      <div className="w-12 h-12 rounded-full bg-emerald-50 text-[#117366] flex items-center justify-center mx-auto mb-2">
+                        <CheckCheck className="w-6 h-6 stroke-[1.8]" />
                       </div>
-                      <div className="text-sm font-bold text-slate-800">
-                        Hàng đợi ánh xạ nhãn OCR đang trống!
+                      <div className="text-xs font-semibold text-slate-800">
+                        Hàng đợi ánh xạ nhãn OCR đang trống
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        Tất cả các nhãn dị biệt đã được chuẩn hóa đồng bộ với bộ thông số Hadlock / Intergrowth-21st.
+                      <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
+                        Tất cả các nhãn dị biệt đã được chuẩn hóa đồng bộ với bộ thông số Hadlock.
                       </p>
                     </td>
                   </tr>
@@ -152,55 +143,77 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                         {/* Từ khóa lạ */}
-                        <td className="py-3.5 px-6">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-900 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-lg">
+                        <td className="py-3 px-4 align-middle">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-semibold text-slate-900 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs whitespace-nowrap">
                               {item.raw_label}
                             </span>
                             {item.suggested_metric && (
                               <span
-                                className="inline-flex items-center gap-0.5 text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 font-semibold"
-                                title="AI RACA-Net gợi ý chỉ số này"
+                                className="inline-flex items-center gap-0.5 text-[10px] text-[#117366] bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 font-medium whitespace-nowrap"
+                                title="AI Gợi ý chỉ số này"
                               >
                                 <Sparkles className="w-2.5 h-2.5" />
-                                Gợi ý
+                                <span>Gợi ý</span>
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                          <div className="text-[11px] text-slate-400 font-mono mt-1 flex items-center gap-1 whitespace-nowrap">
                             <Clock className="w-3 h-3" />
-                            <span>Phát hiện: {item.detected_at}</span>
+                            <span>{item.detected_at}</span>
                           </div>
                         </td>
 
-                        {/* Giá trị mẫu */}
-                        <td className="py-3.5 px-4 font-semibold text-slate-700 font-mono">
+                        {/* Giá trị đo mẫu */}
+                        <td className="py-3 px-4 align-middle font-mono font-semibold text-slate-800 whitespace-nowrap">
                           {item.sample_value}
                         </td>
 
-                        {/* File tài liệu gốc */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-1 text-slate-700 max-w-[200px] truncate" title={item.file_name}>
-                            <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{item.file_name}</span>
+                        {/* Tài liệu gốc */}
+                        <td className="py-3 px-4 align-middle">
+                          <div className="flex items-center gap-1.5 max-w-[210px]">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewItem(item)}
+                              className="group flex items-center gap-1.5 text-slate-700 hover:text-[#117366] text-xs truncate cursor-pointer text-left"
+                              title={item.file_name}
+                            >
+                              <FileText className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#117366] shrink-0" />
+                              <span className="truncate underline decoration-slate-300 group-hover:decoration-[#117366]">
+                                {item.file_name}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewItem(item)}
+                              className="p-1 rounded text-slate-400 hover:text-[#117366] hover:bg-teal-50 shrink-0 cursor-pointer"
+                              title="Đối chiếu bản quét"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
                           </div>
+                          {item.machine_model && (
+                            <div className="text-[11px] text-slate-400 truncate max-w-[210px] mt-0.5" title={item.machine_model}>
+                              {item.machine_model}
+                            </div>
+                          )}
                         </td>
 
-                        {/* Tần suất xuất hiện */}
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700">
+                        {/* Tần suất */}
+                        <td className="py-3 px-4 align-middle text-center whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
                             {item.frequency} lần
                           </span>
                         </td>
 
-                        {/* Dropdown 5 chỉ số chuẩn lâm sàng */}
-                        <td className="py-3.5 px-6">
+                        {/* Dropdown chỉ số */}
+                        <td className="py-3 px-4 align-middle">
                           <select
                             value={currentTarget}
                             onChange={(e) => handleSelectMetric(item.id, e.target.value as StandardBiomarkerMetric)}
-                            className="w-full max-w-xs px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 cursor-pointer"
+                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#117366] focus:border-[#117366] cursor-pointer"
                           >
-                            <option value="">-- Chọn chỉ số lâm sàng --</option>
+                            <option value="">-- Chọn chỉ số chuẩn --</option>
                             {CLINICAL_METRICS.map((metric) => (
                               <option key={metric.value} value={metric.value}>
                                 {metric.label}
@@ -209,25 +222,17 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
                           </select>
                         </td>
 
-                        {/* Nút Xác nhận Map */}
-                        <td className="py-3.5 px-6 text-right">
+                        {/* Nút thao tác */}
+                        <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
                           <button
+                            type="button"
                             onClick={() => handleConfirm(item)}
                             disabled={!currentTarget || isProcessing}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#345C59] hover:bg-[#2A4B48] transition-all shadow-xs cursor-pointer hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Lưu ánh xạ nhãn này vào bộ từ điển chuẩn PreCare"
+                            className="inline-flex items-center justify-center gap-1 h-8 px-3 rounded-lg text-xs font-medium text-white bg-[#117366] hover:bg-[#0e5c52] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                            title="Lưu ánh xạ nhãn này vào từ điển"
                           >
-                            {isProcessing ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Đang map...</span>
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Xác nhận Map</span>
-                              </>
-                            )}
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{isProcessing ? 'Đang lưu...' : 'Xác nhận'}</span>
                           </button>
                         </td>
                       </tr>
@@ -240,15 +245,22 @@ export const MappingQueue: React.FC<MappingQueueProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>
-            Nhãn đã ánh xạ thành công sẽ tự động được xóa khỏi hàng đợi và bổ sung vào từ điển OCR toàn hệ thống.
-          </span>
-          <span className="font-semibold text-slate-700">Hadlock-ACOG Standard Compliance</span>
+        <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span>Nhãn sau khi xác nhận sẽ tự động bổ sung vào từ điển OCR toàn hệ thống.</span>
+          <span className="font-medium text-slate-700">Tuân thủ tiêu chuẩn Hadlock-ACOG</span>
         </div>
       </div>
+
+      <PreviewUltrasoundModal
+        item={previewItem}
+        isOpen={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        onConfirm={async (itemId, metric, label, note) => {
+          await onConfirmMapping(itemId, metric, label, note);
+        }}
+      />
     </div>
   );
 };
-export default MappingQueue;
 
+export default MappingQueue;

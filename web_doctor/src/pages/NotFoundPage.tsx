@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { HelpCircle, Home, LogIn } from 'lucide-react';
@@ -11,7 +11,7 @@ export const NotFoundPage: React.FC = () => {
     if (!isAuthenticated) {
       navigate('/login');
     } else if (user?.role === 'admin') {
-      navigate('/admin');
+      navigate('/admin/dashboard');
     } else {
       navigate('/');
     }

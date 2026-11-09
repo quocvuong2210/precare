@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ForgotPassword.tsx
  *
  * Quản lý 3 bước đầu của quy trình khôi phục mật khẩu:

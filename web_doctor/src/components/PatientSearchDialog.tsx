@@ -32,7 +32,9 @@ export function removeVietnameseTones(str: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D');
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
 }
 
 /**
@@ -46,7 +48,7 @@ export function matchesFuzzy(text: string, cleanQuery: string): boolean {
   if (!cleanQuery) return true;
   if (!text) return false;
 
-  const cleanText = removeVietnameseTones(text).toLowerCase().trim();
+  const cleanText = removeVietnameseTones(text);
 
   // 1. Khớp chuỗi con trực tiếp (có hoặc không dấu)
   if (cleanText.includes(cleanQuery)) return true;
