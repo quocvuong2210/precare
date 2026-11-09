@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
-import { PatientList } from './pages/PatientList';
 import { PregnancyProfile } from './pages/PregnancyProfile';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
@@ -386,11 +385,6 @@ export const App: React.FC = () => {
             <PatientDetail
               patientId={selectedPatientId}
               onBack={() => syncRoute('records', null)}
-            />
-          ) : activeTab === 'patients' ? (
-            <PatientList
-              onSelectPatient={(id) => syncRoute('patients', id)}
-              onNavigateToCreateRecord={() => syncRoute('records', null)}
             />
           ) : activeTab === 'records' ? (
             <PregnancyProfile onSelectPatient={(id) => syncRoute('records', id)} />

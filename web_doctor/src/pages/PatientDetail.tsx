@@ -53,10 +53,14 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
     if (p && p.pregnancyRecordId) {
       return list.find((r) => r.id === p.pregnancyRecordId);
     }
-    return list[0];
+    return undefined;
   }, [patientId, recordsVersion]);
 
+  // Xóa dữ liệu bệnh nhân cũ khi patientId thay đổi; chỉ hiển thị bản ghi phù hợp
   const [currentRecord, setCurrentRecord] = useState<PregnancyRecordItem | undefined>(initialRecord);
+  useEffect(() => {
+    setCurrentRecord(initialRecord);
+  }, [initialRecord]);
 
   // 2. State Ngày mốc khám target_date (mặc định hôm nay theo Endpoint 3 STORY-3.1)
   const [targetDate, setTargetDate] = useState<string>(getTodayISO());
@@ -82,9 +86,11 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
         err.response?.data?.message ||
         err.message ||
         'Không thể tải dữ liệu từ máy chủ API (Cổng 8000)';
-      setFetchError(`${msg}. Đang kích hoạt dữ liệu đệm dự phòng.`);
+      setFetchError(initialRecord ? `${msg}. Đang kích hoạt dữ liệu đệm dự phòng.` : msg);
       if (initialRecord) {
         setCurrentRecord(initialRecord);
+      } else {
+        setCurrentRecord(undefined);
       }
     } finally {
       setIsLoading(false);
@@ -102,12 +108,12 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
       (p) =>
         p.id === patientId ||
         p.pregnancyRecordId === currentRecord?.id ||
-        p.fullName === currentRecord?.patientName
+        (currentRecord?.patientName && p.fullName === currentRecord?.patientName)
     );
     return {
-      fullName: currentRecord?.patientName || found?.fullName || 'Bùi Kim Ngân',
-      phoneNumber: currentRecord?.phoneNumber || found?.phoneNumber || '0945 888 999',
-      email: currentRecord?.email || found?.email || 'kimngan.bui@gmail.com',
+      fullName: currentRecord?.patientName || found?.fullName || 'Chưa xác định',
+      phoneNumber: currentRecord?.phoneNumber || found?.phoneNumber || '---',
+      email: currentRecord?.email || found?.email || '---',
     };
   }, [patientId, currentRecord]);
 
@@ -134,10 +140,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
           statusReason
         );
       } catch (apiErr: any) {
-        console.warn('API update status failed, fallback sang local:', apiErr);
-        const fallback = updatePregnancyStatus(currentRecord.id, selectedStatus, statusReason);
-        if (!fallback) throw apiErr;
-        updated = fallback;
+        throw apiErr; // Giữ trạng thái giữa UI và backend đồng bộ; hiển thị lỗi thay vì toast thành công
       }
 
       setCurrentRecord(updated);
@@ -156,7 +159,12 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
       setIsStatusModalOpen(false);
       setStatusReason('');
     } catch (err: any) {
-      setStatusError(err.message || 'Lỗi khi cập nhật trạng thái hồ sơ');
+      setStatusError(
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        'Lỗi khi cập nhật trạng thái hồ sơ'
+      );
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -317,7 +325,41 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
         </button>
       </div>
 
-      {/* 2. CARD THÔNG TIN THAI PHỤ (HEADER) */}
+      {!currentRecord && !isLoading ? (
+        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-800">Không tìm thấy hồ sơ thai kỳ</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {fetchError
+                ? `Lỗi tải dữ liệu: ${fetchError}`
+                : `Không tìm thấy hồ sơ thai kỳ tương ứng với mã định danh "${patientId}". Vui lòng kiểm tra lại đường dẫn hoặc danh sách hồ sơ.`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Quay lại</span>
+            </button>
+            <button
+              type="button"
+              onClick={loadProfileDetail}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#275248] hover:bg-[#1f423a] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Thử lại API</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 2. CARD THÔNG TIN THAI PHỤ (HEADER) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -642,6 +684,8 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* MODAL ĐỔI TRẠNG THÁI HỒ SƠ THAI KỲ (PATCH /api/v1/pregnancy-profiles/{profile_id}/status) */}
       {isStatusModalOpen && (
