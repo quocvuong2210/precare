@@ -193,21 +193,21 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
   const currentGaFormatted =
     clinicalCalc?.gestationalAge?.formatted ||
     currentRecord?.gestationalAgeFormatted ||
-    '7w2d';
+    '---';
   const currentGaDays =
     clinicalCalc?.gestationalAge?.days ??
     currentRecord?.gestationalAgeDays ??
-    51;
+    0;
   const currentGaWeeks =
     clinicalCalc?.gestationalAge?.weeks ?? Math.floor(currentGaDays / 7);
   const currentEdd =
     clinicalCalc?.formattedEdd ||
     currentRecord?.displayEdd ||
-    '24/06/2027';
+    (currentRecord?.edd ? formatDateToDisplay(currentRecord.edd) : 'Chưa có dữ liệu');
   const currentDaysUntilEdd =
     clinicalCalc?.daysUntilEdd ??
     currentRecord?.daysUntilEdd ??
-    229;
+    0;
 
   // Xác định tam cá nguyệt chuẩn y khoa:
   // Quý 1: 0 - 97 ngày (0w - 13w6d)
@@ -266,17 +266,17 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
   // Dữ liệu lâm sàng đầu vào (Chuẩn PostgreSQL 16 schema)
   const displayLmp = currentRecord?.lmp
     ? formatDateToDisplay(currentRecord.lmp)
-    : '05/11/2026';
+    : 'Chưa có dữ liệu';
   const displayQ1Date = currentRecord?.q1UltrasoundDate
     ? formatDateToDisplay(currentRecord.q1UltrasoundDate)
-    : '05/11/2026';
+    : 'Chưa có dữ liệu';
   const displayQ1Ga =
     currentRecord?.q1GestationalWeeks !== undefined
       ? `${currentRecord.q1GestationalWeeks} tuần ${currentRecord.q1GestationalDays ?? 0} ngày`
-      : '7 tuần 0 ngày';
+      : 'Chưa có dữ liệu';
   const displayCrl = currentRecord?.crlMm
-    ? currentRecord.crlMm.toFixed(2)
-    : '10.00';
+    ? `${currentRecord.crlMm.toFixed(2)} mm`
+    : 'Chưa có dữ liệu';
 
   return (
     <div className="space-y-6">
@@ -619,7 +619,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
             <h3 className="text-base font-bold text-slate-800">Dữ liệu Lâm sàng Đầu vào</h3>
           </div>
           <span className="px-3 py-1 rounded-lg text-xs font-bold bg-[#E6F4F1] text-[#275248] border border-teal-200/60">
-            Siêu âm Quý 1 (Q1 Ultrasound / CRL)
+            {currentRecord?.primaryMethod === 'direct_edd'
+              ? 'Chỉ định EDD trực tiếp'
+              : currentRecord?.primaryMethod === 'lmp'
+              ? 'Ngày kinh cuối (LMP)'
+              : currentRecord?.primaryMethod === 'crl'
+              ? 'Chiều dài đầu mông (CRL)'
+              : 'Siêu âm Quý 1 (Q1 Ultrasound)'}
           </span>
         </div>
 
@@ -655,11 +661,13 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
               <span className="text-slate-400 font-medium text-xs">
                 Chiều dài đầu mông (CRL)
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                Chuẩn
-              </span>
+              {currentRecord?.crlMm ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  Chuẩn
+                </span>
+              ) : null}
             </div>
-            <div className="text-base font-bold text-slate-800 mt-1">{displayCrl} mm</div>
+            <div className="text-base font-bold text-slate-800 mt-1">{displayCrl}</div>
           </div>
         </div>
 
