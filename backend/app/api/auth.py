@@ -44,7 +44,7 @@ def register(
 ) -> Any:
     """
     Bước 3: Tạo tài khoản sau khi đã xác minh email.
-    Lưu ý: Đối với tài khoản bác sĩ, tài khoản mặc định chưa kích hoạt (is_active = True)
+    Lưu ý: Đối với tài khoản bác sĩ, tài khoản mặc định chưa kích hoạt (is_active = False)
     để chờ hội đồng xét duyệt chuyên môn theo đúng quy trình PreCare.
     """
     email = user_in.email.lower()
@@ -63,7 +63,7 @@ def register(
         )
     
     # Tài khoản bác sĩ để is_active=False chờ phê duyệt hồ sơ
-    is_active = True
+    is_active = False
     user = User(
         email=email,
         password_hash=security.get_password_hash(user_in.password),

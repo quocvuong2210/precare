@@ -1,6 +1,7 @@
 # TÀI LIỆU API CHI TIẾT DỰ ÁN PRECARE (API DOCUMENTATION)
-*Hệ thống số hóa hồ sơ cận lâm sàng và theo dõi thai kỳ (Digital Paraclinical Records & Obstetrics Portal)*
-*Phiên bản cập nhật: Tháng 11/2026 (Đồng bộ toàn diện Web Doctor, Mobile App và Backend Gateway)*
+
+_Hệ thống số hóa hồ sơ cận lâm sàng và theo dõi thai kỳ (Digital Paraclinical Records & Obstetrics Portal)_
+_Phiên bản cập nhật: Tháng 11/2026 (Đồng bộ toàn diện Web Doctor, Mobile App và Backend Gateway)_
 
 ---
 
@@ -8,18 +9,20 @@
 
 Hệ thống **PreCare** được thiết kế theo kiến trúc Microservices Monorepo gồm 2 backend services chính:
 
-| Service | Công nghệ | Port mặc định | Base URL cho Client | Swagger / OpenAPI Docs |
-| :--- | :--- | :--- | :--- | :--- |
-| **Backend API Gateway** | FastAPI + PostgreSQL 16 + Redis | `8000` | `http://localhost:8000/api/v1` | `http://localhost:8000/docs` |
-| **Analysis Microservice** | FastAPI + SciPy + PyTorch (RACA-Net) | `8001` | `http://localhost:8001/api/v1` | `http://localhost:8001/docs` |
+| Service                   | Công nghệ                            | Port mặc định | Base URL cho Client            | Swagger / OpenAPI Docs       |
+| :------------------------ | :----------------------------------- | :------------ | :----------------------------- | :--------------------------- |
+| **Backend API Gateway**   | FastAPI + PostgreSQL 16 + Redis      | `8000`        | `http://localhost:8000/api/v1` | `http://localhost:8000/docs` |
+| **Analysis Microservice** | FastAPI + SciPy + PyTorch (RACA-Net) | `8001`        | `http://localhost:8001/api/v1` | `http://localhost:8001/docs` |
 
 ### 1.1. Địa chỉ kết nối cho các nền tảng Frontend
+
 - **Web Doctor Portal (`web_doctor/`)**: `http://localhost:8000/api/v1` (Biến môi trường: `VITE_API_URL`)
 - **Analysis Microservice Endpoint (`web_doctor/`)**: `http://localhost:8001/api/v1` (Biến môi trường: `VITE_ANALYSIS_API_URL`)
 - **Mobile App - Android Emulator (`mobile_app/`)**: `http://10.0.2.2:8000/api/v1`
 - **Mobile App - iOS Simulator / Thiết bị thật qua mạng LAN**: `http://<IP_MAY_TINH_LAN>:8000/api/v1`
 
 ### 1.2. Chuẩn Header và Xác thực (Authentication)
+
 - **Định dạng dữ liệu mặc định**: `Content-Type: application/json`, `Accept: application/json`
 - **Ngoại lệ API Đăng nhập**: `POST /api/v1/auth/login` sử dụng chuẩn OAuth2 Form URL-Encoded (`Content-Type: application/x-www-form-urlencoded`).
 - **Xác thực bảo mật**: Sử dụng chuẩn **Bearer JWT Token** gửi trong HTTP Header của mọi yêu cầu bảo vệ (Protected Routes):
@@ -33,6 +36,7 @@ Hệ thống **PreCare** được thiết kế theo kiến trúc Microservices M
   ```
 
 ### 1.3. Quy tắc An toàn Dữ liệu Lâm sàng (Clinical Safety Commitments)
+
 1. **Confirmation Barrier**: Dữ liệu trích xuất từ phiếu siêu âm (OCR) chỉ nằm ở trạng thái dự thảo (`uploaded_files`). Chỉ sau khi Bác sĩ chuyên khoa kiểm tra, đối soát và bấm xác nhận thì dữ liệu mới được ghi vào bảng chỉ số chính thức `biometric_data`.
 2. **Safety Override (`max(rule, model)`)**: Mức độ cảnh báo nguy cơ thai kỳ luôn lấy giá trị nghiêm trọng nhất giữa Luật Lâm Sàng Hadlock và Mô Hình AI RACA-Net (`green` < `yellow` < `red`). Mô hình AI **tuyệt đối không bao giờ** được phép hạ mức cảnh báo của luật cờ đỏ lâm sàng.
 
@@ -41,7 +45,9 @@ Hệ thống **PreCare** được thiết kế theo kiến trúc Microservices M
 ## 2. QUY ƯỚC RESPONSE & MÃ LỖI CHUẨN
 
 ### 2.1. Chuẩn Response thành công
+
 Hầu hết các API trả về JSON trực tiếp hoặc bọc trong object envelope:
+
 ```json
 {
   "success": true,
@@ -51,13 +57,17 @@ Hầu hết các API trả về JSON trực tiếp hoặc bọc trong object env
 ```
 
 ### 2.2. Chuẩn Response lỗi
+
 Khi xảy ra lỗi (HTTP status `4xx`, `5xx`), backend trả về cấu trúc lỗi chi tiết chuẩn của FastAPI:
+
 ```json
 {
   "detail": "Mô tả chi tiết nguyên nhân lỗi hoặc mảng validation errors"
 }
 ```
+
 Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
+
 ```json
 {
   "detail": {
@@ -68,17 +78,18 @@ Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
 ```
 
 ### 2.3. Bảng mã HTTP Status Codes
-| HTTP Code | Ý nghĩa | Trường hợp xảy ra |
-| :--- | :--- | :--- |
-| `200 OK` | Thành công | Thực hiện truy vấn, tính toán hoặc xác thực thành công. |
-| `201 Created` | Đã tạo mới | Tạo mới lần khám (`checkups`), gửi yêu cầu xóa hoặc tạo tài khoản thành công. |
-| `400 Bad Request` | Sai dữ liệu đầu vào | Email đã tồn tại, mã OTP sai hoặc đã hết hạn, mật khẩu không khớp. |
-| `401 Unauthorized` | Không có quyền / Hết hạn token | Chưa gửi token, sai email/mật khẩu, token hết hạn hoặc Refresh Token đã bị thu hồi. |
-| `403 Forbidden` | Bị từ chối truy cập | Sai quyền hạn (RBAC) - Bác sĩ truy cập trang Admin hoặc Thai phụ truy cập trang Bác sĩ. |
-| `404 Not Found` | Không tìm thấy tài nguyên | Không tìm thấy hồ sơ thai kỳ, bệnh nhân hoặc lần khám tương ứng. |
-| `422 Unprocessable` | Lỗi định dạng dữ liệu | Dữ liệu không thỏa mãn Pydantic schema hoặc logic lâm sàng (tuần thai < 6 hoặc > 14). |
-| `429 Too Many Requests` | Quá giới hạn tần suất | Gửi lại OTP trước thời gian cooldown 60 giây. |
-| `500 Server Error` | Lỗi máy chủ nội bộ | Lỗi tính toán nội bộ, lỗi kết nối cơ sở dữ liệu PostgreSQL hoặc Redis. |
+
+| HTTP Code               | Ý nghĩa                        | Trường hợp xảy ra                                                                       |
+| :---------------------- | :----------------------------- | :-------------------------------------------------------------------------------------- |
+| `200 OK`                | Thành công                     | Thực hiện truy vấn, tính toán hoặc xác thực thành công.                                 |
+| `201 Created`           | Đã tạo mới                     | Tạo mới lần khám (`checkups`), gửi yêu cầu xóa hoặc tạo tài khoản thành công.           |
+| `400 Bad Request`       | Sai dữ liệu đầu vào            | Email đã tồn tại, mã OTP sai hoặc đã hết hạn, mật khẩu không khớp.                      |
+| `401 Unauthorized`      | Không có quyền / Hết hạn token | Chưa gửi token, sai email/mật khẩu, token hết hạn hoặc Refresh Token đã bị thu hồi.     |
+| `403 Forbidden`         | Bị từ chối truy cập            | Sai quyền hạn (RBAC) - Bác sĩ truy cập trang Admin hoặc Thai phụ truy cập trang Bác sĩ. |
+| `404 Not Found`         | Không tìm thấy tài nguyên      | Không tìm thấy hồ sơ thai kỳ, bệnh nhân hoặc lần khám tương ứng.                        |
+| `422 Unprocessable`     | Lỗi định dạng dữ liệu          | Dữ liệu không thỏa mãn Pydantic schema hoặc logic lâm sàng (tuần thai < 6 hoặc > 14).   |
+| `429 Too Many Requests` | Quá giới hạn tần suất          | Gửi lại OTP trước thời gian cooldown 60 giây.                                           |
+| `500 Server Error`      | Lỗi máy chủ nội bộ             | Lỗi tính toán nội bộ, lỗi kết nối cơ sở dữ liệu PostgreSQL hoặc Redis.                  |
 
 ---
 
@@ -125,9 +136,11 @@ Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
 ### 4.1. HỆ THỐNG & GIÁM SÁT
 
 #### `GET /` - Thông tin API Gateway
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**: Không yêu cầu
 - **Response `200 OK`**:
+
 ```json
 {
   "system": "PreCare API Gateway",
@@ -139,8 +152,10 @@ Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
 ---
 
 #### `GET /health` - Health check Gateway
+
 - **Service**: Backend Gateway (`:8000`)
 - **Response `200 OK`**:
+
 ```json
 {
   "status": "healthy"
@@ -150,8 +165,10 @@ Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
 ---
 
 #### `GET /api/v1/health` - Health check Analysis Microservice
+
 - **Service**: Analysis Microservice (`:8001`)
 - **Response `200 OK`**:
+
 ```json
 {
   "status": "healthy",
@@ -166,9 +183,11 @@ Hoặc cấu trúc lỗi lâm sàng định danh (Clinical Error):
 ### 4.2. XÁC THỰC & PHÂN QUYỀN (AUTHENTICATION & RBAC)
 
 #### `POST /api/v1/auth/login` - Đăng nhập tài khoản
+
 Xác thực người dùng bằng email và mật khẩu, trả về JWT Access Token.
+
 - **Service**: Backend Gateway (`:8000`)
-- **Content-Type**: `application/x-www-form-urlencoded` *(Chuẩn OAuth2 Password Request)*
+- **Content-Type**: `application/x-www-form-urlencoded` _(Chuẩn OAuth2 Password Request)_
 - **Lưu ý**: Payload **chỉ chứa** `username` và `password`. Tuyệt đối không gửi trường `role`.
 - **Payload (Form URL-Encoded)**:
   | Tham số | Kiểu | Bắt buộc | Mô tả |
@@ -193,7 +212,9 @@ Xác thực người dùng bằng email và mật khẩu, trả về JWT Access 
 ---
 
 #### `POST /api/v1/auth/send-otp` - Gửi mã OTP xác minh Email
+
 Gửi mã OTP gồm 6 chữ số vào email của người dùng với template HTML. Có cơ chế giới hạn 60 giây chống spam và thời hạn mã 5 phút.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**: `Content-Type: application/json`
 - **Payload (JSON)**:
@@ -224,7 +245,9 @@ Gửi mã OTP gồm 6 chữ số vào email của người dùng với template 
 ---
 
 #### `POST /api/v1/auth/verify-otp` - Xác thực mã OTP
+
 Kiểm tra mã OTP 6 số người dùng nhập từ email. Nếu thành công, cấp `verification_token` có hiệu lực trong 15 phút để hoàn tất đăng ký.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**: `Content-Type: application/json`
 - **Payload (JSON)**:
@@ -253,7 +276,9 @@ Kiểm tra mã OTP 6 số người dùng nhập từ email. Nếu thành công, 
 ---
 
 #### `POST /api/v1/auth/register` - Đăng ký tài khoản người dùng
-Tạo tài khoản người dùng mới. **Tài khoản được kích hoạt ngay lập tức (`is_active = true`)**, người dùng có thể đăng nhập ngay sau khi đăng ký.
+
+Tạo tài khoản người dùng mới. **Tài khoản được kích hoạt ngay lập tức (`is_active = false`)**, người dùng có thể đăng nhập ngay sau khi đăng ký.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Query Parameters**:
   | Tham số | Kiểu | Bắt buộc | Mô tả |
@@ -285,7 +310,7 @@ Tạo tài khoản người dùng mới. **Tài khoản được kích hoạt ng
     "full_name": "BS. CKI Ngọc Trâm",
     "role": "doctor",
     "phone_number": "0912345678",
-    "is_active": true,
+    "is_active": false,
     "created_at": "2026-11-02T20:00:00Z",
     "updated_at": "2026-11-02T20:00:00Z"
   }
@@ -297,7 +322,9 @@ Tạo tài khoản người dùng mới. **Tài khoản được kích hoạt ng
 ---
 
 #### `GET /api/v1/auth/me` - Lấy thông tin tài khoản hiện tại
+
 Lấy hồ sơ cá nhân và quyền hạn (`role`) chính thức từ cơ sở dữ liệu dựa trên Access Token.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**:
   ```http
@@ -311,7 +338,7 @@ Lấy hồ sơ cá nhân và quyền hạn (`role`) chính thức từ cơ sở 
     "full_name": "BS. CKI Ngọc Trâm",
     "role": "doctor",
     "phone_number": "0912345678",
-    "is_active": true,
+    "is_active": false,
     "created_at": "2026-11-02T10:00:00Z",
     "updated_at": "2026-11-02T15:30:00Z"
   }
@@ -322,7 +349,9 @@ Lấy hồ sơ cá nhân và quyền hạn (`role`) chính thức từ cơ sở 
 ---
 
 #### `POST /api/v1/auth/refresh` - Cấp mới Access Token (Token Rotation)
+
 Dùng Refresh Token hợp lệ để đổi lấy cặp Access Token (hạn 30 phút) và Refresh Token mới (hạn 7 ngày). Token cũ bị thu hồi ngay lập tức để chống tấn công Replay Attack.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**: `Content-Type: application/json`
 - **Payload (JSON)**:
@@ -347,6 +376,7 @@ Dùng Refresh Token hợp lệ để đổi lấy cặp Access Token (hạn 30 p
 ---
 
 #### `POST /api/v1/auth/forgot-password` & `POST /api/v1/auth/reset-password`
+
 1. **`POST /api/v1/auth/forgot-password`**: Gửi mã OTP 6 số qua email.
    - Payload: `{"email": "user@example.com"}`
    - Response: `{"success": true, "message": "Mã OTP đã được gửi đến email của bạn"}`
@@ -357,7 +387,9 @@ Dùng Refresh Token hợp lệ để đổi lấy cặp Access Token (hạn 30 p
 ---
 
 #### `POST /api/v1/auth/logout` - Đăng xuất an toàn
+
 Thu hồi Refresh Token và vô hiệu hóa phiên làm việc hiện tại.
+
 - **Headers**:
   ```http
   Authorization: Bearer <access_token>
@@ -371,7 +403,9 @@ Thu hồi Refresh Token và vô hiệu hóa phiên làm việc hiện tại.
 ### 4.3. HỒ SƠ THAI KỲ & CÔNG CỤ TÍNH LÂM SÀNG
 
 #### `POST /api/v1/pregnancy-profiles/calculate` - Tính tuổi thai & Ngày dự sinh (EDD)
+
 Công cụ tính nháp tuổi thai và ngày dự sinh (EDD) tiêu chuẩn lâm sàng theo hướng dẫn của ACOG & Bộ Y Tế. Hỗ trợ 4 phương pháp:
+
 1. `crl`: Đo chiều dài đầu mông quý 1 (10mm - 84mm) - **Độ chính xác cao nhất**.
 2. `q1_ultrasound`: Siêu âm quý 1 (6 đến 14 tuần).
 3. `lmp`: Ngày đầu kỳ kinh cuối (Last Menstrual Period).
@@ -427,7 +461,9 @@ Công cụ tính nháp tuổi thai và ngày dự sinh (EDD) tiêu chuẩn lâm 
 ---
 
 #### `GET /api/v1/pregnancy-profiles` - Lấy danh sách hồ sơ thai kỳ quản lý
+
 Lấy toàn bộ danh sách hồ sơ thai kỳ thuộc phạm vi quản lý của bác sĩ phục vụ trang Dashboard.
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**:
   ```http
@@ -459,7 +495,9 @@ Lấy toàn bộ danh sách hồ sơ thai kỳ thuộc phạm vi quản lý củ
 ### 4.4. KHÁM THAI & SINH TRẮC HỌC SIÊU ÂM (CHECKUPS & BIOMETRICS)
 
 #### `POST /api/v1/checkups` - Ghi nhận lần khám thai mới (Visit)
+
 Ghi nhận đầy đủ thông tin một lần khám thai: Ngày khám, sinh hiệu mẹ bầu (cân nặng, huyết áp) và chỉ số siêu âm sinh trắc học thai nhi (`bpd`, `hc`, `ac`, `fl`, `efw`).
+
 - **Service**: Backend Gateway (`:8000`)
 - **Headers**:
   ```http
@@ -549,9 +587,11 @@ Ghi nhận đầy đủ thông tin một lần khám thai: Ngày khám, sinh hi�
 ---
 
 ### 4.5. YÊU CẦU XÓA DỮ LIỆU Y TẾ (MEDICAL DELETION REQUESTS)
+
 Quy trình tuân thủ quyền được lãng quên (Right to be Forgotten) theo chuẩn y tế HIPAA/GDPR.
 
 #### 1. `POST /api/v1/deletion-requests` - Gửi yêu cầu xóa hồ sơ
+
 - **Quyền yêu cầu**: Role `pregnant_woman` (Chính chủ hồ sơ)
 - **Headers**: `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Payload**:
@@ -579,11 +619,13 @@ Quy trình tuân thủ quyền được lãng quên (Right to be Forgotten) theo
   ```
 
 #### 2. `GET /api/v1/deletion-requests` - Danh sách yêu cầu xóa
+
 - **Quyền yêu cầu**: Role `doctor` hoặc `admin`
 - **Query Parameters**: `?status=pending` (hoặc `approved`, `rejected`)
 - **Response `200 OK`**: Mảng danh sách các yêu cầu xóa kèm thông tin bệnh nhân và lý do xóa.
 
 #### 3. `PATCH /api/v1/deletion-requests/{request_id}/review` - Duyệt/Từ chối yêu cầu xóa
+
 - **Quyền yêu cầu**: Role `doctor` (bác sĩ phụ trách chính) hoặc `admin`
 - **Payload**:
   ```json
@@ -599,7 +641,9 @@ Quy trình tuân thủ quyền được lãng quên (Right to be Forgotten) theo
 ### 4.6. DỊCH VỤ PHÂN TÍCH LÂM SÀNG & RACA-NET (ANALYSIS SERVICE :8001)
 
 #### `POST /api/v1/rules` - Đánh giá Luật lâm sàng Hadlock (Fallback Engine)
+
 Thực hiện tính toán công thức Hadlock thuần túy, tính Z-score, bách phân vị và phát hiện cờ đỏ lâm sàng (FGR thai chậm phát triển, đa ối, thai to).
+
 - **Service**: Analysis Microservice (`:8001`)
 - **Headers**: `Content-Type: application/json`
 - **Payload Example**:
@@ -617,11 +661,36 @@ Thực hiện tính toán công thức Hadlock thuần túy, tính Z-score, bác
   ```json
   {
     "warning_level": "green",
-    "bpd": { "measured": 75.0, "expected": 76.2, "z_score": -0.42, "percentile": 33.72 },
-    "hc":  { "measured": 278.0, "expected": 281.5, "z_score": -0.32, "percentile": 37.45 },
-    "ac":  { "measured": 255.0, "expected": 258.0, "z_score": -0.21, "percentile": 41.68 },
-    "fl":  { "measured": 56.0, "expected": 57.1, "z_score": -0.38, "percentile": 35.20 },
-    "efw": { "measured": 1450.0, "expected": 1490.0, "z_score": -0.24, "percentile": 40.52 },
+    "bpd": {
+      "measured": 75.0,
+      "expected": 76.2,
+      "z_score": -0.42,
+      "percentile": 33.72
+    },
+    "hc": {
+      "measured": 278.0,
+      "expected": 281.5,
+      "z_score": -0.32,
+      "percentile": 37.45
+    },
+    "ac": {
+      "measured": 255.0,
+      "expected": 258.0,
+      "z_score": -0.21,
+      "percentile": 41.68
+    },
+    "fl": {
+      "measured": 56.0,
+      "expected": 57.1,
+      "z_score": -0.38,
+      "percentile": 35.2
+    },
+    "efw": {
+      "measured": 1450.0,
+      "expected": 1490.0,
+      "z_score": -0.24,
+      "percentile": 40.52
+    },
     "explanation_doctor": "Các chỉ số sinh trắc học nằm trong giới hạn phát triển bình thường (bách phân vị 10 - 90%).",
     "explanation_patient": "Thai nhi phát triển bình thường theo tiêu chuẩn tuổi thai 30 tuần.",
     "rules_version": "Hadlock-ACOG-v1.0"
@@ -631,9 +700,11 @@ Thực hiện tính toán công thức Hadlock thuần túy, tính Z-score, bác
 ---
 
 #### `POST /api/v1/predict` - Safety Fusion: Max(Luật Lâm Sàng, RACA-Net)
+
 **Endpoint phân tích chính của hệ thống.** Kết hợp đồng thời Luật Hadlock và Mô hình học sâu RACA-Net theo nguyên tắc an toàn:
 $$\text{final\_warning\_level} = \max(\text{rule\_level}, \text{model\_level})$$
 Mô hình AI chỉ được phép nâng mức cảnh báo lên `red` hoặc `yellow` khi phát hiện bất thường, không bao giờ hạ mức cảnh báo của luật lâm sàng.
+
 - **Service**: Analysis Microservice (`:8001`)
 - **Headers**: `Content-Type: application/json`
 - **Payload Example**:
@@ -663,11 +734,36 @@ Mô hình AI chỉ được phép nâng mức cảnh báo lên `red` hoặc `yel
     "disclaimer_text": "LƯU Ý Y TẾ: Kết quả phân tích được tổng hợp từ Luật Lâm Sàng và Mô Hình RACA-Net. Kết quả chỉ mang tính chất hỗ trợ chẩn đoán và cần được duyệt bởi Bác sĩ Chuyên khoa.",
     "rule_result": {
       "warning_level": "yellow",
-      "bpd": { "measured": 80.5, "expected": 81.5, "z_score": -0.34, "percentile": 36.69 },
-      "hc": { "measured": 298.0, "expected": 301.2, "z_score": -0.28, "percentile": 38.97 },
-      "ac": { "measured": 240.0, "expected": 280.0, "z_score": -2.15, "percentile": 1.58 },
-      "fl": { "measured": 59.0, "expected": 61.8, "z_score": -0.92, "percentile": 17.88 },
-      "efw": { "measured": 1520.0, "expected": 1900.0, "z_score": -1.95, "percentile": 2.56 }
+      "bpd": {
+        "measured": 80.5,
+        "expected": 81.5,
+        "z_score": -0.34,
+        "percentile": 36.69
+      },
+      "hc": {
+        "measured": 298.0,
+        "expected": 301.2,
+        "z_score": -0.28,
+        "percentile": 38.97
+      },
+      "ac": {
+        "measured": 240.0,
+        "expected": 280.0,
+        "z_score": -2.15,
+        "percentile": 1.58
+      },
+      "fl": {
+        "measured": 59.0,
+        "expected": 61.8,
+        "z_score": -0.92,
+        "percentile": 17.88
+      },
+      "efw": {
+        "measured": 1520.0,
+        "expected": 1900.0,
+        "z_score": -1.95,
+        "percentile": 2.56
+      }
     }
   }
   ```
@@ -676,16 +772,16 @@ Mô hình AI chỉ được phép nâng mức cảnh báo lên `red` hoặc `yel
 
 ## 5. THỰC THỂ DỮ LIỆU & LƯU TRỮ (DATABASE SCHEMAS)
 
-| Tên Bảng | Vai trò trong hệ thống | Các trường dữ liệu chính | Trạng thái (Enum/Status) |
-| :--- | :--- | :--- | :--- |
-| `users` | Tài khoản hệ thống | `id`, `email`, `password_hash`, `full_name`, `role`, `phone_number`, `is_active` | `doctor`, `pregnant_woman`, `admin` |
-| `pregnancy_profiles` | Hồ sơ thai kỳ | `id`, `patient_id`, `primary_doctor_id`, `lmp`, `q1_ultrasound_date`, `edd`, `is_deleted` | `active`, `completed`, `terminated` |
-| `checkups` | Phiếu khám thai | `id`, `pregnancy_profile_id`, `doctor_id`, `checkup_date`, `gestational_age_days`, `weight_kg`, `blood_pressure_systolic`, `blood_pressure_diastolic`, `notes` | - |
-| `uploaded_files` | Tệp siêu âm thô (OCR) | `id`, `pregnancy_profile_id`, `file_url`, `ocr_raw_payload`, `status` | `pending`, `processing`, `extracted`, `verified`, `failed` |
-| `biometric_data` | Chỉ số thai đã đối soát | `id`, `pregnancy_profile_id`, `checkup_id`, `bpd`, `hc`, `ac`, `fl`, `efw`, `status`, `verified_by` | `pending_verification`, `verified` |
-| `analysis_results` | Kết quả Z-score & AI | `id`, `checkup_id`, `warning_level`, `bpd_percentile`, `ac_percentile`, `doctor_explanation` | `green`, `yellow`, `red` |
-| `deletion_requests` | Yêu cầu xóa dữ liệu y tế | `id`, `requester_id`, `pregnancy_profile_id`, `checkup_id`, `target_type`, `reason`, `allow_anonymized_research`, `status` | `pending`, `approved`, `rejected` |
-| `audit_logs` | Nhật ký bảo mật bất biến | `id`, `user_id`, `action`, `target_table`, `target_id`, `ip_address`, `user_agent`, `created_at` | - |
+| Tên Bảng             | Vai trò trong hệ thống   | Các trường dữ liệu chính                                                                                                                                       | Trạng thái (Enum/Status)                                   |
+| :------------------- | :----------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------- |
+| `users`              | Tài khoản hệ thống       | `id`, `email`, `password_hash`, `full_name`, `role`, `phone_number`, `is_active`                                                                               | `doctor`, `pregnant_woman`, `admin`                        |
+| `pregnancy_profiles` | Hồ sơ thai kỳ            | `id`, `patient_id`, `primary_doctor_id`, `lmp`, `q1_ultrasound_date`, `edd`, `is_deleted`                                                                      | `active`, `completed`, `terminated`                        |
+| `checkups`           | Phiếu khám thai          | `id`, `pregnancy_profile_id`, `doctor_id`, `checkup_date`, `gestational_age_days`, `weight_kg`, `blood_pressure_systolic`, `blood_pressure_diastolic`, `notes` | -                                                          |
+| `uploaded_files`     | Tệp siêu âm thô (OCR)    | `id`, `pregnancy_profile_id`, `file_url`, `ocr_raw_payload`, `status`                                                                                          | `pending`, `processing`, `extracted`, `verified`, `failed` |
+| `biometric_data`     | Chỉ số thai đã đối soát  | `id`, `pregnancy_profile_id`, `checkup_id`, `bpd`, `hc`, `ac`, `fl`, `efw`, `status`, `verified_by`                                                            | `pending_verification`, `verified`                         |
+| `analysis_results`   | Kết quả Z-score & AI     | `id`, `checkup_id`, `warning_level`, `bpd_percentile`, `ac_percentile`, `doctor_explanation`                                                                   | `green`, `yellow`, `red`                                   |
+| `deletion_requests`  | Yêu cầu xóa dữ liệu y tế | `id`, `requester_id`, `pregnancy_profile_id`, `checkup_id`, `target_type`, `reason`, `allow_anonymized_research`, `status`                                     | `pending`, `approved`, `rejected`                          |
+| `audit_logs`         | Nhật ký bảo mật bất biến | `id`, `user_id`, `action`, `target_table`, `target_id`, `ip_address`, `user_agent`, `created_at`                                                               | -                                                          |
 
 ---
 
@@ -694,14 +790,15 @@ Mô hình AI chỉ được phép nâng mức cảnh báo lên `red` hoặc `yel
 ### 6.1. Cấu hình Axios Client & Tự động Refresh Token (`web_doctor/src/services/api.ts`)
 
 ```typescript
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   timeout: 15000,
 });
@@ -709,13 +806,13 @@ export const apiClient = axios.create({
 // 1. Gắn Bearer Token vào mọi Request
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('precare_token');
+    const token = localStorage.getItem("precare_token");
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // 2. Xử lý Token Rotation khi gặp 401 Unauthorized
@@ -736,7 +833,9 @@ const processQueue = (error: unknown, token: string | null = null) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
@@ -753,11 +852,11 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const currentRefreshToken = localStorage.getItem('precare_refresh_token');
+      const currentRefreshToken = localStorage.getItem("precare_refresh_token");
       if (!currentRefreshToken) {
-        localStorage.removeItem('precare_token');
-        localStorage.removeItem('precare_user');
-        window.location.href = '/login';
+        localStorage.removeItem("precare_token");
+        localStorage.removeItem("precare_user");
+        window.location.href = "/login";
         return Promise.reject(error);
       }
 
@@ -767,8 +866,8 @@ apiClient.interceptors.response.use(
         });
 
         const { access_token, refresh_token } = response.data.data;
-        localStorage.setItem('precare_token', access_token);
-        localStorage.setItem('precare_refresh_token', refresh_token);
+        localStorage.setItem("precare_token", access_token);
+        localStorage.setItem("precare_refresh_token", refresh_token);
 
         apiClient.defaults.headers.common.Authorization = `Bearer ${access_token}`;
         processQueue(null, access_token);
@@ -779,9 +878,9 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
-        localStorage.removeItem('precare_token');
-        localStorage.removeItem('precare_user');
-        window.location.href = '/login';
+        localStorage.removeItem("precare_token");
+        localStorage.removeItem("precare_user");
+        window.location.href = "/login";
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
@@ -789,7 +888,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 ```
 
@@ -798,25 +897,25 @@ apiClient.interceptors.response.use(
 ### 6.2. Code Gọi API Đăng Nhập & Đăng Ký Chuẩn Contract
 
 ```typescript
-import { apiClient } from './api';
+import { apiClient } from "./api";
 
 // 1. Đăng nhập qua OAuth2 Form URL-Encoded
 export async function login(email: string, password: string) {
   const formData = new URLSearchParams();
-  formData.append('username', email.trim()); // FastAPI OAuth2 yêu cầu trường 'username'
-  formData.append('password', password);
+  formData.append("username", email.trim()); // FastAPI OAuth2 yêu cầu trường 'username'
+  formData.append("password", password);
 
-  const res = await apiClient.post('/auth/login', formData, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await apiClient.post("/auth/login", formData, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
 
   const token = res.data.access_token;
-  localStorage.setItem('precare_token', token);
+  localStorage.setItem("precare_token", token);
 
   // Sau khi lấy token, gọi /auth/me để lấy hồ sơ chính chủ
-  const meRes = await apiClient.get('/auth/me');
+  const meRes = await apiClient.get("/auth/me");
   const user = meRes.data;
-  localStorage.setItem('precare_user', JSON.stringify(user));
+  localStorage.setItem("precare_user", JSON.stringify(user));
 
   return { token, user };
 }
@@ -829,15 +928,21 @@ export async function register(userData: {
   phone_number?: string;
   verification_token?: string;
 }) {
-  const res = await apiClient.post('/auth/register', {
-    email: userData.email,
-    password: userData.password,
-    full_name: userData.full_name,
-    phone_number: userData.phone_number,
-    role: 'doctor',
-  }, {
-    params: userData.verification_token ? { verification_token: userData.verification_token } : {},
-  });
+  const res = await apiClient.post(
+    "/auth/register",
+    {
+      email: userData.email,
+      password: userData.password,
+      full_name: userData.full_name,
+      phone_number: userData.phone_number,
+      role: "doctor",
+    },
+    {
+      params: userData.verification_token
+        ? { verification_token: userData.verification_token }
+        : {},
+    },
+  );
 
   return res.data;
 }
@@ -863,7 +968,7 @@ export async function createCheckupVisit(checkupData: {
     efw?: number;
   };
 }) {
-  const response = await apiClient.post('/checkups', checkupData);
+  const response = await apiClient.post("/checkups", checkupData);
   return response.data;
 }
 ```

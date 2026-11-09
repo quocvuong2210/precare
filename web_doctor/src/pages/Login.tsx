@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -275,7 +275,7 @@ export const Login: React.FC<LoginProps> = ({
 
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#0D9488]/20 selection:text-[#0D9488] relative">
-      <aside className="w-full lg:w-[45%] xl:w-[44%] min-h-[360px] lg:min-h-screen bg-[#0D9488] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
+<aside className="w-full lg:w-[45%] xl:w-[44%] min-h-[360px] lg:min-h-screen bg-[#0D9488] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">      
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <img
             src={loginIllustration}
