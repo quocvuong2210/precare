@@ -10,7 +10,6 @@ import { ResetPassword } from './pages/ResetPassword';
 import {
   HeartPulse,
   LayoutDashboard,
-  Users,
   BookOpen,
   BarChart2,
   Settings,
@@ -22,7 +21,7 @@ import {
 } from 'lucide-react';
 
 type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
-type TabType = 'overview' | 'patients' | 'records' | 'reports' | 'settings';
+type TabType = 'overview' | 'records' | 'reports' | 'settings';
 
 interface ParsedRoute {
   view: AppView;
@@ -65,7 +64,7 @@ function parseLocation(pathname: string): ParsedRoute {
   }
   const patientDetailMatch = pathname.match(/^\/patients\/([a-zA-Z0-9_-]+)/i);
   if (patientDetailMatch && patientDetailMatch[1]) {
-    return { view: 'app', tab: 'patients', patientId: patientDetailMatch[1] };
+    return { view: 'app', tab: 'records', patientId: patientDetailMatch[1] };
   }
 
   // Tab Quản lý Hồ sơ Thai kỳ: /pregnancy-profiles hoặc /records
@@ -73,14 +72,11 @@ function parseLocation(pathname: string): ParsedRoute {
     path === '/pregnancy-profiles' ||
     path.startsWith('/pregnancy-profiles') ||
     path === '/records' ||
-    path.startsWith('/records')
+    path.startsWith('/records') ||
+    path === '/patients' ||
+    path.startsWith('/patients')
   ) {
     return { view: 'app', tab: 'records', patientId: null };
-  }
-
-  // Tab Danh sách bệnh nhân: /patients
-  if (path === '/patients' || path.startsWith('/patients')) {
-    return { view: 'app', tab: 'patients', patientId: null };
   }
 
   // Tab Báo cáo: /reports
@@ -112,8 +108,6 @@ export const App: React.FC = () => {
       targetPath = `/pregnancy-profiles/${patientId}`;
     } else if (tab === 'records') {
       targetPath = '/pregnancy-profiles';
-    } else if (tab === 'patients') {
-      targetPath = '/patients';
     } else if (tab === 'reports') {
       targetPath = '/reports';
     } else if (tab === 'settings') {
@@ -257,7 +251,6 @@ export const App: React.FC = () => {
   // VIEW 3: GIAO DIỆN BÁC SĨ (DASHBOARD)
   const navItems = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'patients', label: 'Danh sách bệnh nhân', icon: Users },
     { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
     { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
     { id: 'settings', label: 'Cài đặt', icon: Settings },
@@ -353,8 +346,6 @@ export const App: React.FC = () => {
               ? 'Hồ sơ chi tiết thai phụ'
               : activeTab === 'records'
               ? 'Quản lý Hồ sơ Thai kỳ'
-              : activeTab === 'patients'
-              ? 'Danh sách bệnh nhân'
               : activeTab === 'reports'
               ? 'Báo cáo thống kê'
               : activeTab === 'settings'
