@@ -115,7 +115,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-5">
       {/* 1. Banner chào bác sĩ */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0C4E47] via-[#0F5C53] to-[#0A423C] p-6 sm:p-7 text-white shadow-sm">
+      <section className="relative overflow-hidden rounded-2xl bg-[#0D9488] p-6 sm:p-7 text-white shadow-sm">
         {/* Subtle decorative background glow */}
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
 

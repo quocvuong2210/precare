@@ -297,7 +297,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                       <button
                         type="button"
                         onClick={onRetry}
-                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0D8A7C] hover:bg-[#0A7367] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Thử lại</span>

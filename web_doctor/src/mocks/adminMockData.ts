@@ -1,4 +1,4 @@
-﻿export type UserRole = 'doctor' | 'pregnant_woman' | 'admin';
+export type UserRole = 'doctor' | 'pregnant_woman' | 'admin';
 export type WarningLevel = 'green' | 'yellow' | 'red';
 export type ApprovalStatus = 'pending' | 'active' | 'rejected';
 export type AuditActionType =
@@ -45,10 +45,13 @@ export interface AuditLogRecord {
 export interface SystemKpiSummary {
   totalPregnantWomen: number;
   totalFacilities: number;
-  pendingDoctors: number;
-  pendingDoctorsOver24h: number;
+  totalDoctors: number;
+  activeDoctors: number;
+  totalUsers: number;
   pendingOcrFiles: number;
   readyToMapOcrFiles: number;
+  pendingDoctors?: number;
+  pendingDoctorsOver24h?: number;
 }
 
 export interface WarningDistributionItem {
@@ -67,7 +70,7 @@ export interface WarningDistributionSummary {
 
 export interface PendingActionTask {
   id: string;
-  type: 'doctor_approval' | 'ocr_fix' | 'ocr_failed';
+  type: 'doctor_approval' | 'ocr_fix' | 'ocr_failed' | 'ocr_ready' | 'audit_check';
   title: string;
   subtitle: string;
   actionText: string;
@@ -589,7 +592,10 @@ export const calculateDashboardOverview = (): DashboardOverviewResponse => {
   // Số cơ sở y tế lấy từ số lượng facilityId duy nhất trong danh sách thai phụ
   const totalFacilities = new Set(mockPregnantWomen.map((p) => p.facilityId)).size;
 
-  // 2. Số Bác sĩ chờ duyệt tính từ mockUsers (inMemoryUsers)
+  // 2. Thống kê Bác sĩ & Người dùng từ mockUsers (inMemoryUsers)
+  const totalDoctors = inMemoryUsers.filter((u) => u.role === 'doctor').length;
+  const activeDoctors = inMemoryUsers.filter((u) => u.role === 'doctor' && u.is_active).length;
+  const totalUsers = inMemoryUsers.length;
   const pendingDoctors = inMemoryUsers.filter(
     (u) => u.role === 'doctor' && (u.approval_status === 'pending' || (u as any).status === 'pending')
   ).length;
@@ -620,6 +626,9 @@ export const calculateDashboardOverview = (): DashboardOverviewResponse => {
     kpis: {
       totalPregnantWomen,
       totalFacilities,
+      totalDoctors,
+      activeDoctors,
+      totalUsers,
       pendingDoctors,
       pendingDoctorsOver24h,
       pendingOcrFiles,
@@ -657,27 +666,27 @@ export const calculateDashboardOverview = (): DashboardOverviewResponse => {
     pendingTasks: [
       {
         id: 'task-01',
-        type: 'doctor_approval',
-        title: 'Nhắc duyệt hồ sơ',
-        subtitle: `${pendingDoctorsOver24h} hồ sơ bác sĩ chờ duyệt > 24 giờ`,
-        actionText: 'Xem xét phê duyệt →',
-        targetTab: 'users',
-      },
-      {
-        id: 'task-02',
         type: 'ocr_fix',
-        title: 'Sửa lỗi OCR',
-        subtitle: `${failedOcrFiles} tệp trích xuất thất bại cần kiểm tra lại`,
+        title: 'Sửa lỗi trích xuất OCR',
+        subtitle: `${failedOcrFiles} tệp trích xuất cần kiểm tra lại`,
         actionText: 'Mở hàng đợi ánh xạ →',
         targetTab: 'ocr',
       },
       {
-        id: 'task-03',
-        type: 'ocr_failed',
-        title: 'Tệp OCR thất bại',
-        subtitle: `${failedOcrFiles} tệp cần kiểm tra lại`,
-        actionText: 'Xem tệp thất bại →',
+        id: 'task-02',
+        type: 'ocr_ready',
+        title: 'Ánh xạ nhãn sinh trắc học',
+        subtitle: `${readyToMapOcrFiles} tệp sẵn sàng ánh xạ chuẩn hóa`,
+        actionText: 'Xem danh sách ánh xạ →',
         targetTab: 'ocr',
+      },
+      {
+        id: 'task-03',
+        type: 'audit_check',
+        title: 'Giám sát an toàn hệ thống',
+        subtitle: 'Kiểm tra nhật ký thao tác và truy cập gần nhất',
+        actionText: 'Xem nhật ký kiểm toán →',
+        targetTab: 'logs',
       },
     ],
     lastUpdated: '01/11/2026 - UTC',
@@ -687,19 +696,9 @@ export const calculateDashboardOverview = (): DashboardOverviewResponse => {
 export const INITIAL_SYSTEM_KPIS: SystemKpiSummary = {
   get totalPregnantWomen() { return mockPregnantWomen.length; },
   get totalFacilities() { return new Set(mockPregnantWomen.map((p) => p.facilityId)).size; },
-  get pendingDoctors() {
-    return inMemoryUsers.filter(
-      (u) => u.role === 'doctor' && (u.approval_status === 'pending' || (u as any).status === 'pending')
-    ).length;
-  },
-  get pendingDoctorsOver24h() {
-    return inMemoryUsers.filter(
-      (u) =>
-        u.role === 'doctor' &&
-        (u.approval_status === 'pending' || (u as any).status === 'pending') &&
-        (u.wait_time?.includes('ngày') || u.wait_time?.includes('24'))
-    ).length;
-  },
+  get totalDoctors() { return inMemoryUsers.filter((u) => u.role === 'doctor').length; },
+  get activeDoctors() { return inMemoryUsers.filter((u) => u.role === 'doctor' && u.is_active).length; },
+  get totalUsers() { return inMemoryUsers.length; },
   get pendingOcrFiles() { return mockUploadedFiles.filter((f) => f.status === 'pending').length; },
   get readyToMapOcrFiles() { return mockUploadedFiles.filter((f) => f.status === 'ready_to_map').length; },
 };
@@ -714,14 +713,6 @@ export const INITIAL_WARNING_DISTRIBUTION: WarningDistributionSummary = {
 export const INITIAL_PENDING_TASKS: PendingActionTask[] = [
   {
     id: 'task-01',
-    type: 'doctor_approval',
-    title: 'Nhắc duyệt hồ sơ',
-    subtitle: 'Hồ sơ bác sĩ chờ duyệt > 24 giờ',
-    actionText: 'Xem xét phê duyệt →',
-    targetTab: 'users',
-  },
-  {
-    id: 'task-02',
     type: 'ocr_fix',
     title: 'Sửa lỗi OCR',
     subtitle: 'Tệp trích xuất thất bại cần kiểm tra lại',
@@ -729,12 +720,20 @@ export const INITIAL_PENDING_TASKS: PendingActionTask[] = [
     targetTab: 'ocr',
   },
   {
-    id: 'task-03',
-    type: 'ocr_failed',
-    title: 'Tệp OCR thất bại',
-    subtitle: 'Tệp cần kiểm tra lại',
-    actionText: 'Xem tệp thất bại →',
+    id: 'task-02',
+    type: 'ocr_ready',
+    title: 'Ánh xạ nhãn sinh trắc học',
+    subtitle: 'Tệp sẵn sàng ánh xạ chuẩn hóa',
+    actionText: 'Xem danh sách ánh xạ →',
     targetTab: 'ocr',
+  },
+  {
+    id: 'task-03',
+    type: 'audit_check',
+    title: 'Giám sát an toàn hệ thống',
+    subtitle: 'Kiểm tra nhật ký thao tác gần nhất',
+    actionText: 'Xem nhật ký kiểm toán →',
+    targetTab: 'logs',
   },
 ];
 

@@ -1,10 +1,13 @@
 export interface DashboardKPIs {
   totalPregnantWomen: number;
   totalFacilities: number;
-  pendingDoctors: number;
-  pendingDoctorsOver24h: number;
+  totalDoctors: number;
+  activeDoctors: number;
+  totalUsers: number;
   pendingOcrFiles: number;
   readyToMapOcrFiles: number;
+  pendingDoctors?: number;
+  pendingDoctorsOver24h?: number;
 }
 
 export interface RiskDistributionItem {

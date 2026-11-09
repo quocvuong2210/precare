@@ -11,6 +11,13 @@ import { ResetPassword } from './pages/ResetPassword';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PatientSearchDialog } from './components/PatientSearchDialog';
+import { AdminLayout } from './layouts/AdminLayout';
+import {
+  Dashboard as AdminDashboard,
+  UserManagement,
+  AuditLogs,
+  MappingQueuePage,
+} from './pages/admin';
 import {
   HeartPulse,
   Home,
@@ -338,9 +345,19 @@ const DoctorPortal: React.FC = () => {
  * PUBLIC ROUTE WRAPPERS
  */
 const LoginWrapper: React.FC = () => {
-  const { login } = useAuth();
+  const { login, isAuthenticated, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [isLoading, isAuthenticated, user, navigate]);
 
   const handleLoginSuccess = (authData: { user: any; token: string }) => {
     login(authData);
@@ -446,14 +463,15 @@ export const AppRoutes: React.FC = () => {
 
       {/* 3. ADMIN PROTECTED ROUTES (Chỉ vai trò 'admin') */}
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-        <Route
-          path="/admin"
-          element={<div className="p-10 text-center">Trang quản trị đang phát triển (Sprint 4)</div>}
-        />
-        <Route
-          path="/admin/*"
-          element={<div className="p-10 text-center">Trang quản trị đang phát triển (Sprint 4)</div>}
-        />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
+          <Route path="logs" element={<Navigate to="/admin/audit-logs" replace />} />
+          <Route path="ocr" element={<MappingQueuePage />} />
+          <Route path="mapping-queue" element={<Navigate to="/admin/ocr" replace />} />
+        </Route>
       </Route>
 
       {/* 4. CATCH-ALL UNKNOWN ROUTES (Fallback 404) */}

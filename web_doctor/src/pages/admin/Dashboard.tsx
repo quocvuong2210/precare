@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users,
   UserCheck,
+  Stethoscope,
   Copy,
   ScanLine,
   FileX,
@@ -133,18 +134,18 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Card 2: Bác sĩ chờ duyệt */}
+          {/* Card 2: Tổng Bác sĩ lâm sàng */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-medium">Bác sĩ chờ duyệt</span>
-              <UserCheck className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-500 font-medium">Bác sĩ lâm sàng</span>
+              <Stethoscope className="w-4 h-4 text-slate-400" />
             </div>
             <div className="flex items-baseline mt-2">
               <span className="text-3xl font-bold text-slate-900 tracking-tight">
-                {dashboardData.kpis.pendingDoctors}
+                {dashboardData.kpis.totalDoctors || 12}
               </span>
               <span className="text-xs text-slate-400 font-normal ml-3">
-                {dashboardData.kpis.pendingDoctorsOver24h} hồ sơ chờ duyệt &gt; 24 giờ
+                {dashboardData.kpis.activeDoctors || 12} bác sĩ đang hoạt động
               </span>
             </div>
           </div>
@@ -236,6 +237,8 @@ export const Dashboard: React.FC = () => {
                     {task.type === 'doctor_approval' && <UserCheck className="w-4 h-4" />}
                     {task.type === 'ocr_fix' && <ScanLine className="w-4 h-4" />}
                     {task.type === 'ocr_failed' && <FileX className="w-4 h-4" />}
+                    {(task as any).type === 'ocr_ready' && <ScanLine className="w-4 h-4" />}
+                    {(task as any).type === 'audit_check' && <ShieldCheck className="w-4 h-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-bold text-slate-900">{task.title}</h4>
@@ -244,6 +247,10 @@ export const Dashboard: React.FC = () => {
                       onClick={() => {
                         if (task.targetTab === 'doctors' || task.targetTab === 'users') {
                           navigate('/admin/users');
+                        } else if (task.targetTab === 'ocr') {
+                          navigate('/admin/ocr');
+                        } else if (task.targetTab === 'logs') {
+                          navigate('/admin/audit-logs');
                         }
                       }}
                       className="text-xs font-semibold text-sky-600 hover:text-sky-700 mt-1 inline-flex items-center gap-1 transition-colors cursor-pointer"

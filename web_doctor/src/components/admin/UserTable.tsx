@@ -18,7 +18,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
       setUsers(initialUsers);
     }
   }, [initialUsers]);
-  const [activeSubTab, setActiveSubTab] = useState<UserManagementTab>('pending_doctors');
+  const [activeSubTab, setActiveSubTab] = useState<UserManagementTab>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -27,19 +27,11 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
   // State cho Modal Xem chi tiết
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
 
-  // Đếm số lượng hồ sơ chờ duyệt thực tế
-  const pendingCount = useMemo(() => {
-    return users.filter((u) => u.role === 'doctor' && u.status === 'pending').length;
-  }, [users]);
-
   // Lọc dữ liệu theo Tab
   const tabFilteredUsers = useMemo(() => {
     return users.filter((user) => {
-      if (activeSubTab === 'pending_doctors') {
-        return user.role === 'doctor' && user.status === 'pending';
-      }
       if (activeSubTab === 'active_doctors') {
-        return user.role === 'doctor' && user.status === 'active';
+        return user.role === 'doctor';
       }
       if (activeSubTab === 'pregnant_women') {
         return user.role === 'pregnant_woman';
@@ -86,23 +78,20 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
   };
 
-  const handleApprove = (userId: string, name: string) => {
+  const handleToggleLock = (userId: string, name: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'locked' ? 'active' : 'locked';
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'active', is_active: true } : u))
+      prev.map((u) => (u.id === userId ? { ...u, status: nextStatus, is_active: nextStatus === 'active' } : u))
     );
-    setSelectedUser(null);
-    if (onActionNotification) {
-      onActionNotification(`Đã phê duyệt hồ sơ bác sĩ thành công cho ${name}.`);
+    if (selectedUser && selectedUser.id === userId) {
+      setSelectedUser({ ...selectedUser, status: nextStatus, is_active: nextStatus === 'active' });
     }
-  };
-
-  const handleReject = (userId: string, name: string) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, status: 'rejected', is_active: false } : u))
-    );
-    setSelectedUser(null);
     if (onActionNotification) {
-      onActionNotification(`Đã từ chối hồ sơ bác sĩ của ${name}.`);
+      onActionNotification(
+        nextStatus === 'locked'
+          ? `Đã tạm khóa tài khoản của ${name}.`
+          : `Đã kích hoạt lại tài khoản của ${name}.`
+      );
     }
   };
 
@@ -121,19 +110,19 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
       <div>
         <div className="flex items-center gap-4 flex-wrap">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quản lý người dùng</h1>
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 text-xs font-medium shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>{pendingCount} hồ sơ chờ duyệt</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+            <span>{users.length} tài khoản người dùng</span>
           </div>
         </div>
         <p className="text-xs text-slate-500 mt-1">
-          Xem xét hồ sơ, theo dõi trạng thái và quản lý quyền truy cập cổng lâm sàng.
+          Theo dõi danh sách tài khoản, trạng thái hoạt động và phân quyền trong hệ thống PreCare.
         </p>
       </div>
 
       {/* 2. Khối Bảng dữ liệu (Card nền trắng, bo góc, viền mảnh) */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Thanh Tabs 4 mục */}
+        {/* Thanh Tabs 3 mục */}
         <div className="border-b border-slate-200/80 px-6 pt-3 flex gap-8 text-xs select-none overflow-x-auto">
           <button
             onClick={() => handleTabChange('all')}
@@ -143,17 +132,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Tất cả người dùng
-          </button>
-          <button
-            onClick={() => handleTabChange('pending_doctors')}
-            className={`pb-3 -mb-px font-medium transition-colors whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'pending_doctors'
-                ? 'text-sky-600 font-semibold border-b-2 border-sky-600'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Bác sĩ chờ duyệt
+            Tất cả người dùng ({users.length})
           </button>
           <button
             onClick={() => handleTabChange('active_doctors')}
@@ -163,7 +142,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Bác sĩ đã kích hoạt
+            Bác sĩ lâm sàng ({users.filter((u) => u.role === 'doctor').length})
           </button>
           <button
             onClick={() => handleTabChange('pregnant_women')}
@@ -173,7 +152,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Phụ nữ mang thai
+            Phụ nữ mang thai ({users.filter((u) => u.role === 'pregnant_woman').length})
           </button>
         </div>
 
@@ -216,7 +195,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                 <th className="px-6 py-3.5 w-[220px] whitespace-nowrap">Email</th>
                 <th className="px-6 py-3.5 w-[160px] whitespace-nowrap">Số điện thoại</th>
                 <th className="px-6 py-3.5 w-[130px] whitespace-nowrap">Ngày đăng ký</th>
-                <th className="px-6 py-3.5 w-[160px] whitespace-nowrap">Thời gian chờ duyệt</th>
+                <th className="px-6 py-3.5 w-[160px] whitespace-nowrap">Vai trò</th>
                 <th className="px-6 py-3.5 w-[120px] whitespace-nowrap">Trạng thái</th>
                 <th className="px-6 py-3.5 w-[130px] whitespace-nowrap text-left">Hành động</th>
               </tr>
@@ -254,9 +233,15 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                         {time && <div className="text-[11px] text-slate-400 mt-0.5">{time}</div>}
                       </td>
 
-                      {/* Cột 5: Thời gian chờ duyệt */}
+                      {/* Cột 5: Vai trò */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-xs text-slate-600">{user.wait_time}</span>
+                        <span className="text-xs font-medium text-slate-700">
+                          {user.role === 'doctor'
+                            ? 'Bác sĩ lâm sàng'
+                            : user.role === 'admin'
+                            ? 'Quản trị viên'
+                            : 'Phụ nữ mang thai'}
+                        </span>
                       </td>
 
                       {/* Cột 6: Trạng thái (Badge vàng nhạt, chữ cam đậm) */}
@@ -307,10 +292,8 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
               <span>
                 Hiển thị {(currentPage - 1) * pageSize + 1}–
                 {Math.min(currentPage * pageSize, sortedUsers.length)} trên {sortedUsers.length}{' '}
-                {activeSubTab === 'pending_doctors'
-                  ? 'bác sĩ chờ duyệt'
-                  : activeSubTab === 'active_doctors'
-                  ? 'bác sĩ đã kích hoạt'
+                {activeSubTab === 'active_doctors'
+                  ? 'bác sĩ lâm sàng'
                   : activeSubTab === 'pregnant_women'
                   ? 'phụ nữ mang thai'
                   : 'người dùng'}
@@ -354,7 +337,7 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
 
       {/* Dòng ghi chú dưới cùng ngoài card */}
       <p className="text-xs text-slate-400">
-        Kiểm tra thông tin tài khoản trước khi phê duyệt. Phụ nữ mang thai không thuộc quy trình xét duyệt bác sĩ.
+        Quản trị danh sách tài khoản bác sĩ và thai phụ trong hệ thống PreCare.
       </p>
 
       {/* Modal Xem chi tiết Hồ sơ Bác sĩ */}
@@ -399,8 +382,10 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
                   <span className="text-slate-800">{selectedUser.created_at}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block mb-1">Thời gian chờ duyệt</span>
-                  <span className="text-slate-800 font-medium">{selectedUser.wait_time}</span>
+                  <span className="text-slate-400 block mb-1">Trạng thái</span>
+                  <span className="text-slate-800 font-medium">
+                    {selectedUser.status === 'active' ? 'Đã kích hoạt' : selectedUser.status === 'locked' ? 'Đang bị khóa' : 'Hoạt động'}
+                  </span>
                 </div>
               </div>
 
@@ -421,27 +406,21 @@ export const UserTable: React.FC<UserTableProps> = ({ onActionNotification, init
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <button
                 onClick={() => setSelectedUser(null)}
-                className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
               >
                 Đóng
               </button>
 
-              {selectedUser.status === 'pending' && selectedUser.role === 'doctor' && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleReject(selectedUser.id, selectedUser.full_name)}
-                    className="px-3.5 py-2 text-xs font-medium text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors"
-                  >
-                    Từ chối
-                  </button>
-                  <button
-                    onClick={() => handleApprove(selectedUser.id, selectedUser.full_name)}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors shadow-xs"
-                  >
-                    Phê duyệt hồ sơ
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => handleToggleLock(selectedUser.id, selectedUser.full_name, selectedUser.status)}
+                className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                  selectedUser.status === 'locked'
+                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
+                    : 'text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                }`}
+              >
+                {selectedUser.status === 'locked' ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản'}
+              </button>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import {
   Activity,
   Users,
   ClipboardList,
+  Layers,
   Bell,
   HelpCircle,
   ChevronRight,
@@ -40,11 +41,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       isActive: (pathname: string) => pathname.startsWith('/admin/users'),
     },
     {
+      id: 'ocr',
+      label: 'Hàng đợi OCR',
+      path: '/admin/ocr',
+      icon: Layers,
+      isActive: (pathname: string) => pathname.startsWith('/admin/ocr') || pathname.startsWith('/admin/mapping-queue'),
+    },
+    {
       id: 'logs',
-      label: 'Nhật ký',
-      path: '/admin/logs',
+      label: 'Nhật ký kiểm toán',
+      path: '/admin/audit-logs',
       icon: ClipboardList,
-      isActive: (pathname: string) => pathname.startsWith('/admin/logs'),
+      isActive: (pathname: string) => pathname.startsWith('/admin/logs') || pathname.startsWith('/admin/audit-logs'),
     },
   ] as const;
 
@@ -52,7 +60,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     if (pathname.startsWith('/admin/users')) {
       return 'Quản lý người dùng';
     }
-    if (pathname.startsWith('/admin/logs')) {
+    if (pathname.startsWith('/admin/ocr') || pathname.startsWith('/admin/mapping-queue')) {
+      return 'Hàng đợi ánh xạ OCR';
+    }
+    if (pathname.startsWith('/admin/logs') || pathname.startsWith('/admin/audit-logs')) {
       return 'Nhật ký kiểm toán';
     }
     return 'Tổng quan Hệ thống';

@@ -5,6 +5,7 @@ import { UserRecord, UserStatus } from '../../types/userManagement.types';
 
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
     adminMockService.getUsersByTab('all').then((records: AdminUserRecord[]) => {
@@ -15,11 +16,7 @@ export const UserManagement: React.FC = () => {
         phone_number: u.phone_number,
         created_at: u.created_at,
         wait_time: u.wait_time || '',
-        status: (u.approval_status === 'pending'
-          ? 'pending'
-          : u.approval_status === 'active'
-          ? 'active'
-          : 'rejected') as UserStatus,
+        status: (u.is_active ? 'active' : 'locked') as UserStatus,
         role: u.role,
         is_active: u.is_active,
       }));
@@ -28,12 +25,21 @@ export const UserManagement: React.FC = () => {
   }, []);
 
   return (
-    <UserTable
-      users={users as any}
-      isLoading={false}
-      onApproveDoctor={async () => {}}
-      onToggleLock={async () => {}}
-    />
+    <div>
+      {notification && (
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center justify-between">
+          <span>{notification}</span>
+          <button onClick={() => setNotification(null)} className="font-bold ml-2 cursor-pointer">✕</button>
+        </div>
+      )}
+      <UserTable
+        initialUsers={users.length > 0 ? users : undefined}
+        onActionNotification={(msg) => {
+          setNotification(msg);
+          setTimeout(() => setNotification(null), 3000);
+        }}
+      />
+    </div>
   );
 };
 
