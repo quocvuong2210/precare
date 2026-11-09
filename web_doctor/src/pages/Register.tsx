@@ -566,21 +566,20 @@ export const Register: React.FC<RegisterProps> = ({
   };
 
   return (
-    <div className="h-screen max-h-screen w-full flex flex-col lg:flex-row bg-[#F8FAFC] font-sans antialiased text-slate-800 overflow-hidden selection:bg-[#447C72]/20 selection:text-[#447C72]">
+    <div className="h-screen max-h-screen w-full flex flex-col lg:flex-row bg-[#F8FAFC] font-sans antialiased text-slate-800 overflow-hidden selection:bg-[#5869cb] selection:text-white">
       {/* =========================================================================
-          LEFT PANEL (SOLID DEEP TEAL/CHARCOAL #0E262E - 40% WIDTH)
+          LEFT PANEL (SOLID TEAL #0D9488 - EXACT MATCH WITH LOGIN)
           ========================================================================= */}
-      <aside className="w-full lg:w-[40%] xl:w-[38%] h-full bg-[#0E262E] text-white p-6 sm:p-10 lg:p-12 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
+      <aside className="w-full lg:w-[40%] xl:w-[38%] h-full bg-[#0D9488] text-white p-6 sm:p-10 lg:p-12 flex flex-col justify-between shrink-0 select-none relative overflow-hidden">
         {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-[#447C72]/10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-[#447C72]/10 blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-white/10 blur-3xl pointer-events-none" />
 
-        {/* Top: Logo PreCare with "ĐĂNG KÝ BÁC SĨ" */}
+        {/* Top: Logo PreCare */}
         <div className="relative z-10">
           <PreCareLogo
             variant="dark"
             size="md"
-            subtitle="ĐĂNG KÝ BÁC SĨ"
             onClick={handleNavigateToLogin}
           />
         </div>
@@ -588,7 +587,7 @@ export const Register: React.FC<RegisterProps> = ({
         {/* Lower Content matching Figma screenshot */}
         <div className="my-auto max-w-[420px] relative z-10 py-6">
           {step === 5 && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#447C72]/20 text-[#5EEAD4] border border-[#5EEAD4]/30 text-[11px] font-bold tracking-wider uppercase mb-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white border border-white/30 text-[11px] font-bold tracking-wider uppercase mb-4">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Đang xét duyệt hồ sơ</span>
             </div>
@@ -598,13 +597,13 @@ export const Register: React.FC<RegisterProps> = ({
             {currentMeta.leftTitle}
           </h1>
 
-          <p className="mt-4 text-xs sm:text-[13.5px] text-[#94A3B8] leading-[1.65]">
+          <p className="mt-4 text-xs sm:text-[13.5px] text-teal-50/90 leading-[1.65]">
             {currentMeta.leftDesc}
           </p>
         </div>
 
         {/* Bottom subtle system watermark / copyright */}
-        <div className="relative z-10 pt-4 border-t border-white/5 text-[11px] text-slate-500 hidden sm:block">
+        <div className="relative z-10 pt-4 border-t border-white/10 text-[11px] text-teal-100/75 hidden sm:block">
           PreCare Doctor Portal • Cổng tiếp nhận hồ sơ xét duyệt chuyên môn Sản khoa
         </div>
       </aside>

@@ -331,18 +331,21 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      display: 'flex', minHeight: '100vh', width: '100vw',
-      overflowX: 'hidden', backgroundColor: '#F8FAFC', fontFamily: 'inherit',
-    }}>
-      {/* LEFT SIDEBAR 40% */}
+    <div
+      className="selection:bg-[#5869cb] selection:text-white"
+      style={{
+        display: 'flex', minHeight: '100vh', width: '100vw',
+        overflowX: 'hidden', backgroundColor: '#F8FAFC', fontFamily: 'inherit',
+      }}
+    >
+      {/* LEFT SIDEBAR 40% - COLOR #0D9488 MATCHING LOGIN */}
       <aside style={{
-        width: '40%', minWidth: '300px', backgroundColor: '#0A2530', color: '#FFF',
+        width: '40%', minWidth: '300px', backgroundColor: '#0D9488', color: '#FFF',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         padding: '48px 40px', boxSizing: 'border-box', flexShrink: 0,
       }}>
         <div>
-          <PreCareLogo variant="dark" size="md" subtitle="KHÔI PHỤC MẬT KHẨU" />
+          <PreCareLogo variant="dark" size="md" />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: 'auto', marginBottom: 'auto', paddingTop: '24px', paddingBottom: '24px' }}>
@@ -350,9 +353,9 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '4px 10px', borderRadius: '6px', alignSelf: 'flex-start',
-            backgroundColor: 'rgba(15,118,110,0.25)', color: '#5EEAD4',
+            backgroundColor: 'rgba(255, 255, 255, 0.2)', color: '#FFFFFF',
             fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
-            border: '1px solid rgba(94,234,212,0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
           }}>
             <ShieldCheck size={14} />
             <span>{sidebar.badge}</span>
@@ -361,12 +364,12 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#FFF', lineHeight: 1.3, letterSpacing: '-0.02em', margin: 0 }}>
             {sidebar.title}
           </h1>
-          <p style={{ fontSize: '13.5px', color: '#94A3B8', lineHeight: 1.6, margin: 0 }}>
+          <p style={{ fontSize: '13.5px', color: 'rgba(204, 251, 241, 0.95)', lineHeight: 1.6, margin: 0 }}>
             {sidebar.desc}
           </p>
         </div>
 
-        <div style={{ fontSize: '11.5px', color: '#64748B', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+        <div style={{ fontSize: '11.5px', color: 'rgba(204, 251, 241, 0.8)', borderTop: '1px solid rgba(255, 255, 255, 0.15)', paddingTop: '16px' }}>
           Hệ thống y tế số PreCare • Tuân thủ an toàn dữ liệu y khoa
         </div>
       </aside>

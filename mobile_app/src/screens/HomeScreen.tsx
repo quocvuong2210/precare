@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -9,14 +9,160 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { colors } from '../theme/colors';
-import { currentUserProfile } from '../services/api';
+import {
+  calculatePregnancyProfile,
+  currentAccessToken,
+  currentUserProfile,
+  restoreSession,
+} from '../services/api';
+
+type PregnancySummary = {
+  weeks: number | null;
+  days: number;
+  trimester: string;
+  dueDate: string;
+};
+
+type SavedAccountRecord = {
+  profile?: {
+    lmp?: string;
+    q1_ultrasound_date?: string;
+    q1_gestational_weeks?: string;
+    q1_gestational_days?: string;
+    crl_mm?: string;
+    override_edd?: string;
+  };
+  gestationalAge?: string;
+  trimester?: string;
+  dueDate?: string;
+};
+
+function getTodayISO(): string {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+function formatDueDate(value?: string): string {
+  if (!value) return '';
+  const normalized = value.slice(0, 10);
+  const iso = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : normalized;
+}
+
+function parseSavedWeeks(value?: string): { weeks: number | null; days: number } {
+  const match = value?.match(/(\d+)\s*tuần(?:\s*(\d+)\s*ngày)?/i);
+  return match
+    ? { weeks: Number(match[1]), days: Number(match[2] || 0) }
+    : { weeks: null, days: 0 };
+}
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const displayName = currentUserProfile?.full_name || 'Nguyễn Thị Lan';
+  const [pregnancy, setPregnancy] = useState<PregnancySummary>({
+    weeks: null,
+    days: 0,
+    trimester: '',
+    dueDate: '',
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadPregnancySummary() {
+        try {
+          const account = currentUserProfile || (await restoreSession());
+          const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
+          const raw = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
+          if (!raw) {
+            if (isActive) {
+              setPregnancy({ weeks: null, days: 0, trimester: '', dueDate: '' });
+            }
+            return;
+          }
+
+          const saved: SavedAccountRecord = JSON.parse(raw);
+          const profile = saved.profile || {};
+          let next: PregnancySummary = {
+            ...parseSavedWeeks(saved.gestationalAge),
+            trimester: saved.trimester || '',
+            dueDate: saved.dueDate || '',
+          };
+
+          const hasPregnancyInput =
+            profile.lmp ||
+            profile.q1_ultrasound_date ||
+            profile.crl_mm ||
+            profile.override_edd;
+
+          if (hasPregnancyInput) {
+            const payload: {
+              target_date: string;
+              lmp?: string;
+              q1_ultrasound_date?: string;
+              q1_gestational_weeks?: number;
+              q1_gestational_days?: number;
+              crl_mm?: number;
+              override_edd?: string;
+            } = { target_date: getTodayISO() };
+
+            if (profile.lmp) payload.lmp = profile.lmp;
+            if (profile.q1_ultrasound_date) payload.q1_ultrasound_date = profile.q1_ultrasound_date;
+            if (profile.q1_gestational_weeks !== undefined && profile.q1_gestational_weeks !== '') {
+              payload.q1_gestational_weeks = Number(profile.q1_gestational_weeks);
+            }
+            if (profile.q1_gestational_days !== undefined && profile.q1_gestational_days !== '') {
+              payload.q1_gestational_days = Number(profile.q1_gestational_days);
+            }
+            if (profile.crl_mm) payload.crl_mm = Number(profile.crl_mm);
+            if (profile.override_edd) payload.override_edd = profile.override_edd;
+
+            try {
+              const response = await calculatePregnancyProfile(payload, currentAccessToken);
+              const data = response?.data || response;
+              const weeks = data?.gestational_age?.weeks;
+              const days = data?.gestational_age?.remaining_days ?? 0;
+              const trimester = data?.gestational_age?.trimester_name ||
+                (weeks < 14 ? 'Tam cá nguyệt 1' : weeks < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
+              const dueDate = formatDueDate(data?.calculated_edd || data?.override_edd);
+
+              if (Number.isFinite(weeks)) {
+                next = {
+                  weeks,
+                  days,
+                  trimester,
+                  dueDate: dueDate || next.dueDate,
+                };
+              }
+            } catch {
+              // Keep the last summary saved by the Profile screen when offline.
+            }
+          }
+
+          if (isActive) setPregnancy(next);
+        } catch (error) {
+          console.log('Không tải được tuổi thai trên trang chủ:', error);
+        }
+      }
+
+      void loadPregnancySummary();
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
+
+  const ageText = pregnancy.weeks === null
+    ? 'Chưa cập nhật tuổi thai'
+    : `${pregnancy.weeks} tuần ${pregnancy.days} ngày`;
+  const weekProgress = pregnancy.weeks === null
+    ? 0
+    : Math.min(100, Math.max(0, (pregnancy.weeks / 40) * 100));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -34,7 +180,9 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.weekBadge}>
-          <Text style={styles.weekText}>Tuần thứ 24</Text>
+          <Text style={styles.weekText}>
+            {pregnancy.weeks === null ? 'Chưa cập nhật' : `Tuần thứ ${pregnancy.weeks}`}
+          </Text>
         </View>
       </View>
 
@@ -47,14 +195,21 @@ export default function HomeScreen() {
         <View style={styles.pregnancyCard}>
           <View style={styles.pregnancyInfo}>
             <Text style={styles.smallWhite}>TUỔI THAI HIỆN TẠI</Text>
-            <Text style={styles.weekNumber}>24 tuần 2 ngày</Text>
-            <Text style={styles.dueDate}>Dự sinh: 22/09/2026 • Tam cá nguyệt 2</Text>
+            <Text style={styles.weekNumber}>{ageText}</Text>
+            <Text style={styles.dueDate}>
+              {pregnancy.dueDate ? `Dự sinh: ${pregnancy.dueDate}` : 'Ngày dự sinh: Chưa cập nhật'}
+              {pregnancy.trimester ? ` • ${pregnancy.trimester}` : ''}
+            </Text>
 
             <View style={styles.progressBackground}>
-              <View style={styles.progress} />
+              <View style={[styles.progress, { width: `${weekProgress}%` as `${number}%` }]} />
             </View>
 
-            <Text style={styles.progressText}>Tuần 24 trên hành trình 40 tuần</Text>
+            <Text style={styles.progressText}>
+              {pregnancy.weeks === null
+                ? 'Cập nhật thông tin trong Hồ sơ để theo dõi thai kỳ'
+                : `Tuần ${pregnancy.weeks} trên hành trình 40 tuần`}
+            </Text>
           </View>
 
           <View style={styles.pregnancyImageContainer}>

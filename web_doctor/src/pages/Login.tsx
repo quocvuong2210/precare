@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -137,6 +137,12 @@ export const Login: React.FC<LoginProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 0. Chặn vai trò Quản trị viên vì chưa phát triển giao diện riêng cho Admin
+    if (role === 'admin') {
+      setLoginError('Giao diện Quản trị viên (Admin) đang trong quá trình phát triển. Vui lòng chọn vai trò "Bác sĩ" để đăng nhập.');
+      return;
+    }
+
     let hasValidationError = false;
     setEmailError(null);
     setPasswordError(null);
@@ -270,7 +276,9 @@ export const Login: React.FC<LoginProps> = ({
         };
 
         const mockToken = 'mock_jwt_' + resolvedRole + '_' + Date.now();
+        const mockRefreshToken = 'mock_refresh_' + resolvedRole + '_' + Date.now();
         localStorage.setItem('precare_token', mockToken);
+        localStorage.setItem('precare_refresh_token', mockRefreshToken);
         localStorage.setItem('precare_user', JSON.stringify(userObj));
 
         authResponse = {
@@ -351,7 +359,7 @@ export const Login: React.FC<LoginProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#0D9488]/20 selection:text-[#0D9488] relative">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white font-sans antialiased text-slate-800 overflow-x-hidden selection:bg-[#5869cb] selection:text-white relative">
       {/* =========================================================================
           LEFT PANEL (SAGE TEAL WITH IMAGE BACKGROUND - EXACT SAMPLE DIMENSIONS)
           ========================================================================= */}
@@ -438,6 +446,19 @@ export const Login: React.FC<LoginProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Cảnh báo khi chọn vai trò Quản trị viên */}
+            {role === 'admin' && (
+              <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-amber-900">Giao diện Quản trị viên đang được phát triển</p>
+                  <p className="text-amber-700 leading-relaxed text-[11.5px]">
+                    Hệ thống chưa hỗ trợ giao diện riêng cho Quản trị viên trên cổng này. Vui lòng chuyển sang vai trò <strong>Bác sĩ</strong> để đăng nhập.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Inputs container with 16px spacing */}
             <div className="space-y-4">
@@ -549,10 +570,18 @@ export const Login: React.FC<LoginProps> = ({
             {/* Submit button: height 38px, 100% full width matching inputs */}
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full h-[38px] px-4 rounded-lg text-sm font-semibold text-white bg-[#0D9488] hover:bg-[#0f766e] active:scale-[0.99] transition-all shadow-xs cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={isSubmitting || role === 'admin'}
+              className={`w-full h-[38px] px-4 rounded-lg text-sm font-semibold text-white transition-all shadow-xs flex items-center justify-center gap-2 ${
+                role === 'admin'
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#0D9488] hover:bg-[#0f766e] active:scale-[0.99] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed'
+              }`}
             >
-              {isSubmitting ? 'Đang xác thực...' : 'Đăng nhập'}
+              {isSubmitting
+                ? 'Đang xác thực...'
+                : role === 'admin'
+                ? 'Chưa hỗ trợ Quản trị viên'
+                : 'Đăng nhập'}
             </button>
 
             {/* Remember & Forgot password */}

@@ -399,8 +399,12 @@ export const authApi = {
       });
 
       const token = res.data?.access_token || res.data?.data?.tokens?.access_token;
+      const refreshToken = res.data?.refresh_token || res.data?.data?.tokens?.refresh_token;
       if (token) {
         localStorage.setItem('precare_token', token);
+      }
+      if (refreshToken) {
+        localStorage.setItem('precare_refresh_token', refreshToken);
       }
 
       let userProfile: UserProfile;
@@ -436,8 +440,12 @@ export const authApi = {
             password: data.password,
           });
           const token = jsonRes.data?.data?.tokens?.access_token || jsonRes.data?.access_token;
+          const refreshToken = jsonRes.data?.data?.tokens?.refresh_token || jsonRes.data?.refresh_token;
           if (token) {
             localStorage.setItem('precare_token', token);
+          }
+          if (refreshToken) {
+            localStorage.setItem('precare_refresh_token', refreshToken);
           }
           const user = jsonRes.data?.data?.user || {
             id: 'u-' + Date.now(),
@@ -545,17 +553,16 @@ export const authApi = {
    * 10. POST /api/v1/auth/logout � �ang xu?t
    */
   async logout(): Promise<void> {
-    const refreshToken = localStorage.getItem('precare_refresh_token');
+    const refreshToken = localStorage.getItem('precare_refresh_token') || '';
     try {
-      if (refreshToken) {
-        await apiClient.post('/auth/logout', { refresh_token: refreshToken });
-      }
-    } catch {
-      // ignore
+      await apiClient.post('/auth/logout', { refresh_token: refreshToken });
+    } catch (err) {
+      console.warn('API logout error:', err);
     } finally {
       localStorage.removeItem('precare_token');
       localStorage.removeItem('precare_refresh_token');
       localStorage.removeItem('precare_user');
+      sessionStorage.clear();
     }
   },
 };
