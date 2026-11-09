@@ -75,7 +75,7 @@ export const DeletionRequestsReview: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-slate-800">
             <ShieldCheck className="w-6 h-6 text-[#4D7D74]" />
-            <h2 className="text-lg font-bold">Thẩm Định & Xét Duyệt Xóa Hồ Sơ Y Tế (PRC-37)</h2>
+            <h2 className="text-lg font-bold">Thẩm Định & Xét Duyệt Xóa Hồ Sơ Y Tế</h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Quy trình phê duyệt hai bước (Two-Step Approval) tuân thủ tiêu chuẩn bảo mật dữ liệu y tế và quyền riêng tư NCKH.

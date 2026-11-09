@@ -71,7 +71,7 @@ export const RequestDeletionModal: React.FC<RequestDeletionModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2.5 text-rose-700">
             <ShieldAlert className="w-5 h-5 text-rose-600" />
-            <h3 className="font-bold text-base text-slate-800">Yêu cầu Xóa Hồ sơ Y tế (PRC-37)</h3>
+            <h3 className="font-bold text-base text-slate-800">Yêu cầu Xóa Hồ sơ Y tế</h3>
           </div>
           <button
             onClick={onClose}
