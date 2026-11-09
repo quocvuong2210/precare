@@ -1,8 +1,11 @@
-﻿/**
+/**
  * Ticket Module Exports
  */
 // STORY-2.1: Quản lý Tài khoản & Xác thực Người dùng (M-AUTH)
 export * from './auth.types';
+
+// STORY-3.1: Quản lý Hồ sơ Thai kỳ (Pregnancy Profile)
+export * from './pregnancyProfile.types';
 
 // =========================================================================
 // CLINICAL & ULTRASOUND DOMAIN TYPES

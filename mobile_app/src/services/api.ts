@@ -78,7 +78,14 @@ export async function logout(): Promise<void> {
 
 // Hàm dùng chung để xử lý response từ backend
 async function handleResponse(response: Response) {
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(response.status >= 500
+      ? 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.'
+      : `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}).`);
+  }
 
   if (!response.ok) {
     const detail = data.detail;
@@ -289,6 +296,55 @@ export function resetPassword(
 
 
 // --- TÍNH TOÁN HỒ SƠ THAI KỲ (TUỔI THAI & EDD) ---
+async function medicalRequest(path: string, body?: object) {
+  if (!currentAccessToken) await restoreSession();
+  if (!currentAccessToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        Authorization: `Bearer ${currentAccessToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: controller.signal,
+    });
+    return await handleResponse(response);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function requestPregnancyDeletion(reason: string, allowResearch: boolean): Promise<string> {
+  if (reason.trim().length < 10) throw new Error('Lý do cần có ít nhất 10 ký tự.');
+  if (!currentAccessToken) await restoreSession();
+  if (!currentAccessToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+
+  // 1. Lấy hồ sơ thai kỳ đang hoạt động qua GET /pregnancy-profiles/active
+  const profile = await fetchPregnancyProfileFromDB(currentAccessToken);
+  const profileId = profile?.id ? String(profile.id).trim() : '';
+  if (!profileId) {
+    throw new Error('Không tìm thấy hồ sơ thai kỳ hiện tại để gửi yêu cầu xóa.');
+  }
+
+  // 2. Gửi yêu cầu xóa với đúng profileId và checkup_id = null
+  const result = await medicalRequest('/deletion-requests', {
+    pregnancy_profile_id: profileId,
+    checkup_id: null,
+    target_type: 'full_profile',
+    reason: reason.trim(),
+    allow_anonymized_research: allowResearch,
+  });
+
+  if (!result.success || result.data?.status !== 'pending' || !result.data?.request_id) {
+    throw new Error('Chưa xác nhận được yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi gửi lại.');
+  }
+  return result.data.request_id;
+}
+
 export interface PregnancyCalculateRequest {
   target_date?: string;
   lmp?: string;
@@ -339,21 +395,40 @@ export async function savePregnancyProfileToDB(
     Authorization: `Bearer ${authToken}`,
   };
 
+  // Chuẩn hóa body gửi lên khớp với CreatePregnancyProfileRequest của Backend
+  const requestBody: Record<string, any> = {};
+  if (payload.lmp) requestBody.lmp = payload.lmp;
+  if (payload.q1_ultrasound_date) requestBody.q1_ultrasound_date = payload.q1_ultrasound_date;
+  if (payload.q1_gestational_weeks !== undefined) requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
+  if (payload.q1_gestational_days !== undefined) requestBody.q1_gestational_days = payload.q1_gestational_days;
+  if (payload.crl_mm !== undefined) requestBody.crl_mm = payload.crl_mm;
+  if (payload.override_edd) {
+    requestBody.override_edd = payload.override_edd;
+  } else if (!payload.lmp && !payload.q1_ultrasound_date && payload.edd) {
+    requestBody.override_edd = payload.edd;
+  }
+
   try {
-    // Thử tạo mới hoặc cập nhật qua POST /pregnancy-profiles
+    // 1. Thử tạo mới qua POST /pregnancy-profiles
     let res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestBody),
     });
 
-    // Nếu hồ sơ đã tồn tại, thử cập nhật qua PUT /pregnancy-profiles/me hoặc PUT /pregnancy-profiles
-    if (!res.ok && (res.status === 400 || res.status === 405 || res.status === 409)) {
-      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/me`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(payload),
-      });
+    // 2. Nếu đã có hồ sơ active (400 ACTIVE_PROFILE_EXISTS), lấy ID hiện tại và gọi PUT /pregnancy-profiles/{id}
+    if (!res.ok && (res.status === 400 || res.status === 409)) {
+      const existingProfile = await fetchPregnancyProfileFromDB(authToken);
+      if (existingProfile?.id) {
+        res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingProfile.id}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            ...requestBody,
+            recalculate_edd: true,
+          }),
+        });
+      }
     }
 
     if (res.ok) {
@@ -365,7 +440,7 @@ export async function savePregnancyProfileToDB(
   return null;
 }
 
-// Lấy hồ sơ thai kỳ từ bảng public.pregnancy_profiles trong Database khi đăng nhập lại
+// Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
 export async function fetchPregnancyProfileFromDB(token?: string) {
   const authToken = token || currentAccessToken;
   if (!authToken) return null;
@@ -376,17 +451,10 @@ export async function fetchPregnancyProfileFromDB(token?: string) {
   };
 
   try {
-    let res = await fetch(`${API_BASE_URL}/pregnancy-profiles/me`, {
+    const res = await fetch(`${API_BASE_URL}/pregnancy-profiles/active`, {
       method: 'GET',
       headers,
     });
-
-    if (!res.ok) {
-      res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
-        method: 'GET',
-        headers,
-      });
-    }
 
     if (res.ok) {
       const json = await res.json();
@@ -602,4 +670,5 @@ export async function retryIngestFile(fileId: string) {
   const data = await handleResponse(response);
   console.log(`Thử lại trích xuất tài liệu (${fileId}) thành công!`);
   return data;
+
 }

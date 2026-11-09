@@ -1,8 +1,18 @@
-﻿@layer base {
+@layer base {
   body {
     background-color: #F8FAFC;
     color: #1E293B;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  ::selection {
+    background-color: #5869cb;
+    color: #ffffff;
+  }
+
+  ::-moz-selection {
+    background-color: #5869cb;
+    color: #ffffff;
   }
 }
 

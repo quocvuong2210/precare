@@ -16,7 +16,7 @@ from app.schemas.token import Token
 # email
 from app.schemas.auth import SendOTPRequest, SendOTPResponse, VerifyOTPRequest, VerifyOTPResponse
 from app.services.otp_service import OTPService
-from app.services.email_service import send_otp_email
+from app.services.email_service import send_otp_email, send_reset_password_email
 
 # refresh token
 from datetime import datetime, timezone
@@ -293,7 +293,7 @@ async def forgot_password(
     db.commit()
     # 4. Gửi email chứa OTP ngầm qua BackgroundTasks
     background_tasks.add_task(
-        send_otp_email,
+        send_reset_password_email,
         to_email=user.email,
         otp_code=otp_code,
         expire_seconds=900
