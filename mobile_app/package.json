@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "npx expo start --android",
+    "android": "start \"\" /B \"%LOCALAPPDATA%\\Android\\Sdk\\emulator\\emulator.exe\" -avd Pixel_7 & npx expo start --android",
     "ios": "npx expo start --ios"
   },
   "dependencies": {
