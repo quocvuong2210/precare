@@ -26,6 +26,7 @@ export type RootStackParamList = {
   Main: undefined;
   Appointments: undefined;
   ForgotPassword: undefined;
+  HistoryResults: undefined;
   OtpVerification: {
     email: string;
     role: string; // <-- Thêm dòng này vào để nhận role truyền sang
@@ -48,7 +49,6 @@ export type RootStackParamList = {
     email: string;
     otp_code: string;
   };
-  HistoryResults: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

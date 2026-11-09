@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
   Filter,
@@ -14,9 +14,14 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import {
   PatientItem,
+  PatientPregnancyStatusType,
+  ALL_PREGNANT_WOMEN_USERS,
+  getInitials,
+  getAvatarColors,
   getStoredPatients,
   saveStoredPatients,
 } from '../services/patient.service';
@@ -26,8 +31,15 @@ import {
   PregnancyCalculationParams,
   PregnancyCalculationResult,
   getTodayISO,
+  formatDateToDisplay,
 } from '../services/pregnancyCalculator';
-import { createNewPregnancyRecord } from '../services/pregnancyProfile.service';
+import {
+  fetchPregnancyProfilesApi,
+  createPregnancyProfileApi,
+  getUniqueDoctorsFromRecords,
+  PregnancyRecordItem,
+} from '../services/pregnancyProfile.service';
+import { CalculationMethod } from '../types/pregnancyProfile.types';
 
 export interface PatientListProps {
   onSelectPatient: (patientId: string) => void;
@@ -39,8 +51,10 @@ export const PatientList: React.FC<PatientListProps> = ({
   onNavigateToCreateRecord,
 }) => {
   const [patients, setPatients] = useState<PatientItem[]>([]);
+  const [rawRecords, setRawRecords] = useState<PregnancyRecordItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'none' | 'delivered'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'none'>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
@@ -49,6 +63,7 @@ export const PatientList: React.FC<PatientListProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPatientForCreate, setSelectedPatientForCreate] = useState<PatientItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Fields inside modal
   const [calcMode, setCalcMode] = useState<'lmp' | 'q1' | 'override'>('lmp');
@@ -59,12 +74,185 @@ export const PatientList: React.FC<PatientListProps> = ({
   const [crlMm, setCrlMm] = useState('');
   const [useCrlInput, setUseCrlInput] = useState(false);
   const [overrideEdd, setOverrideEdd] = useState('');
-  const [doctorName, setDoctorName] = useState('BS. Lê Minh');
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
-  useEffect(() => {
-    setPatients(getStoredPatients());
+  // User hiện tại từ LocalStorage
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('precare_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   }, []);
+
+  // Danh sách bác sĩ phụ trách từ dữ liệu bản ghi và bác sĩ hiện tại
+  const doctorsList = useMemo(() => {
+    const list = getUniqueDoctorsFromRecords(rawRecords);
+    if (currentUser?.id && (currentUser?.role === 'doctor' || currentUser?.role === 'admin')) {
+      const exists = list.some((d) => d.id === currentUser.id);
+      if (!exists) {
+        return [
+          {
+            id: currentUser.id,
+            name: currentUser.full_name ? `BS. ${currentUser.full_name}` : 'Bác sĩ phụ trách',
+          },
+          ...list,
+        ];
+      }
+    }
+    return list;
+  }, [rawRecords, currentUser]);
+
+  // Nạp danh sách hồ sơ thai kỳ từ API & Hợp nhất thông minh với danh sách thai phụ hệ thống
+  const loadPatientsData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetchPregnancyProfilesApi({ page: 1, page_size: 100 });
+      const profiles = response.items || [];
+      setRawRecords(profiles);
+
+      // Lập chỉ mục các hồ sơ theo patientId và số điện thoại
+      const profilesByPatientId = new Map<string, PregnancyRecordItem[]>();
+      const profilesByPhone = new Map<string, PregnancyRecordItem[]>();
+
+      profiles.forEach((p) => {
+        if (p.patientId) {
+          const list = profilesByPatientId.get(p.patientId) || [];
+          list.push(p);
+          profilesByPatientId.set(p.patientId, list);
+        }
+        if (p.phoneNumber) {
+          const cleanPhone = p.phoneNumber.replace(/\s+/g, '');
+          const list = profilesByPhone.get(cleanPhone) || [];
+          list.push(p);
+          profilesByPhone.set(cleanPhone, list);
+        }
+      });
+
+      const merged: PatientItem[] = [];
+      const processedIds = new Set<string>();
+      const processedPhones = new Set<string>();
+
+      // 1. Duyệt qua toàn bộ danh sách thai phụ hệ thống (role pregnant_woman trong CSDL)
+      ALL_PREGNANT_WOMEN_USERS.forEach((u) => {
+        const cleanPhone = u.phoneNumber.replace(/\s+/g, '');
+        const userProfiles =
+          profilesByPatientId.get(u.id) ||
+          profilesByPhone.get(cleanPhone) ||
+          [];
+
+        const activeProf = userProfiles.find((p) => p.status === 'active');
+        const endedProf = userProfiles.find(
+          (p) => p.status === 'completed' || p.status === 'terminated'
+        );
+
+        let statusType: PatientPregnancyStatusType = 'none';
+        let statusLabel = 'Chưa có hồ sơ hoạt động';
+        let pregnancyRecordId: string | undefined = undefined;
+
+        if (activeProf) {
+          statusType = 'active';
+          const ga =
+            activeProf.gestationalAgeFormatted ||
+            activeProf.gestationalAgeDisplay?.split(' ')[0] ||
+            '--';
+          statusLabel = `Đang mang thai (${ga})`;
+          pregnancyRecordId = activeProf.id;
+        } else if (endedProf) {
+          statusType = 'delivered';
+          statusLabel = `Lần sinh trước: ${endedProf.displayEdd || formatDateToDisplay(endedProf.edd)}`;
+          pregnancyRecordId = endedProf.id;
+        }
+
+        processedIds.add(u.id);
+        processedPhones.add(cleanPhone);
+
+        merged.push({
+          id: u.id,
+          stt: '',
+          fullName: u.fullName,
+          phoneNumber: u.phoneNumber,
+          email: u.email,
+          avatarInitials: getInitials(u.fullName),
+          avatarBgColor: '',
+          avatarTextColor: '',
+          pregnancyStatusType: statusType,
+          pregnancyStatusLabel: statusLabel,
+          pregnancyRecordId,
+        });
+      });
+
+      // 2. Bổ sung các hồ sơ có thai phụ mới trên CSDL chưa nằm trong danh sách hằng số
+      profiles.forEach((p) => {
+        const pid = p.patientId || p.id;
+        const cleanPhone = (p.phoneNumber || '').replace(/\s+/g, '');
+        if (
+          (p.patientId && processedIds.has(p.patientId)) ||
+          (cleanPhone && processedPhones.has(cleanPhone)) ||
+          processedIds.has(pid)
+        ) {
+          return;
+        }
+
+        let statusType: PatientPregnancyStatusType = 'none';
+        let statusLabel = 'Chưa có hồ sơ hoạt động';
+        let pregnancyRecordId: string | undefined = undefined;
+
+        if (p.status === 'active') {
+          statusType = 'active';
+          const ga =
+            p.gestationalAgeFormatted ||
+            p.gestationalAgeDisplay?.split(' ')[0] ||
+            '--';
+          statusLabel = `Đang mang thai (${ga})`;
+          pregnancyRecordId = p.id;
+        } else if (p.status === 'completed' || p.status === 'terminated') {
+          statusType = 'delivered';
+          statusLabel = `Lần sinh trước: ${p.displayEdd || formatDateToDisplay(p.edd)}`;
+          pregnancyRecordId = p.id;
+        }
+
+        processedIds.add(pid);
+        if (cleanPhone) processedPhones.add(cleanPhone);
+
+        merged.push({
+          id: pid,
+          stt: '',
+          fullName: p.patientName,
+          phoneNumber: p.phoneNumber,
+          email: p.email || '',
+          avatarInitials: getInitials(p.patientName),
+          avatarBgColor: '',
+          avatarTextColor: '',
+          pregnancyStatusType: statusType,
+          pregnancyStatusLabel: statusLabel,
+          pregnancyRecordId,
+        });
+      });
+
+      // Gán STT và bảng màu avatar chuẩn thiết kế
+      merged.forEach((item, idx) => {
+        item.stt = String(idx + 1).padStart(2, '0');
+        const color = getAvatarColors(idx);
+        item.avatarBgColor = color.bg;
+        item.avatarTextColor = color.text;
+      });
+
+      setPatients(merged);
+      saveStoredPatients(merged);
+    } catch (err) {
+      console.warn('Sử dụng dữ liệu cục bộ do không thể kết nối API:', err);
+      setPatients(getStoredPatients());
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPatientsData();
+  }, [loadPatientsData]);
 
   // Filter patients
   const filteredPatients = useMemo(() => {
@@ -75,7 +263,11 @@ export const PatientList: React.FC<PatientListProps> = ({
         p.email.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
-        statusFilter === 'all' ? true : p.pregnancyStatusType === statusFilter;
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'active'
+          ? p.pregnancyStatusType === 'active'
+          : p.pregnancyStatusType === 'none' || p.pregnancyStatusType === 'delivered';
 
       return matchesSearch && matchesStatus;
     });
@@ -142,36 +334,53 @@ export const PatientList: React.FC<PatientListProps> = ({
     setCrlMm('');
     setUseCrlInput(false);
     setOverrideEdd('');
-    setDoctorName('BS. Lê Minh');
+    setSelectedDoctorId(currentUser?.id || doctorsList[0]?.id || '60ad56ea-437e-47bd-839a-d97333790da0');
     setFormErrors([]);
     setIsModalOpen(true);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatientForCreate) return;
 
     const errors: string[] = [];
+    const today = getTodayISO();
     const params: PregnancyCalculationParams = {};
+
+    if (!selectedDoctorId) {
+      errors.push('Vui lòng chọn bác sĩ phụ trách.');
+    }
 
     if (calcMode === 'lmp') {
       if (!lmpDate) errors.push('Vui lòng chọn Ngày kinh cuối (LMP).');
+      else if (lmpDate > today) errors.push('Ngày kinh cuối không được ở trong tương lai.');
       else params.lmp = lmpDate;
     } else if (calcMode === 'q1') {
       if (!q1Date) errors.push('Vui lòng chọn Ngày siêu âm Quý 1.');
+      else if (q1Date > today) errors.push('Ngày siêu âm không được ở trong tương lai.');
       else {
         params.q1UltrasoundDate = q1Date;
         if (useCrlInput) {
-          if (!crlMm || parseFloat(crlMm) <= 0) errors.push('Vui lòng nhập chỉ số CRL.');
-          else params.crlMm = parseFloat(crlMm);
+          const numCrl = parseFloat(crlMm);
+          if (!crlMm || isNaN(numCrl) || numCrl <= 0) {
+            errors.push('Vui lòng nhập chỉ số chiều dài đầu mông CRL (mm).');
+          } else if (numCrl < 10.0 || numCrl > 84.0) {
+            errors.push('Chỉ số CRL đo tuổi thai quý 1 tiêu chuẩn từ 10.0mm đến 84.0mm.');
+          } else {
+            params.crlMm = numCrl;
+          }
         } else {
-          params.q1GestationalWeeks = parseInt(q1Weeks || '0', 10);
-          params.q1GestationalDays = parseInt(q1Days || '0', 10);
+          const w = parseInt(q1Weeks || '0', 10);
+          const d = parseInt(q1Days || '0', 10);
+          if (w < 6 || w > 14) errors.push('Tuổi thai siêu âm quý 1 phải nằm trong khoảng 6 - 14 tuần.');
+          if (d < 0 || d > 6) errors.push('Số ngày lẻ phải từ 0 đến 6 ngày.');
+          params.q1GestationalWeeks = w;
+          params.q1GestationalDays = d;
         }
         if (lmpDate) params.lmp = lmpDate;
       }
     } else if (calcMode === 'override') {
-      if (!overrideEdd) errors.push('Vui lòng chỉ định Ngày dự sinh.');
+      if (!overrideEdd) errors.push('Vui lòng chỉ định Ngày dự sinh (EDD).');
       else params.overrideEdd = overrideEdd;
     }
 
@@ -186,40 +395,43 @@ export const PatientList: React.FC<PatientListProps> = ({
       return;
     }
 
-    // Save record to pregnancyProfile service
-    const createdRecord = createNewPregnancyRecord({
-      patientName: selectedPatientForCreate.fullName,
-      phoneNumber: selectedPatientForCreate.phoneNumber,
-      email: selectedPatientForCreate.email,
-      doctorName,
-      lmp: params.lmp,
-      q1UltrasoundDate: params.q1UltrasoundDate,
-      q1GestationalWeeks: params.q1GestationalWeeks,
-      q1GestationalDays: params.q1GestationalDays,
-      crlMm: params.crlMm,
-      overrideEdd: params.overrideEdd,
-      status: 'active',
-    });
+    setIsSubmitting(true);
+    setFormErrors([]);
 
-    // Update patient status in list
-    const updatedPatients = patients.map((p) => {
-      if (p.id === selectedPatientForCreate.id) {
-        return {
-          ...p,
-          pregnancyStatusType: 'active' as const,
-          pregnancyStatusLabel: `Đang mang thai (${createdRecord.gestationalAgeDisplay.split(' ')[0]})`,
-          pregnancyRecordId: createdRecord.id,
-        };
-      }
-      return p;
-    });
+    let calculationMethod: CalculationMethod = 'lmp';
+    if (calcMode === 'q1') {
+      calculationMethod = useCrlInput ? 'crl' : 'q1_ultrasound';
+    } else if (calcMode === 'override') {
+      calculationMethod = 'direct_edd';
+    }
 
-    setPatients(updatedPatients);
-    saveStoredPatients(updatedPatients);
-    setIsModalOpen(false);
+    try {
+      await createPregnancyProfileApi({
+        patient_id: selectedPatientForCreate.id,
+        primary_doctor_id: selectedDoctorId,
+        calculation_method: calculationMethod,
+        lmp: params.lmp || null,
+        q1_ultrasound_date: params.q1UltrasoundDate || null,
+        q1_gestational_weeks: params.q1GestationalWeeks || null,
+        q1_gestational_days: params.q1GestationalDays || null,
+        crl_mm: params.crlMm || null,
+        override_edd: params.overrideEdd || null,
+      });
 
-    setToastMessage(`Đã khởi tạo hồ sơ thai kỳ thành công cho ${selectedPatientForCreate.fullName}!`);
-    setTimeout(() => setToastMessage(null), 4000);
+      setIsModalOpen(false);
+      setToastMessage(`Đã khởi tạo hồ sơ thai kỳ thành công cho thai phụ ${selectedPatientForCreate.fullName}!`);
+      await loadPatientsData();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.detail?.message ||
+        err.response?.data?.message ||
+        err.message ||
+        'Không thể khởi tạo hồ sơ thai kỳ qua API PreCare';
+      setFormErrors([msg]);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -242,7 +454,9 @@ export const PatientList: React.FC<PatientListProps> = ({
               Cơ sở dữ liệu Bệnh nhân
             </h2>
             <p className="text-xs text-slate-500 mt-1 font-normal">
-              Tổng số 1,245 thai phụ đang quản lý trong hệ thống
+              {isLoading
+                ? 'Đang đồng bộ dữ liệu bệnh nhân từ máy chủ PreCare...'
+                : `Tổng số ${patients.length} thai phụ đang quản lý trong hệ thống`}
             </p>
           </div>
 
@@ -281,9 +495,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                     ? 'Lọc trạng thái'
                     : statusFilter === 'active'
                     ? 'Đang mang thai'
-                    : statusFilter === 'none'
-                    ? 'Chưa có hồ sơ'
-                    : 'Lần sinh trước'}
+                    : 'Chưa có hồ sơ'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -323,17 +535,6 @@ export const PatientList: React.FC<PatientListProps> = ({
                   >
                     Chưa có hồ sơ hoạt động
                   </button>
-                  <button
-                    onClick={() => {
-                      setStatusFilter('delivered');
-                      setShowFilterDropdown(false);
-                    }}
-                    className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 ${
-                      statusFilter === 'delivered' ? 'font-bold text-[#4D7D74] bg-teal-50/50' : ''
-                    }`}
-                  >
-                    Lần sinh trước
-                  </button>
                 </div>
               )}
             </div>
@@ -353,7 +554,16 @@ export const PatientList: React.FC<PatientListProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/90">
-              {paginatedPatients.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                    <div className="flex items-center justify-center gap-2.5">
+                      <Loader2 className="w-5 h-5 text-[#4D7D74] animate-spin" />
+                      <span>Đang nạp dữ liệu hồ sơ bệnh nhân...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedPatients.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
                     Không tìm thấy bệnh nhân nào phù hợp.
@@ -376,8 +586,8 @@ export const PatientList: React.FC<PatientListProps> = ({
                         <div
                           className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 select-none shadow-2xs"
                           style={{
-                            backgroundColor: item.avatarBgColor,
-                            color: item.avatarTextColor,
+                            backgroundColor: item.avatarBgColor || '#CCFBF1',
+                            color: item.avatarTextColor || '#0F766E',
                           }}
                         >
                           {item.avatarInitials}
@@ -394,7 +604,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                       </div>
                     </td>
 
-                    {/* Email (thay thế ngày sinh) */}
+                    {/* Email */}
                     <td className="py-4 px-6 text-slate-600 text-xs whitespace-nowrap">
                       {item.email}
                     </td>
@@ -458,7 +668,7 @@ export const PatientList: React.FC<PatientListProps> = ({
             </span>{' '}
             trong số{' '}
             <span className="font-semibold text-slate-700">
-              {totalItems > 10 ? '1,245' : totalItems}
+              {totalItems}
             </span>{' '}
             bệnh nhân
           </div>
@@ -467,7 +677,7 @@ export const PatientList: React.FC<PatientListProps> = ({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -476,7 +686,7 @@ export const PatientList: React.FC<PatientListProps> = ({
               <button
                 key={num}
                 onClick={() => setCurrentPage(num)}
-                className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all ${
+                className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   currentPage === num
                     ? 'bg-[#275248] text-white shadow-xs'
                     : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -486,14 +696,10 @@ export const PatientList: React.FC<PatientListProps> = ({
               </button>
             ))}
 
-            {totalPages > 3 && (
-              <span className="px-1 text-slate-400 select-none">...</span>
-            )}
-
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -545,14 +751,22 @@ export const PatientList: React.FC<PatientListProps> = ({
               {/* Thông tin bác sĩ phụ trách */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bác sĩ phụ trách
+                  Bác sĩ phụ trách <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-[#4D7D74]"
-                />
+                <select
+                  value={selectedDoctorId}
+                  onChange={(e) => setSelectedDoctorId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl outline-none focus:border-[#4D7D74] bg-white cursor-pointer"
+                >
+                  {doctorsList.map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Bác sĩ điều trị và theo dõi lâm sàng trực tiếp cho thai phụ.
+                </p>
               </div>
 
               {/* Căn cứ tính tuổi thai & EDD */}
@@ -570,7 +784,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                   <button
                     type="button"
                     onClick={() => setCalcMode('lmp')}
-                    className={`flex-1 py-1.5 rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                       calcMode === 'lmp'
                         ? 'bg-white text-slate-800 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -581,7 +795,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                   <button
                     type="button"
                     onClick={() => setCalcMode('q1')}
-                    className={`flex-1 py-1.5 rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                       calcMode === 'q1'
                         ? 'bg-white text-slate-800 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -592,7 +806,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                   <button
                     type="button"
                     onClick={() => setCalcMode('override')}
-                    className={`flex-1 py-1.5 rounded-lg transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                       calcMode === 'override'
                         ? 'bg-white text-slate-800 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
@@ -674,7 +888,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Tuần thai lúc siêu âm (6 - 14)
+                            Tuần thai lúc siêu âm (6 - 14) <span className="text-rose-500">*</span>
                           </label>
                           <input
                             type="number"
@@ -702,7 +916,7 @@ export const PatientList: React.FC<PatientListProps> = ({
                     ) : (
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Chiều dài đầu mông CRL (10 - 84 mm)
+                          Chiều dài đầu mông CRL (10 - 84 mm) <span className="text-rose-500">*</span>
                         </label>
                         <input
                           type="number"
@@ -764,16 +978,25 @@ export const PatientList: React.FC<PatientListProps> = ({
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#275248] hover:bg-[#1E433B] text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-[#275248] hover:bg-[#1E433B] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  Lưu hồ sơ thai kỳ
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <span>Lưu hồ sơ thai kỳ</span>
+                  )}
                 </button>
               </div>
             </form>

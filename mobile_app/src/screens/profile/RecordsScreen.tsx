@@ -1,7 +1,16 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, Text, TextInput, View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +19,9 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { MainTabParamList } from '../navigation/MainTabs';
-import { colors } from '../theme/colors';
-import EmergencyContacts, { type EmergencyContact } from '../components/EmergencyContacts';
+import type { MainTabParamList } from '../../navigation/MainTabs';
+import { colors } from '../../theme/colors';
+import EmergencyContacts, { type EmergencyContact } from '../../components/EmergencyContacts';
 import {
   calculatePregnancyProfile,
   currentUserProfile,
@@ -20,14 +29,25 @@ import {
   restoreSession,
   savePregnancyProfileToDB,
   type PregnancyCalculateRequest,
-} from '../services/api';
+} from '../../services/api';
 
-type Editor = 'personal' | 'medical' | 'history' | null;
+type Editor = 'personal' | 'medical' | null;
 type Profile = {
-  name: string; birthday: string; phone: string; email: string;
-  blood: string; allergies: string; conditions: string; obstetricHistory: string;
-  target_date: string; lmp: string; q1_ultrasound_date: string;
-  q1_gestational_weeks: string; q1_gestational_days: string; crl_mm: string; override_edd: string;
+  name: string;
+  birthday: string;
+  phone: string;
+  email: string;
+  blood: string;
+  allergies: string;
+  conditions: string;
+  obstetricHistory: string;
+  target_date: string;
+  lmp: string;
+  q1_ultrasound_date: string;
+  q1_gestational_weeks: string;
+  q1_gestational_days: string;
+  crl_mm: string;
+  override_edd: string;
 };
 type Field = { key: keyof Profile; label: string; placeholder?: string };
 
@@ -137,11 +157,22 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [contactsVisible, setContactsVisible] = useState(false);
+
   const mainContact = contacts.find((contact) => contact.primary) || contacts[0];
 
   const [trimester, setTrimester] = useState('Chưa cập nhật');
   const [gestationalAge, setGestationalAge] = useState('--');
   const [dueDate, setDueDate] = useState('Chưa cập nhật');
+
+  // Hàm mở trang riêng HistoryResultsScreen trên RootStack
+  const goToHistoryScreen = useCallback(() => {
+    const rootNav = navigation.getParent() as any;
+    if (rootNav) {
+      rootNav.navigate('HistoryResults');
+    } else {
+      (navigation as any).navigate('HistoryResults');
+    }
+  }, [navigation]);
 
   const persistAccountData = async (
     nextProfile: Profile,
@@ -265,7 +296,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             if (edd) {
               loadedDue = String(edd).slice(0, 10).split('-').reverse().join('/');
             }
-          } catch (e) {
+          } catch {
             // Giữ nguyên kết quả
           }
         }
@@ -310,7 +341,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
   const handleContactsChange = (nextContacts: EmergencyContact[]) => {
     setContacts(nextContacts);
     persistAccountData(profile, trimester, gestationalAge, dueDate, nextContacts);
-    Alert.alert('Thành công', 'Đã cập nhật danh sách liên hệ khẩn cấp.')
+    Alert.alert('Thành công', 'Đã cập nhật danh sách liên hệ khẩn cấp.');
   };
 
   const save = async () => {
@@ -420,12 +451,10 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
     await persistAccountData(next, nextTrimester, nextGestationalAge, nextDueDate, contacts);
     setEditor(null);
 
-    // Hiển thị thông báo thành công khi lưu thay đổi hồ sơ
     Alert.alert('Thành công', 'Đã lưu thông tin hồ sơ và đồng bộ vào cơ sở dữ liệu.');
   };
 
-  const modalTitle = editor === 'personal' ? 'Chỉnh sửa hồ sơ' : editor === 'medical'
-    ? 'Thông tin y tế' : 'Lịch sử kết quả';
+  const modalTitle = editor === 'personal' ? 'Chỉnh sửa hồ sơ' : 'Thông tin y tế';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -433,7 +462,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
       <View style={styles.header}><Text style={styles.headerTitle}>Hồ sơ mẹ bầu</Text></View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.identity}>
-          <Image source={require('../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
+          <Image source={require('../../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
           <View style={styles.identityText}>
             <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
             <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
@@ -490,9 +519,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         <Text style={styles.sectionTitle}>Hồ sơ khám & kết quả</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            navigation.getParent()?.navigate('HistoryResults' as never)
-          }
+          onPress={goToHistoryScreen}
           style={({ pressed }) => [
             styles.card,
             styles.historyCard,
@@ -500,11 +527,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
           ]}
         >
           <View style={styles.iconBox}>
-            <Ionicons
-              name="document-text-outline"
-              size={20}
-              color={colors.primary}
-            />
+            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
           </View>
 
           <View style={styles.contactText}>
@@ -514,11 +537,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             </Text>
           </View>
 
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={colors.textLight}
-          />
+          <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
         </Pressable>
       </ScrollView>
 
@@ -528,6 +547,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         onChange={handleContactsChange}
         onClose={() => setContactsVisible(false)}
       />
+
       <Modal visible={editor !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditor(null)}>
         <SafeAreaView style={styles.modalContainer}>
           <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -538,16 +558,7 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-              {editor === 'history' ? (
-                <View style={styles.emptyState}>
-                  <View style={styles.emptyIcon}><Ionicons name="documents-outline" size={32} color={colors.primary} /></View>
-                  <Text style={styles.name}>Chưa có kết quả để hiển thị</Text>
-                  <Text style={styles.emptyDescription}>Tải phiếu khám, xét nghiệm hoặc siêu âm của mẹ để bắt đầu lưu hồ sơ.</Text>
-                  <OutlineButton title="Tải phiếu khám" icon="cloud-upload-outline" onPress={() => {
-                    setEditor(null); navigation.navigate('Upload', { screen: 'UploadHome' });
-                  }} />
-                </View>
-              ) : editor && (
+              {editor && (
                 <>
                   <Text style={styles.formNote}>Thông tin được lưu theo tài khoản của mẹ.</Text>
                   {fields[editor].map((field) => {
@@ -634,7 +645,4 @@ const styles = StyleSheet.create({
   error: { color: '#B91C1C', marginBottom: 16, lineHeight: 21 },
   saveButton: { backgroundColor: colors.primary, padding: 15, alignItems: 'center', borderRadius: 10 },
   saveText: { color: colors.white, fontSize: 15, fontWeight: '700' },
-  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 18 },
-  emptyIcon: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E6FAF5', borderRadius: 36 },
-  emptyDescription: { color: colors.textMuted, textAlign: 'center', fontSize: 14, lineHeight: 22 },
 });

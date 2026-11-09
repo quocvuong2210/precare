@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View,
+  ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +15,7 @@ import type { MainTabParamList } from '../navigation/MainTabs';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { settingsThemes } from '../theme/settings';
+import { logout } from '../services/api';
 
 const translations = {
   vi: {
@@ -31,6 +32,8 @@ const translations = {
     textSizeNote: 'Xem trước cỡ chữ trong màn hình Cài đặt.',
     passwordNote: 'Xác thực email của mẹ để đặt lại mật khẩu qua mã OTP.',
     logoutNote: 'Mẹ có muốn đăng xuất khỏi PreCare?',
+    loggingOut: 'Đang đăng xuất…',
+    logoutError: 'Chưa thể xóa phiên đăng nhập trên thiết bị. Vui lòng thử lại.',
     deleteNote: 'Tính năng gửi yêu cầu xóa dữ liệu chưa khả dụng trong phiên bản này. Vui lòng quay lại sau khi tính năng được cập nhật.',
     exportNote: 'Chưa có hồ sơ khám được kết nối để xuất PDF. Mẹ có thể tải phiếu khám hoặc xem thông tin trong mục Hồ sơ.',
     upload: 'Tải phiếu khám', records: 'Xem hồ sơ',
@@ -58,6 +61,8 @@ const translations = {
     textSizeNote: 'Preview text size on the Settings screen.',
     passwordNote: 'Verify your email with a one-time code to reset your password.',
     logoutNote: 'Would you like to log out of PreCare?',
+    loggingOut: 'Logging out…',
+    logoutError: 'Unable to clear the session on this device. Please try again.',
     deleteNote: 'Data deletion requests are not available in this version. Please check back when this feature is available.',
     exportNote: 'No connected health records are available to export as PDF yet. You can upload a document or view your profile.',
     upload: 'Upload a document', records: 'View profile',
@@ -132,14 +137,34 @@ function SettingsSection({ title, theme, children }: { title: string; theme: The
 export default function SettingsScreen({ navigation }: BottomTabScreenProps<MainTabParamList, 'Settings'>) {
   const { preferences, updatePreference, isLoaded, storageError } = useAppSettings();
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  const logoutInProgress = useRef(false);
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const theme = settingsThemes[preferences.darkMode ? 'dark' : 'light'];
   const copy = translations[preferences.language];
   const fontScale = preferences.textSize === 'small' ? 0.9 : preferences.textSize === 'large' ? 1.15 : 1;
   const shared = { theme, fontScale };
-  const close = () => setDialog(null);
+  const close = () => { if (!logoutInProgress.current) { setDialog(null); setLogoutError(false); } };
   const rootNavigation = () => navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
+  const handleLogout = async () => {
+    if (logoutInProgress.current) return;
+    const root = rootNavigation();
+    if (!root) return;
+    logoutInProgress.current = true;
+    setLoggingOut(true);
+    setLogoutError(false);
+    try {
+      await logout();
+      root.reset({ index: 0, routes: [{ name: 'Login' }] });
+    } catch {
+      setLogoutError(true);
+    } finally {
+      logoutInProgress.current = false;
+      setLoggingOut(false);
+    }
+  };
   const dialogTitle = dialog ? copy[dialog] : '';
   const textStyle = { color: theme.muted, fontSize: 14 * fontScale };
   const dialogNotes = {
@@ -148,7 +173,7 @@ export default function SettingsScreen({ navigation }: BottomTabScreenProps<Main
   };
 
   const button = (label: string, onPress: () => void, secondary = false, danger = false) => (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [
+    <Pressable accessibilityRole="button" disabled={loggingOut} accessibilityState={{ disabled: loggingOut }} onPress={onPress} style={({ pressed }) => [
       styles.actionButton,
       { backgroundColor: secondary ? theme.iconBackground : danger ? theme.danger : colors.primary },
       pressed && styles.pressed,
@@ -267,7 +292,9 @@ export default function SettingsScreen({ navigation }: BottomTabScreenProps<Main
                 <Text style={[styles.bodyText, textStyle]}>{dialogNotes[dialog as keyof typeof dialogNotes]}</Text>
                 {dialog === 'password' ? button(copy.continue, () => { close(); rootNavigation()?.navigate('ForgotPassword'); })
                   : dialog === 'logout' ? <>
-                    {button(copy.logout, () => { close(); rootNavigation()?.reset({ index: 0, routes: [{ name: 'Login' }] }); }, false, true)}
+                    {loggingOut && <ActivityIndicator color={colors.primary} />}
+                    {logoutError && <Text accessibilityRole="alert" style={[styles.bodyText, { color: theme.danger }]}>{copy.logoutError}</Text>}
+                    {button(loggingOut ? copy.loggingOut : copy.logout, handleLogout, false, true)}
                     {button(copy.cancel, close, true)}
                   </> : dialog === 'export' ? <>
                     {button(copy.upload, () => { close(); navigation.navigate('Upload', { screen: 'UploadHome' }); })}

@@ -11,6 +11,8 @@ from app.api.pregnancy import router as pregnancy_router
 from app.api.checkup import router as checkup_router
 from app.api.deletion_request import router as deletion_request_router
 
+from app.models.uploaded_file import UploadedFile
+from app.api.ingest import router as ingest_router
   
 
 # Initialize database tables
@@ -45,7 +47,8 @@ app.include_router(checkup_router, prefix="/api/v1/checkups", tags=["Checkups & 
 # Deletion Request Routes
 app.include_router(deletion_request_router, prefix="/api/v1/deletion-requests", tags=["Medical Deletion Requests"])
 
-  
+# Paraclinical Ingest & Queue Routes
+app.include_router(ingest_router, prefix="/api/v1/ingest", tags=["Paraclinical Ingest & Queue"])
 
 
 @app.get("/", tags=["System"])

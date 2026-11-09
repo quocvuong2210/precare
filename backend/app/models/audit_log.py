@@ -1,12 +1,12 @@
 # backend/app/models/audit_log.py
-from sqlalchemy import Column, BigInteger, String, DateTime, Text, func, ForeignKey
+from sqlalchemy import Column, BigInteger, Integer, String, DateTime, Text, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action = Column(String(50), nullable=False)
     target_table = Column(String(100), nullable=False)

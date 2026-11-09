@@ -11,6 +11,6 @@ def test_lmp_calculation():
     assert method == "lmp"
 
 def test_crl_formula():
-    # CRL 47.5mm tương đương ~11 tuần (77 ngày)
+    # CRL 47.5mm tương đương ~11 tuần 3 ngày (80 ngày) theo Robinson & Fleming / Hadlock
     ga_days = calculate_ga_from_crl(47.5)
-    assert 76 <= ga_days <= 79
+    assert 76 <= ga_days <= 81

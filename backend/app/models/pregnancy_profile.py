@@ -38,11 +38,12 @@ class PregnancyProfile(Base):
     checkups = relationship("Checkup", back_populates="pregnancy_profile", cascade="all, delete-orphan", order_by="Checkup.checkup_date")
     biometric_records = relationship("BiometricData", back_populates="pregnancy_profile", cascade="all, delete-orphan")
     deletion_requests = relationship("DeletionRequest", back_populates="pregnancy_profile", cascade="all, delete-orphan")
+    uploaded_files = relationship("UploadedFile", back_populates="pregnancy_profile", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed', 'terminated')", name="chk_pregnancy_status"),
         CheckConstraint("q1_gestational_days IS NULL OR (q1_gestational_days >= 0 AND q1_gestational_days <= 6)", name="chk_gestational_days"),
         CheckConstraint("q1_gestational_weeks IS NULL OR (q1_gestational_weeks >= 0 AND q1_gestational_weeks <= 42)", name="chk_gestational_weeks"),
         CheckConstraint("crl_mm IS NULL OR crl_mm > 0", name="chk_crl_positive"),
-        Index("uq_active_pregnancy_per_patient", "patient_id", unique=True, postgresql_where=(status == 'active')),
+        Index("uq_active_pregnancy_per_patient", "patient_id", unique=True, postgresql_where=(status == 'active'), sqlite_where=(status == 'active')),
     )
