@@ -19,6 +19,7 @@ import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen'
 
 
 import HistoryResultsScreen from '../screens/profile/HistoryResultsScreen';
+import DeletionRequestScreen from '../screens/profile/DeletionRequestScreen';
 export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
@@ -49,6 +50,7 @@ export type RootStackParamList = {
     email: string;
     otp_code: string;
   };
+  DeletionRequest: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +59,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Onboarding">
+        <Stack.Screen name="DeletionRequest" component={DeletionRequestScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
