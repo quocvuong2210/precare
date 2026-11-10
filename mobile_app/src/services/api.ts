@@ -92,7 +92,7 @@ async function handleResponse(response: Response) {
     const message = Array.isArray(detail)
       ? detail.map((d: any) => d.msg).join('; ')
       : typeof detail === 'string'
-        ? detail : data.message || 'Yêu cầu thất bại';
+        ? detail : detail?.message || data.message || 'Yêu cầu thất bại';
     throw new Error(message);
   }
 
@@ -355,6 +355,8 @@ export interface PregnancyCalculateRequest {
   override_edd?: string;
 }
 
+export type PregnancyCalculationMethod = 'lmp' | 'q1_ultrasound' | 'crl' | 'direct_edd';
+
 export async function calculatePregnancyProfile(
   payload: PregnancyCalculateRequest,
   token?: string,
@@ -383,11 +385,11 @@ export async function calculatePregnancyProfile(
 
 // Lưu hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
 export async function savePregnancyProfileToDB(
-  payload: PregnancyCalculateRequest & { edd?: string },
+  payload: PregnancyCalculateRequest & { edd?: string; calculation_method?: PregnancyCalculationMethod },
   token?: string,
 ) {
   const authToken = token || currentAccessToken;
-  if (!authToken) return null;
+  if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -397,6 +399,7 @@ export async function savePregnancyProfileToDB(
 
   // Chuẩn hóa body gửi lên khớp với CreatePregnancyProfileRequest của Backend
   const requestBody: Record<string, any> = {};
+  if (payload.calculation_method) requestBody.calculation_method = payload.calculation_method;
   if (payload.lmp) requestBody.lmp = payload.lmp;
   if (payload.q1_ultrasound_date) requestBody.q1_ultrasound_date = payload.q1_ultrasound_date;
   if (payload.q1_gestational_weeks !== undefined) requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
@@ -408,42 +411,37 @@ export async function savePregnancyProfileToDB(
     requestBody.override_edd = payload.edd;
   }
 
-  try {
-    // 1. Thử tạo mới qua POST /pregnancy-profiles
-    let res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-    });
+  let res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody),
+  });
 
-    // 2. Nếu đã có hồ sơ active (400 ACTIVE_PROFILE_EXISTS), lấy ID hiện tại và gọi PUT /pregnancy-profiles/{id}
-    if (!res.ok && (res.status === 400 || res.status === 409)) {
-      const existingProfile = await fetchPregnancyProfileFromDB(authToken);
-      if (existingProfile?.id) {
-        res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingProfile.id}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            ...requestBody,
-            recalculate_edd: true,
-          }),
-        });
-      }
+  if (!res.ok && (res.status === 400 || res.status === 409)) {
+    const existingProfile = await fetchPregnancyProfileFromDB(authToken, { throwOnError: true });
+    if (existingProfile?.id) {
+      const { calculation_method: _method, ...updateBody } = requestBody;
+      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingProfile.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ ...updateBody, recalculate_edd: true }),
+      });
     }
-
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {
-    console.log('Lưu DB pregnancy_profiles:', e);
   }
-  return null;
+
+  return handleResponse(res);
 }
 
 // Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
-export async function fetchPregnancyProfileFromDB(token?: string) {
+export async function fetchPregnancyProfileFromDB(
+  token?: string,
+  options: { throwOnError?: boolean } = {},
+) {
   const authToken = token || currentAccessToken;
-  if (!authToken) return null;
+  if (!authToken) {
+    if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+    return null;
+  }
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -461,7 +459,10 @@ export async function fetchPregnancyProfileFromDB(token?: string) {
       const data = json?.data || json;
       return Array.isArray(data) ? data[0] : data;
     }
+    if (res.status === 404) return null;
+    if (options.throwOnError) await handleResponse(res);
   } catch (e) {
+    if (options.throwOnError) throw e;
     console.log('Tải DB pregnancy_profiles:', e);
   }
   return null;

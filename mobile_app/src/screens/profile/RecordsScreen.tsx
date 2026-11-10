@@ -424,6 +424,13 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
           await savePregnancyProfileToDB({
             ...body,
             edd: edd ? String(edd).slice(0, 10) : undefined,
+            calculation_method: body.lmp
+              ? 'lmp'
+              : body.q1_ultrasound_date && body.crl_mm !== undefined
+                ? 'crl'
+                : body.q1_ultrasound_date
+                  ? 'q1_ultrasound'
+                  : 'direct_edd',
           });
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Lỗi tính toán tuổi thai từ máy chủ.');

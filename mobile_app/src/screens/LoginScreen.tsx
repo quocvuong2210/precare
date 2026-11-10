@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
-import { login } from '../services/api';
+import { fetchPregnancyProfileFromDB, login } from '../services/api';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -53,8 +53,8 @@ export default function LoginScreen({ navigation }: Props) {
       }   
       console.log('Đăng nhập thành công!');
 
-      // Chuyển thẳng vào Home
-      navigation.replace('Main');
+      const pregnancyProfile = await fetchPregnancyProfileFromDB(data.access_token, { throwOnError: true });
+      navigation.replace(pregnancyProfile ? 'Main' : 'PregnancySetup');
 
       // Chưa chuyển màn hình vì cần xác định tên màn hình chính
       // trong AppNavigator trước.
