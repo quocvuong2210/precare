@@ -20,11 +20,13 @@ import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen'
 
 import HistoryResultsScreen from '../screens/profile/HistoryResultsScreen';
 import DeletionRequestScreen from '../screens/profile/DeletionRequestScreen';
+import PregnancySetupScreen from '../screens/PregnancySetupScreen';
 export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Register: undefined;
   Main: undefined;
+  PregnancySetup: undefined;
   Appointments: undefined;
   ForgotPassword: undefined;
   HistoryResults: undefined;
@@ -82,6 +84,12 @@ export default function AppNavigator() {
           name="Main"
           component={MainTabs}
           options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="PregnancySetup"
+          component={PregnancySetupScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
 
         <Stack.Screen
