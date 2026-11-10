@@ -34,6 +34,7 @@ from app.api.pregnancy import (
     update_pregnancy_profile,
     update_pregnancy_profile_status,
     calculate_preview,
+    get_eligible_patients,
 )
 
 # Thiết lập SQLite in-memory cho test
@@ -423,3 +424,79 @@ def test_calculate_preview_endpoint():
     assert res["data"]["calculated_edd"] == date(2027, 3, 8)
     assert res["data"]["gestational_age"]["days"] == 139
     assert res["data"]["gestational_age"]["formatted"] == "19w6d"
+
+
+# ==============================================================================
+# 8. TEST GET /api/v1/pregnancy-profiles/eligible-patients
+# ==============================================================================
+
+def test_get_eligible_patients(db_session):
+    doctor = User(
+        id=uuid.uuid4(),
+        email="doctor.eligible@example.com",
+        password_hash="hash_doc",
+        full_name="BS. Dang Thi Hoa",
+        role="doctor"
+    )
+    # Thai phụ 1: có hồ sơ active
+    patient1 = User(
+        id=uuid.uuid4(),
+        email="patient1.has_active@example.com",
+        password_hash="hash_p1",
+        full_name="Tran Thi Active",
+        role="pregnant_woman",
+        phone_number="0911111111"
+    )
+    # Thai phụ 2: chưa từng có hồ sơ nào
+    patient2 = User(
+        id=uuid.uuid4(),
+        email="patient2.no_profile@example.com",
+        password_hash="hash_p2",
+        full_name="Le Thi ChuaHoSo",
+        role="pregnant_woman",
+        phone_number="0922222222"
+    )
+    # Thai phụ 3: có hồ sơ nhưng đã completed (đã sinh)
+    patient3 = User(
+        id=uuid.uuid4(),
+        email="patient3.completed@example.com",
+        password_hash="hash_p3",
+        full_name="Pham Thi DaSinh",
+        role="pregnant_woman",
+        phone_number="0933333333"
+    )
+    db_session.add_all([doctor, patient1, patient2, patient3])
+    db_session.commit()
+
+    # Tạo hồ sơ active cho patient1
+    profile1 = PregnancyProfile(
+        id=uuid.uuid4(),
+        patient_id=patient1.id,
+        primary_doctor_id=doctor.id,
+        lmp=date.today() - timedelta(days=60),
+        edd=date.today() + timedelta(days=220),
+        status="active",
+        is_deleted=False
+    )
+    # Tạo hồ sơ completed cho patient3
+    profile3 = PregnancyProfile(
+        id=uuid.uuid4(),
+        patient_id=patient3.id,
+        primary_doctor_id=doctor.id,
+        lmp=date.today() - timedelta(days=300),
+        edd=date.today() - timedelta(days=20),
+        status="completed",
+        is_deleted=False
+    )
+    db_session.add_all([profile1, profile3])
+    db_session.commit()
+
+    # Bác sĩ gọi API lấy danh sách thai phụ đủ điều kiện tạo hồ sơ mới
+    res = get_eligible_patients(db=db_session, current_user=doctor)
+
+    assert res.success is True
+    assert res.total == 2
+    returned_ids = {p.id for p in res.data}
+    assert patient2.id in returned_ids
+    assert patient3.id in returned_ids
+    assert patient1.id not in returned_ids
