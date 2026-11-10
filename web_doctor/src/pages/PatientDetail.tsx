@@ -152,10 +152,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
 
       const statusName =
         selectedStatus === 'completed'
-          ? 'Đã sinh (Completed)'
+          ? 'Đã sinh'
           : selectedStatus === 'terminated'
-          ? 'Đình chỉ (Terminated)'
-          : 'Đang hoạt động (Active)';
+          ? 'Đình chỉ'
+          : 'Đang hoạt động';
 
       setToastMessage(`Đã cập nhật trạng thái hồ sơ sang: ${statusName}`);
       setTimeout(() => setToastMessage(null), 3500);
@@ -411,17 +411,17 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
           {currentRecord?.status === 'completed' ? (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] border border-sky-200">
               <span className="w-2 h-2 rounded-full bg-[#0284C7]"></span>
-              Đã sinh (Completed)
+              Đã sinh
             </span>
           ) : currentRecord?.status === 'terminated' ? (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#FFE4E6] text-[#BE123C] border border-rose-200">
               <span className="w-2 h-2 rounded-sm bg-[#E11D48]"></span>
-              Đình chỉ (Terminated)
+              Đình chỉ
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#DCFCE7] text-[#15803D] border border-emerald-200">
               <span className="w-2 h-2 rounded-full bg-[#16A34A]"></span>
-              Đang hoạt động (Active)
+              Đang hoạt động
             </span>
           )}
 
@@ -770,19 +770,19 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
                 {[
                   {
                     value: 'active' as PregnancyStatus,
-                    label: 'Đang hoạt động (Active)',
+                    label: 'Đang hoạt động',
                     desc: 'Thai kỳ đang trong quá trình theo dõi',
                     color: 'emerald',
                   },
                   {
                     value: 'completed' as PregnancyStatus,
-                    label: 'Đã sinh (Completed)',
+                    label: 'Đã sinh',
                     desc: 'Thai kỳ kết thúc thành công sau sinh',
                     color: 'sky',
                   },
                   {
                     value: 'terminated' as PregnancyStatus,
-                    label: 'Đình chỉ (Terminated)',
+                    label: 'Đình chỉ',
                     desc: 'Thai kỳ kết thúc sớm do y khoa hoặc sảy thai',
                     color: 'rose',
                   },
