@@ -35,8 +35,45 @@ docker-compose down
 ### 2. Services Access Points
 - **Doctor Web Portal**: `http://localhost:3000`
 - **FastAPI Backend Swagger**: `http://localhost:8000/docs`
+
 - **Analysis Microservice OpenAPI**: `http://localhost:8001/docs`
 - **MinIO Storage Console**: `http://localhost:9001` (User: `precare_minio`, Pass: `precare_minio_secret`)
+
+## Run the Mobile App on Android
+
+From the repository root, install the Mobile dependencies:
+
+```bash
+cd mobile_app
+npm ci
+```
+
+### Create the Android emulator
+
+1. Open Android Studio and open **Device Manager**. From the Welcome screen, choose **More Actions > Virtual Device Manager**; from an open project, choose **Tools > Device Manager**.
+2. Select **Create Device**, choose a Pixel phone profile (for example, Pixel 8), then select **Next**.
+3. Select a system image and download it if prompted. Select **Next**, then **Finish**.
+4. In Device Manager, start the new virtual device with the **Play** button. Name it `Pixel_8` so the command below can find it.
+
+In PowerShell, list the available Android Virtual Devices (AVDs):
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -list-avds
+```
+
+Start the `Pixel_8` emulator. Run this command in a separate PowerShell window:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_8
+```
+
+In the `mobile_app` folder, start Expo:
+
+```bash
+npm run start
+```
+
+When Expo is ready, press `a` in the terminal to open the app in the running emulator. Keep the Expo terminal open while using the app.
 
 ---
 
