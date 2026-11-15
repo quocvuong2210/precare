@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { RequestDeletionModal } from '../components/RequestDeletionModal';
+import { VisitTimeline } from '../components/VisitTimeline';
 import {
   getStoredPregnancyRecords,
   PregnancyRecordItem,
@@ -656,7 +657,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
         </div>
       </div>
 
-      {/* 4. KHỐI: DỮ LIỆU LÂM SÀNG ĐẦU VÀO (CHUẨN HÓA SCHEMA POSTGRESQL 16) */}
+      {/* 4. TIMELINE CÁC LẦN KHÁM */}
+      {currentRecord && <VisitTimeline pregnancyProfileId={currentRecord.id} />}
+
+      {/* 5. KHỐI: DỮ LIỆU LÂM SÀNG ĐẦU VÀO (CHUẨN HÓA SCHEMA POSTGRESQL 16) */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-800">
