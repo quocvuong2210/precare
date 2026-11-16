@@ -692,53 +692,23 @@ const buildDefaultExtractedAnalysis = (
   const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
   const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
 
-  let metrics: MedicalMetric[] = [];
-
-  if (presetMode === 'normal') {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '115/72', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '144', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '218', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '705', 'g', '', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '12.1', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '4.6', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.05 (Âm tính)', 'g/L', '< 0.15 g/L', clampedWeek),
-    ];
-  } else if (presetMode === 'danger') {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '148/95', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '176', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '68', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '255', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '51', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '235', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '1150', 'g', '', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '9.1', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '6.2', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.45 (++ Dương tính)', 'g/L', '< 0.15 g/L', clampedWeek),
-    ];
-  } else {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
-      buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
-      buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.5', '', '5.0 – 7.5', clampedWeek),
-      buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
-    ];
-  }
+  const metrics: MedicalMetric[] = [
+    buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
+    buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
+    buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
+    buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
+    buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
+    buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
+    buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
+    buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
+    buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
+    buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
+    buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
+    buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
+    buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
+    buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.9', '', '5.0 – 7.5', clampedWeek),
+    buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
+  ];
 
   const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
   return {
@@ -762,6 +732,15 @@ const nowLabel = () => {
   return `Hôm nay, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+export function decodeFileName(name?: string): string {
+  if (!name) return 'Tài liệu phiếu khám';
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
 function isImageItem(item: UploadItem): boolean {
   const lowerName = item.name.toLowerCase();
   const lowerMime = (item.mimeType || '').toLowerCase();
@@ -777,15 +756,16 @@ function isImageItem(item: UploadItem): boolean {
 export default function UploadScreen({ navigation }: Props) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(true);
-  const [profileId, setProfileId] = useState<string>('profile_demo_01');
+  const [savingToDb, setSavingToDb] = useState(false);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string>('');
   const [profileWeek, setProfileWeek] = useState<number>(24);
   const [batchProgressText, setBatchProgressText] = useState<string | null>(null);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
+  const [isModalEditing, setIsModalEditing] = useState<boolean>(false);
   const [draftWeek, setDraftWeek] = useState<string>('24');
   const [draftMetrics, setDraftMetrics] = useState<Record<string, string>>({});
-
-  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
   const [zoomSlipImage, setZoomSlipImage] = useState(false);
 
   const isPickingFileRef = useRef(false);
@@ -810,8 +790,46 @@ export default function UploadScreen({ navigation }: Props) {
     });
   }, []);
 
+  const persistConfirmedItemToPostgreSQL = useCallback(
+    async (confirmedItem: UploadItem) => {
+      if (!confirmedItem.analysis) return null;
+      const analysis = confirmedItem.analysis;
+
+      return await saveVerifiedRecordToDatabase({
+        fileId: confirmedItem.fileId,
+        profileId: confirmedItem.profileId || profileId,
+        checkupId: confirmedItem.checkupId,
+        verificationUrl: confirmedItem.verificationUrl,
+        gestationalWeek: analysis.gestationalWeek || profileWeek || 24,
+        gestationalDays: analysis.gestationalDays ?? 0,
+        overallSeverity: analysis.overallSeverity,
+        percentile:
+          analysis.overallSeverity === 'danger'
+            ? 2.0
+            : analysis.overallSeverity === 'warning'
+            ? 8.5
+            : 50.0,
+        explanationDoctor: analysis.doctorConclusion,
+        explanationPatient: analysis.appConclusion || analysis.doctorConclusion,
+        disclaimerText:
+          'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
+        ruleVersion: analysis.rule_version || DEFAULT_RULE_VERSION,
+        modelVersion: analysis.model_version || DEFAULT_MODEL_VERSION,
+        metrics: analysis.metrics.map((m) => ({
+          key: m.key,
+          label: m.label,
+          value: m.value,
+          unit: m.unit,
+          percentile: m.percentile,
+          severity: m.severity,
+        })),
+      });
+    },
+    [profileId, profileWeek]
+  );
+
   /* =========================================================================
-     API 7: ĐỒNG BỘ DANH SÁCH FILE CỦA HỒ SƠ KHI MỞ MÀN HÌNH
+     API 7: GET /api/v1/ingest/profiles/{profile_id}/files
      ========================================================================= */
   const loadAccountData = useCallback(async () => {
     if (isPickingFileRef.current) return;
@@ -824,17 +842,15 @@ export default function UploadScreen({ navigation }: Props) {
         setItems(localList);
       }
 
+      const realProfileId = await ensureActivePregnancyProfileId(24);
       const dbProfile = await fetchPregnancyProfileFromDB();
-      const resolvedPid = String(
-        dbProfile?.id || dbProfile?.profile_id || currentUserProfile?.id || 'profile_demo_01'
-      );
       const dbWeek = Number(
         dbProfile?.gestational_weeks || dbProfile?.q1_gestational_weeks || 24
       );
       const safeWeek = dbWeek >= 12 && dbWeek <= 41 ? dbWeek : 24;
 
       if (isMountedRef.current) {
-        setProfileId(resolvedPid);
+        setProfileId(realProfileId);
         setProfileWeek(safeWeek);
       }
 
