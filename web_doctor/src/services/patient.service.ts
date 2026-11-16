@@ -300,44 +300,6 @@ export const ALL_PREGNANT_WOMEN_USERS: {
   },
 ];
 
-export const UNREGISTERED_PREGNANT_WOMEN: {
-  id: string;
-  fullName: string;
-  phoneNumber: string;
-  email: string;
-}[] = [
-  {
-    id: '55555555-0001-4000-8000-000000000001',
-    fullName: 'Phạm Thị Mai Anh',
-    phoneNumber: '0912345001',
-    email: 'maianh.pham@gmail.com',
-  },
-  {
-    id: '55555555-0002-4000-8000-000000000002',
-    fullName: 'Vũ Thị Ngọc Ánh',
-    phoneNumber: '0912345002',
-    email: 'ngocanh.vu@gmail.com',
-  },
-  {
-    id: '55555555-0003-4000-8000-000000000003',
-    fullName: 'Hoàng Bích Phương',
-    phoneNumber: '0912345003',
-    email: 'bichphuong.hoang@gmail.com',
-  },
-  {
-    id: '55555555-0004-4000-8000-000000000004',
-    fullName: 'Đặng Thùy Dung',
-    phoneNumber: '0912345004',
-    email: 'thuydung.dang@gmail.com',
-  },
-  {
-    id: '55555555-0005-4000-8000-000000000005',
-    fullName: 'Dương Khánh Linh',
-    phoneNumber: '0912345005',
-    email: 'khanhlinh.duong@gmail.com',
-  },
-];
-
 const PATIENTS_STORAGE_KEY = 'precare_patients_list';
 
 export function getStoredPatients(): PatientItem[] {
