@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from app.models.biometric_data import BiometricData
 from app.schemas.checkup import (
     CreateCheckupRequest,
     CheckupResponse,
+    CheckupHistoryResponse,
     CheckupDetailData,
     DoctorSummary,
     GestationalAgeInfo,
@@ -20,6 +22,89 @@ from app.schemas.checkup import (
 )
 
 router = APIRouter()
+
+
+@router.get("/pregnancy-profile/{pregnancy_profile_id}", response_model=CheckupHistoryResponse)
+def list_profile_checkups(
+    pregnancy_profile_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(["doctor", "admin", "pregnant_woman"])),
+):
+    """Lấy lịch sử khám chưa bị xóa của một hồ sơ thai kỳ để hiển thị trên timeline. 
+       API Timeline hiện cho phép role (doctor|admin|pregnant_woman) đã đăng nhập truy cập.
+       Thai phụ chỉ xem được hồ sơ của chính mình
+       Bác sĩ và quản trị viên có thể xem hồ sơ theo quyền của họ.
+    """
+    profile = db.query(PregnancyProfile).filter(
+        PregnancyProfile.id == pregnancy_profile_id,
+        PregnancyProfile.is_deleted == False,
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy hồ sơ thai kỳ.")
+
+    if current_user.role == "pregnant_woman" and profile.patient_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền xem hồ sơ này.")
+
+    checkups = db.query(Checkup).filter(
+        Checkup.pregnancy_profile_id == profile.id,
+        Checkup.is_deleted == False,
+    ).order_by(Checkup.checkup_date.asc(), Checkup.created_at.asc()).all()
+
+    items = []
+    for checkup in checkups:
+        ga_days = checkup.gestational_age_days
+        ga_weeks, ga_remaining_days = divmod(ga_days, 7)
+        trimester = 1 if ga_days <= 97 else 2 if ga_days <= 195 else 3
+        ga_info = GestationalAgeInfo(
+            days=ga_days,
+            weeks=ga_weeks,
+            remaining_days=ga_remaining_days,
+            formatted=f"{ga_weeks}w{ga_remaining_days}d",
+            trimester=trimester,
+        )
+        biometric = checkup.biometrics
+        if biometric and biometric.is_deleted:
+            biometric = None
+
+        bp_status = evaluate_blood_pressure(
+            checkup.blood_pressure_systolic,
+            checkup.blood_pressure_diastolic,
+        )
+        items.append(CheckupDetailData(
+            id=checkup.id,
+            pregnancy_profile_id=checkup.pregnancy_profile_id,
+            doctor=DoctorSummary(id=checkup.doctor.id, full_name=checkup.doctor.full_name),
+            checkup_date=checkup.checkup_date,
+            gestational_age=ga_info,
+            vitals=MaternalVitalsResponse(
+                weight_kg=float(checkup.weight_kg) if checkup.weight_kg is not None else None,
+                blood_pressure_systolic=checkup.blood_pressure_systolic,
+                blood_pressure_diastolic=checkup.blood_pressure_diastolic,
+                blood_pressure_status=bp_status,
+            ),
+            notes=checkup.notes,
+            biometric_data=BiometricDataResponse(
+                id=biometric.id,
+                bpd=float(biometric.bpd) if biometric.bpd is not None else None,
+                hc=float(biometric.hc) if biometric.hc is not None else None,
+                ac=float(biometric.ac) if biometric.ac is not None else None,
+                fl=float(biometric.fl) if biometric.fl is not None else None,
+                efw=float(biometric.efw) if biometric.efw is not None else None,
+                status=biometric.status,
+            ) if biometric else None,
+            created_at=checkup.created_at,
+        ))
+
+    log_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action="VIEW_CHECKUP_HISTORY",
+        target_table="pregnancy_profiles",
+        target_id=profile.id,
+        request=request,
+    )
+    return CheckupHistoryResponse(data=items)
 
 
 def evaluate_blood_pressure(systolic: int | None, diastolic: int | None) -> str:
