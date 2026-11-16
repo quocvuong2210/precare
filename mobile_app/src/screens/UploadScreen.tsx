@@ -1785,20 +1785,26 @@ export default function UploadScreen({ navigation }: Props) {
                     <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
                   </View>
 
-                  <Pressable
-                    onPress={() => deleteItem(item)}
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  </Pressable>
+                  {deletingFileId === item.id ? (
+                    <ActivityIndicator size="small" color="#EF4444" style={{ marginLeft: 8 }} />
+                  ) : (
+                    <Pressable
+                      onPress={() => deleteItem(item)}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </Pressable>
+                  )}
                 </View>
 
                 {item.status === 'processing' && (
                   <View style={styles.processingBox}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.processingText}>
-                      Đang xử lý trích xuất trên Celery Queue & đối chiếu theo tuần thai...
+                      {item.stageMessage
+                        ? `${item.stageMessage} (${item.progressPercentage ?? 0}%)`
+                        : 'Đang phân tích trên Celery Queue...'}
                     </Text>
                   </View>
                 )}
@@ -1820,281 +1826,81 @@ export default function UploadScreen({ navigation }: Props) {
                         <Text style={styles.retryBtnText}>Thử lại trích xuất (Retry)</Text>
                       </Pressable>
 
-                      <Pressable
-                        style={styles.removeFailedBtn}
-                        onPress={() => deleteItem(item)}
-                      >
-                        <Text style={styles.removeFailedBtnText}>Xoá file</Text>
-                      </Pressable>
+                      {deletingFileId === item.id ? (
+                        <ActivityIndicator size="small" color="#EF4444" style={{ marginHorizontal: 16 }} />
+                      ) : (
+                        <Pressable
+                          style={styles.removeFailedBtn}
+                          onPress={() => deleteItem(item)}
+                        >
+                          <Text style={styles.removeFailedBtnText}>Xoá file</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 )}
 
+                {/* CHỈ HIỂN THỊ KHUNG MỞ MÀN HÌNH ĐỐI CHIẾU, KHÔNG HIỂN THỊ CÁC CHỈ SỐ Ở NGOÀI */}
                 {item.analysis && (
-                  <View style={styles.analysisBox}>
-                    <View style={styles.slipPreviewContainer}>
-                      <View style={styles.slipPreviewHeader}>
-                        <View style={styles.slipPreviewTitleRow}>
-                          <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
-                          <Text style={styles.slipPreviewTitle}>
-                            {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
-                          </Text>
-                        </View>
-                        <Pressable
-                          style={styles.compareSplitBtn}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Ionicons name="git-compare-outline" size={14} color={colors.white} />
-                          <Text style={styles.compareSplitBtnText}>
-                            Mở màn hình Đối chiếu
-                          </Text>
-                        </Pressable>
-                      </View>
-
-                      {hasImagePreview ? (
-                        <Pressable onPress={() => openVerificationModal(item)}>
-                          <Image
-                            source={{ uri: previewSourceUri }}
-                            style={styles.slipThumbnail}
-                            resizeMode="cover"
-                          />
-                          <View style={styles.slipOverlayHint}>
-                            <Ionicons name="expand-outline" size={14} color={colors.white} />
-                            <Text style={styles.slipOverlayHintText}>
-                              Chạm vào ảnh để phóng to & đối chiếu từng chỉ số
-                            </Text>
-                          </View>
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          style={styles.pdfSlipPreviewBox}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Ionicons name="document-text" size={24} color="#EF4444" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.pdfSlipName} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={styles.pdfSlipSub}>
-                              Bấm để lấy Presigned URL & Đối chiếu từng chỉ số
-                            </Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={18} color="#64748B" />
-                        </Pressable>
-                      )}
-                    </View>
-
-                    <View style={styles.analysisHeader}>
-                      <Ionicons name="medkit-outline" size={16} color={colors.primary} />
-                      <Text style={styles.analysisTitle}>{item.analysis.recordType}</Text>
-                    </View>
-
-                    <View style={styles.stageBadgeBox}>
-                      <Ionicons name="calendar-outline" size={15} color="#0F766E" />
-                      <Text style={styles.stageBadgeText}>
-                        Mốc đối chiếu: {stageInfo.stageLabel}
-                      </Text>
-                    </View>
-
-                    {isEditingThis && (
-                      <View style={styles.weekEditorRow}>
-                        <Text style={styles.weekEditorLabel}>
-                          Đổi tuần thai (12–41 tuần) để so sánh lại chuẩn:
+                  <View style={styles.compactVerifyBox}>
+                    <View style={styles.slipPreviewHeader}>
+                      <View style={styles.slipPreviewTitleRow}>
+                        <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
+                        <Text style={styles.slipPreviewTitle}>
+                          {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
                         </Text>
-                        <View style={styles.weekStepper}>
-                          <Pressable
-                            style={styles.weekStepBtn}
-                            onPress={() =>
-                              setDraftWeek((w) =>
-                                String(Math.max(12, (parseInt(w, 10) || 24) - 1))
-                              )
-                            }
-                          >
-                            <Ionicons name="remove" size={16} color={colors.navy} />
-                          </Pressable>
-                          <TextInput
-                            style={styles.weekInput}
-                            value={draftWeek}
-                            onChangeText={setDraftWeek}
-                            keyboardType="number-pad"
-                            maxLength={2}
-                          />
-                          <Pressable
-                            style={styles.weekStepBtn}
-                            onPress={() =>
-                              setDraftWeek((w) =>
-                                String(Math.min(41, (parseInt(w, 10) || 24) + 1))
-                              )
-                            }
-                          >
-                            <Ionicons name="add" size={16} color={colors.navy} />
-                          </Pressable>
-                        </View>
                       </View>
+                      <Pressable
+                        style={styles.compareSplitBtn}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="git-compare-outline" size={14} color={colors.white} />
+                        <Text style={styles.compareSplitBtnText}>
+                          Mở màn hình Đối chiếu
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {hasImagePreview ? (
+                      <Pressable onPress={() => openVerificationModal(item)}>
+                        <Image
+                          source={{ uri: previewSourceUri }}
+                          style={styles.slipThumbnail}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.slipOverlayHint}>
+                          <Ionicons name="expand-outline" size={14} color={colors.white} />
+                          <Text style={styles.slipOverlayHintText}>
+                            Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.pdfSlipPreviewBox}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="document-text" size={24} color="#EF4444" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pdfSlipName} numberOfLines={1}>
+                            {decodeFileName(item.name)}
+                          </Text>
+                          <Text style={styles.pdfSlipSub}>
+                            Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                      </Pressable>
                     )}
 
-                    <View
-                      style={[
-                        styles.doctorBanner,
-                        {
-                          backgroundColor:
-                            item.analysis.overallSeverity === 'normal'
-                              ? '#ECFDF5'
-                              : overallTheme.cardBg,
-                          borderColor:
-                            item.analysis.overallSeverity === 'normal'
-                              ? '#10B981'
-                              : overallTheme.border,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={overallTheme.icon}
-                        size={18}
-                        color={
-                          item.analysis.overallSeverity === 'normal'
-                            ? '#059669'
-                            : overallTheme.valueColor
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.doctorBannerText,
-                          {
-                            color:
-                              item.analysis.overallSeverity === 'normal'
-                                ? '#065F46'
-                                : overallTheme.valueColor,
-                          },
-                        ]}
-                      >
-                        {item.analysis.doctorConclusion}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricsGrid}>
-                      {item.analysis.metrics.map((m) => {
-                        const liveEval = isEditingThis
-                          ? evaluateMetricByWeek(
-                              m.key,
-                              draftMetrics[m.key] ?? m.value,
-                              parseInt(draftWeek, 10) || 24
-                            )
-                          : null;
-
-                        const activeSeverity = liveEval ? liveEval.severity : m.severity;
-                        const activeRefRange = liveEval?.refRange || m.refRange;
-                        const activeNote = liveEval ? liveEval.clinicalNote : m.clinicalNote;
-                        const mTheme = SEVERITY_THEME[activeSeverity];
-                        const isFullWidth =
-                          m.key === 'glu' || m.key === 'pro' || m.key === 'efw' || m.key === 'hgb';
-
-                        return (
-                          <View
-                            key={m.key}
-                            style={[
-                              styles.metricItem,
-                              isFullWidth && { minWidth: '100%' },
-                              {
-                                backgroundColor: mTheme.cardBg,
-                                borderColor: isEditingThis ? colors.primary : mTheme.border,
-                                borderWidth: activeSeverity === 'normal' ? 1 : 1.5,
-                              },
-                            ]}
-                          >
-                            <View style={styles.metricTopRow}>
-                              <Text style={styles.metricLabel}>{m.label}</Text>
-                              <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
-                                <Text style={[styles.severityPillText, { color: mTheme.badgeColor }]}>
-                                  {mTheme.badgeLabel}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {isEditingThis ? (
-                              <View style={styles.metricInputRow}>
-                                <TextInput
-                                  style={styles.metricInput}
-                                  value={draftMetrics[m.key] ?? m.value}
-                                  onChangeText={(text) =>
-                                    setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
-                                  }
-                                  placeholder="Nhập chỉ số..."
-                                  placeholderTextColor="#94A3B8"
-                                />
-                                {!!m.unit && <Text style={styles.metricUnitText}>{m.unit}</Text>}
-                              </View>
-                            ) : (
-                              <Text style={[styles.metricValue, { color: mTheme.valueColor }]}>
-                                {m.value} {m.unit}
-                              </Text>
-                            )}
-
-                            <Text style={styles.refRangeText}>Ngưỡng chuẩn: {activeRefRange}</Text>
-                            <Text
-                              style={[
-                                styles.clinicalNoteText,
-                                activeSeverity !== 'normal' && {
-                                  color: mTheme.valueColor,
-                                  fontWeight: '700',
-                                },
-                              ]}
-                            >
-                              {activeNote}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    <View style={styles.fixedDisclaimerBox}>
-                      <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
-                      <Text style={styles.fixedDisclaimerText}>
-                        Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa. (Rule: {item.analysis.rule_version || DEFAULT_RULE_VERSION} • Model: {item.analysis.model_version || DEFAULT_MODEL_VERSION})
-                      </Text>
-                    </View>
-
-                    {isEditingThis ? (
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          style={styles.saveRecordBtn}
-                          onPress={() => saveEditedMetrics(item.id)}
-                        >
-                          <Ionicons name="save-outline" size={16} color={colors.white} />
-                          <Text style={styles.saveRecordBtnText}>Lưu & Đối chiếu lại</Text>
-                        </Pressable>
-
-                        <Pressable style={styles.editRecordBtn} onPress={cancelEditing}>
-                          <Text style={styles.editRecordBtnText}>Huỷ</Text>
-                        </Pressable>
-                      </View>
-                    ) : !item.analysis.savedToProfile ? (
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          style={styles.saveRecordBtn}
-                          onPress={() => saveAnalysisToMedicalRecord(item.id)}
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} />
-                          <Text style={styles.saveRecordBtnText}>Xác nhận & Ghi vào hồ sơ</Text>
-                        </Pressable>
-
-                        <Pressable
-                          style={styles.editRecordBtn}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Text style={styles.editRecordBtnText}>Đối chiếu & Sửa</Text>
-                        </Pressable>
-                      </View>
-                    ) : (
+                    {item.analysis.savedToProfile && (
                       <View style={styles.savedRow}>
                         <View style={styles.savedTag}>
                           <Ionicons name="checkmark-done" size={14} color={colors.primaryDark} />
-                          <Text style={styles.savedTagText}>Đã đối chiếu & lưu vào hồ sơ</Text>
+                          <Text style={styles.savedTagText}>
+                            Đã đối chiếu & lưu vào Database ({item.analysis.gestationalAge})
+                          </Text>
                         </View>
-
-                        <Pressable onPress={() => startEditingInline(item)} hitSlop={6}>
-                          <Text style={styles.reEditText}>Chỉnh sửa / Đổi tuần</Text>
-                        </Pressable>
                       </View>
                     )}
                   </View>
@@ -2114,24 +1920,32 @@ export default function UploadScreen({ navigation }: Props) {
         </Pressable>
       </ScrollView>
 
-      {/* MODAL ĐỐI CHIẾU VỚI PRESIGNED URL BẢN GỐC & XÁC NHẬN DỮ LIỆU */}
+      {/* MODAL MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU */}
       <Modal
         visible={verifyModalItem !== null}
         animationType="slide"
-        onRequestClose={() => setVerifyModalItem(null)}
+        onRequestClose={() => {
+          setVerifyModalItem(null);
+          setIsModalEditing(false);
+        }}
       >
         <SafeAreaView style={styles.modalScreen} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <Pressable
               style={styles.headerButton}
-              onPress={() => setVerifyModalItem(null)}
+              onPress={() => {
+                setVerifyModalItem(null);
+                setIsModalEditing(false);
+              }}
             >
               <Ionicons name="close" size={20} color={colors.navy} />
             </Pressable>
             <View style={{ flex: 1, alignItems: 'center' }}>
               <Text style={styles.modalHeaderTitle}>Đối chiếu & Xác nhận dữ liệu</Text>
               <Text style={styles.modalHeaderSub}>
-                Kiểm tra các chỉ số trích xuất với phiếu khám trước khi lưu
+                {isModalEditing
+                  ? 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch'
+                  : 'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi'}
               </Text>
             </View>
             <View style={{ width: 32 }} />
@@ -2147,7 +1961,7 @@ export default function UploadScreen({ navigation }: Props) {
                   <View style={styles.slipPreviewTitleRow}>
                     <Ionicons name="document-text-outline" size={15} color={colors.white} />
                     <Text style={styles.splitTopBarTitle} numberOfLines={1}>
-                      Bản gốc: {verifyModalItem.name}
+                      Bản gốc: {decodeFileName(verifyModalItem.name)}
                     </Text>
                   </View>
                   {isImageItem(verifyModalItem) && (
@@ -2188,10 +2002,12 @@ export default function UploadScreen({ navigation }: Props) {
                     <Ionicons name="document-attach" size={28} color="#F87171" />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.modalPdfTitle} numberOfLines={1}>
-                        {verifyModalItem.name}
+                        {decodeFileName(verifyModalItem.name)}
                       </Text>
                       <Text style={styles.modalPdfHint}>
-                        Hãy kiểm tra các chỉ số bên dưới khớp với tờ phiếu khám của bạn. Chạm vào ô bất kỳ để chỉnh sửa.
+                        {isModalEditing
+                          ? 'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.'
+                          : 'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.'}
                       </Text>
                     </View>
                   </View>
