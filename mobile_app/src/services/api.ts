@@ -678,6 +678,153 @@ export interface IngestFileDetailData {
   [key: string]: any;
 }
 
+export function isUuid(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+}
+
+async function getIngestAuthHeaders(isJson = false): Promise<Record<string, string>> {
+  if (!currentAccessToken) {
+    await restoreSession();
+  }
+  const authToken =
+    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  if (isJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+  return headers;
+}
+
+/**
+ * Tải file lên Backend bằng XMLHttpRequest thuần túy của React Native.
+ * Bỏ qua hoàn toàn WinterCG expo/fetch để không bị lỗi "Unsupported FormDataPart implementation"
+ * trên Expo SDK 52+ / 57 và React Native New Architecture.
+ */
+export async function uploadMultipartViaXHR<T = any>(
+  url: string,
+  formData: FormData,
+  token?: string
+): Promise<T> {
+  const authToken =
+    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (authToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+    }
+    // LƯU Ý: Không set thủ công Content-Type để React Native tự động gán boundary chính xác
+
+    xhr.onload = () => {
+      try {
+        const text = xhr.responseText;
+        let json: any = {};
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = { message: text };
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(json);
+        } else {
+          const detailMsg =
+            json?.detail?.message ||
+            (typeof json?.detail === 'string' ? json.detail : null) ||
+            json?.message ||
+            `HTTP ${xhr.status}: ${xhr.statusText || 'Yêu cầu tải lên thất bại'}`;
+          reject(new Error(detailMsg));
+        }
+      } catch (err: any) {
+        reject(new Error(err?.message || 'Lỗi xử lý phản hồi từ máy chủ.'));
+      }
+    };
+
+    xhr.onerror = () => {
+      console.log(`[XHR Error Event] status=${xhr.status}, response=${xhr.responseText}`);
+      if (xhr.status > 0) {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          const msg =
+            json?.detail?.message ||
+            (typeof json?.detail === 'string' ? json.detail : null) ||
+            json?.message;
+          if (msg) {
+            reject(new Error(msg));
+            return;
+          }
+        } catch {}
+      }
+      reject(
+        new Error(
+          'Lỗi kết nối mạng khi tải tài liệu lên máy chủ. Vui lòng kiểm tra kết nối mạng hoặc máy chủ Backend.'
+        )
+      );
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Hết thời gian chờ kết nối đến máy chủ PreCare (Timeout 60s).'));
+    };
+
+    xhr.timeout = 60000;
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Hàm điều phối tải tài liệu cận lâm sàng:
+ * Thử tải qua Fetch trước (khi đã kích hoạt EXPO_PUBLIC_USE_RN_FETCH=1),
+ * nếu môi trường gặp sự cố FormDataPart sẽ tự động Fallback sang native XMLHttpRequest.
+ */
+export async function uploadParaclinicalFile<T = any>(
+  url: string,
+  formData: FormData,
+  token?: string
+): Promise<T> {
+  const authToken =
+    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: formData,
+    });
+
+    const resJson: any = await safeParseJson(res);
+    if (res.ok) {
+      return resJson;
+    }
+    const errMsg =
+      resJson?.detail?.message ||
+      (typeof resJson?.detail === 'string' ? resJson.detail : null) ||
+      resJson?.message ||
+      `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  } catch (err: any) {
+    if (
+      err?.message?.includes('Unsupported FormDataPart') ||
+      err?.message?.includes('Network request failed')
+    ) {
+      console.log('[Upload] Fallback sang native XMLHttpRequest...');
+      return await uploadMultipartViaXHR(url, formData, authToken);
+    }
+    throw err;
+  }
+}
+
+// 1. POST /api/v1/ingest/upload — Tải lên đơn lẻ phiếu khám cận lâm sàng & sinh task Celery
 export async function ingestUploadSingle(
   file: IngestFilePayload,
   profileId?: string
