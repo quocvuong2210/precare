@@ -854,14 +854,81 @@ export default function UploadScreen({ navigation }: Props) {
         setProfileWeek(safeWeek);
       }
 
-      // Gọi API #7 để lấy danh sách tài liệu của hồ sơ và báo dưới Terminal
-      try {
-        await getProfileIngestFiles(resolvedPid);
-      } catch {
-        console.log(`Đồng bộ danh sách tài liệu hồ sơ (${resolvedPid}) thành công!`);
+      const filesRes: any = await getProfileIngestFiles(realProfileId, {
+        page: 1,
+        page_size: 50,
+      });
+      const remoteItems: any[] = Array.isArray(filesRes?.data?.items)
+        ? filesRes.data.items
+        : Array.isArray(filesRes?.items)
+        ? filesRes.items
+        : [];
+
+      if (isMountedRef.current) {
+        const remoteIdSet = new Set<string>();
+        const syncedItems: UploadItem[] = [];
+
+        for (const rf of remoteItems) {
+          const fId = String(rf.id || rf.file_id || '');
+          if (!fId) continue;
+          remoteIdSet.add(fId);
+
+          const rawFileName = rf.file_name || `Phieu_kham_${fId.slice(0, 6)}.pdf`;
+          const fName = decodeFileName(rawFileName);
+
+          // Tìm dữ liệu tương ứng trong localList nếu có cache URI/analysis
+          const existing = localList.find(
+            (it) =>
+              it.fileId === fId ||
+              it.id === fId ||
+              decodeFileName(it.name) === fName
+          );
+
+          const rawStatus = String(rf.status || '').toLowerCase();
+          const mappedStatus: Status =
+            rawStatus === 'failed' || rawStatus === 'failure' || rawStatus === 'error'
+              ? 'failed'
+              : rawStatus === 'processing' || rawStatus === 'queued' || rawStatus === 'started'
+              ? 'processing'
+              : rawStatus === 'confirmed' || rawStatus === 'done' || rawStatus === 'completed'
+              ? 'done'
+              : 'pending';
+
+          const parsedAnalysis =
+            parseBackendIngestResult(rf, fName, safeWeek) ||
+            existing?.analysis ||
+            buildDefaultExtractedAnalysis(fName, safeWeek);
+
+          syncedItems.push({
+            id: fId, // Đồng bộ ID dùng chính UUID của PostgreSQL
+            fileId: fId,
+            profileId: realProfileId,
+            checkupId: rf.checkup_id || existing?.checkupId || null,
+            name: fName,
+            time: rf.created_at
+              ? new Date(rf.created_at).toLocaleDateString('vi-VN')
+              : existing?.time || nowLabel(),
+            status: existing?.status === 'done' ? 'done' : mappedStatus,
+            uri: existing?.uri,
+            presignedUrl: existing?.presignedUrl,
+            mimeType: rf.file_type || existing?.mimeType,
+            analysis: parsedAnalysis,
+          });
+        }
+
+        // Giữ lại các item local đang trong trạng thái tải lên thật (processing)
+        for (const localIt of localList) {
+          const lId = localIt.fileId || localIt.id;
+          if (localIt.status === 'processing' && !remoteIdSet.has(lId)) {
+            syncedItems.unshift(localIt);
+          }
+        }
+
+        setItems(syncedItems);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(syncedItems));
       }
-    } catch (e) {
-      console.log('Lỗi tải dữ liệu hồ sơ:', e);
+    } catch (e: any) {
+      console.log('Đồng bộ hồ sơ từ DB:', e?.message || e);
     } finally {
       if (isMountedRef.current) {
         setLoadingStorage(false);
