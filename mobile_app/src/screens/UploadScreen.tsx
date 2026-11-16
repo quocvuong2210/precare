@@ -1204,52 +1204,45 @@ export default function UploadScreen({ navigation }: Props) {
       if (taskId) {
         await pollCeleryTaskStatus(newItemId, taskId, fileId, name);
         return;
-      } catch (networkErr) {
-        if (!USE_MOCK_ANALYSIS_IF_OFFLINE) throw networkErr;
       }
 
-      // Trường hợp chạy mô phỏng khi Server trả lỗi hoặc chưa bật worker
-      const mockFileId = `file_${newItemId.slice(-5)}`;
-      const mockTaskId = `celery_${newItemId.slice(-5)}`;
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
+      }
 
-      console.log(`Tải lên file đơn lẻ "${name}" thành công! (file_id: ${mockFileId})`);
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      await getIngestTaskStatus(mockTaskId).catch(() => {
-        console.log(`Kiểm tra trạng thái Task Celery (${mockTaskId}) thành công!`);
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      await getIngestFileDetail(mockFileId).catch(() => {
-        console.log(`Lấy chi tiết file & Presigned URL (${mockFileId}) thành công!`);
-      });
-
-      const mockItem: UploadItem = {
+      const analyzedItem: UploadItem = {
         ...newItem,
-        fileId: mockFileId,
-        taskId: mockTaskId,
+        fileId,
+        taskId,
+        checkupId,
+        profileId: validPid,
+        presignedUrl: fileDetail?.presigned_view_url,
         status: 'pending',
-        analysis: simulateMedicalAnalysis(name, profileWeek, 'warning'),
+        analysis:
+          parseBackendIngestResult(fileDetail || resData, name, profileWeek) ||
+          buildDefaultExtractedAnalysis(name, profileWeek),
       };
+
       updateItemsAndPersist((prev) =>
-        prev.map((item) => (item.id === newItemId ? mockItem : item))
+        prev.map((it) => (it.id === newItemId ? analyzedItem : it))
       );
-      console.log(`Hoàn tất tải lên và trích xuất file "${name}" thành công!`);
-      openVerificationModal(mockItem, false);
+      openVerificationModal(analyzedItem, false);
     } catch (err: any) {
-      console.log(`Lỗi tải lên hoặc phân tích file "${name}":`, err?.message);
       updateItemsAndPersist((prev) =>
         prev.map((item) =>
           item.id === newItemId
             ? {
                 ...item,
                 status: 'failed',
-                errorMessage: err?.message || 'Không thể phân tích tài liệu.',
+                canRetry: true,
+                errorMessage: err?.message || 'Không thể tải tài liệu lên máy chủ.',
               }
             : item
         )
       );
+      Alert.alert('Lỗi tải lên', err?.message || 'Không thể tải tài liệu lên máy chủ.');
     }
   };
 
@@ -1268,74 +1261,108 @@ export default function UploadScreen({ navigation }: Props) {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const batchNow = Date.now();
-      const defaultBatchId = `batch_${batchNow}`;
+      const resolveMime = (fName: string, rawMime?: string | null) => {
+        if (rawMime && rawMime !== 'application/octet-stream') return rawMime;
+        const lower = (fName || '').toLowerCase();
+        if (lower.endsWith('.pdf')) return 'application/pdf';
+        if (lower.endsWith('.png')) return 'image/png';
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+        return 'application/pdf';
+      };
+
       const newBatchItems: UploadItem[] = result.assets.map((asset, idx) => ({
         id: `${batchNow}_${idx}`,
-        batchId: defaultBatchId,
-        fileId: `file_${batchNow}_${idx}`,
-        taskId: `task_${batchNow}_${idx}`,
         name: asset.name,
         time: nowLabel(),
         status: 'processing',
         uri: asset.uri,
-        mimeType: asset.mimeType ?? 'application/pdf',
+        mimeType: resolveMime(asset.name, asset.mimeType),
       }));
 
       updateItemsAndPersist((prev) => [...newBatchItems, ...prev]);
       setBatchProgressText(
-        `Đang xử lý tải lên hàng loạt (${newBatchItems.length} phiếu khám)...`
+        `Đang tải lên hàng loạt ${newBatchItems.length} phiếu khám...`
       );
 
-      let resolvedBatchId = defaultBatchId;
-
       try {
-        // Gọi API #2: Upload hàng loạt
-        const batchRes = await ingestUploadBatch(
+        const validPid = await ensureActivePregnancyProfileId(profileWeek);
+        setProfileId(validPid);
+
+        const batchRes: any = await ingestUploadBatch(
           result.assets.map((a) => ({
             uri: a.uri,
             name: a.name,
-            type: a.mimeType ?? 'application/pdf',
+            type: resolveMime(a.name, a.mimeType),
           })),
-          profileId
+          validPid
         );
-        const batchPayload = batchRes?.data || batchRes;
-        if (batchPayload?.batch_id) {
-          resolvedBatchId = String(batchPayload.batch_id);
+
+        const batchData: any = batchRes?.data || batchRes;
+        const batchId = String(batchData?.batch_id || `batch_${batchNow}`);
+        const enqueuedItems = Array.isArray(batchData?.items) ? batchData.items : [];
+
+        updateItemsAndPersist((prev) =>
+          prev.map((item) => {
+            const idx = newBatchItems.findIndex((b) => b.id === item.id);
+            if (idx === -1) return item;
+            const eq = enqueuedItems[idx];
+            return {
+              ...item,
+              batchId,
+              profileId: validPid,
+              fileId: eq?.file_id ? String(eq.file_id) : item.fileId,
+              taskId: eq?.task_id ? String(eq.task_id) : item.taskId,
+            };
+          })
+        );
+
+        for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+          if (!isMountedRef.current) break;
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+          try {
+            const statusRes: any = await getIngestBatchStatus(batchId);
+            const stData: any = statusRes?.data || statusRes;
+            const completed = Number(stData?.completed_files ?? 0);
+            const total = Number(stData?.total_files ?? newBatchItems.length);
+            const pct = Number(stData?.overall_progress_percentage ?? 0);
+
+            if (isMountedRef.current) {
+              setBatchProgressText(
+                `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`
+              );
+            }
+
+            if (stData?.is_all_finished || (total > 0 && completed >= total)) {
+              break;
+            }
+          } catch {
+            break;
+          }
         }
-      } catch {
-        console.log(
-          `Tải lên hàng loạt (${newBatchItems.length} file) thành công! (batch_id: ${resolvedBatchId})`
+
+        const newIds = new Set(newBatchItems.map((i) => i.id));
+        updateItemsAndPersist((prev) =>
+          prev.map((item) =>
+            newIds.has(item.id)
+              ? {
+                  ...item,
+                  status: 'pending',
+                  analysis: buildDefaultExtractedAnalysis(item.name, profileWeek),
+                }
+              : item
+          )
         );
+
+        setBatchProgressText(null);
+        Alert.alert(
+          'Tải hàng loạt hoàn tất',
+          `Đã phân tích xong ${newBatchItems.length} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`
+        );
+      } catch (err: any) {
+        setBatchProgressText(null);
+        Alert.alert('Lỗi tải hàng loạt', err?.message || 'Không thể tải hàng loạt lên máy chủ.');
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Gọi API #4: Kiểm tra tiến trình Batch
-      await getIngestBatchStatus(resolvedBatchId).catch(() => {
-        console.log(`Kiểm tra tiến trình Batch (${resolvedBatchId}) thành công!`);
-      });
-
-      const newIds = new Set(newBatchItems.map((i) => i.id));
-      updateItemsAndPersist((prev) =>
-        prev.map((item) =>
-          newIds.has(item.id)
-            ? {
-                ...item,
-                batchId: resolvedBatchId,
-                status: 'pending',
-                analysis: simulateMedicalAnalysis(item.name, profileWeek, 'warning'),
-              }
-            : item
-        )
-      );
-      setBatchProgressText(null);
-      console.log(
-        `Hoàn tất xử lý Batch Upload (${newBatchItems.length} phiếu khám - #${resolvedBatchId}) thành công!`
-      );
-      Alert.alert(
-        'Tải hàng loạt hoàn tất',
-        `Đã tải lên và trích xuất hoàn tất ${newBatchItems.length} phiếu khám.`
-      );
     } finally {
       isPickingFileRef.current = false;
     }
@@ -1354,13 +1381,19 @@ export default function UploadScreen({ navigation }: Props) {
     );
 
     try {
-      await retryIngestFile(fId).catch(() => {
-        console.log(`Thử lại trích xuất tài liệu (${fId}) thành công!`);
-      });
+      const retryRes: any = await retryIngestFile(fId);
+      const retryData: any = retryRes?.data;
+      const newTaskId =
+        typeof retryData === 'string' && retryData.length > 0
+          ? retryData
+          : retryData?.task_id || item.taskId;
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const analysis = simulateMedicalAnalysis(item.name, profileWeek, 'normal');
+      if (newTaskId) {
+        await pollCeleryTaskStatus(item.id, String(newTaskId), fId, item.name);
+        return;
+      }
 
+      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek);
       updateItemsAndPersist((prev) =>
         prev.map((it) =>
           it.id === item.id
@@ -1373,30 +1406,35 @@ export default function UploadScreen({ navigation }: Props) {
             : it
         )
       );
-
-      Alert.alert('Thử lại thành công', `Đã trích xuất lại thành công tài liệu "${item.name}"!`);
-    } catch {
+    } catch (e: any) {
       updateItemsAndPersist((prev) =>
-        prev.map((it) => (it.id === item.id ? { ...it, status: 'failed' } : it))
+        prev.map((it) =>
+          it.id === item.id
+            ? {
+                ...it,
+                status: 'failed',
+                errorMessage: e?.message || 'Thử lại trích xuất thất bại.',
+              }
+            : it
+        )
       );
     }
   };
 
   /* =========================================================================
-     API 6: DELETE /api/v1/ingest/files/{file_id}
+     API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
      ========================================================================= */
   const deleteItem = (item: UploadItem) => {
-    const fId = item.fileId || item.id;
+    const displayName = decodeFileName(item.name);
     Alert.alert(
       'Xoá tài liệu',
-      `Bạn có chắc chắn muốn xoá "${item.name}" không?`,
+      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${displayName}" khỏi hệ thống và Database không?`,
       [
         { text: 'Huỷ', style: 'cancel' },
         {
-          text: 'Xoá',
+          text: 'Xoá vĩnh viễn',
           style: 'destructive',
           onPress: async () => {
-            if (editingId === item.id) cancelEditing();
             if (verifyModalItem?.id === item.id) setVerifyModalItem(null);
 
             try {
