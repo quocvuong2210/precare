@@ -6,9 +6,9 @@
 ### System Architecture & Tech Stack
 - **Web Dashboard (Doctor Portal - `web_doctor/`):** React, TypeScript (Strict mode), Vite, Tailwind CSS, data visualization for fetal growth percentile curves and paraclinical queue review.
 - **Mobile Client (Patient Companion - `mobile_app/`):** React Native / Expo, TypeScript, patient companion interface for record access, milestone tracking, and OCR document capture.
-- **Backend API Gateway (`backend/`):** Python 3.11+, FastAPI (RESTful asynchronous APIs, Pydantic v2 validation), SQLAlchemy 2.0+ ORM.
-- **Analysis & ML Service (`analysis_service/`):** Python, FastAPI, NumPy, SciPy, dedicated microservice hosting the Hadlock & Intergrowth-21st rule engine and the RACA-Net deep learning growth abnormality detection model wrapper with safety fusion constraint.
-- **Database & Storage:** PostgreSQL 16 (relational clinical data), Redis 7 (message broker & caching), MinIO / S3 Object Storage (raw ultrasound images & scanned paraclinical documents).
+- **Backend API Gateway (`backend/`):** Python 3.11+, FastAPI (RESTful asynchronous APIs, Pydantic v2 validation), SQLAlchemy 2.0+ ORM following a 3-tier architecture (Router $\rightarrow$ Service $\rightarrow$ ORM Model).
+- **Analysis & ML Service (`analysis_service/`):** Python, FastAPI (Port 8001), NumPy, SciPy, dedicated stateless microservice hosting the Hadlock & Intergrowth-21st rule engine and the RACA-Net deep learning growth abnormality detection model wrapper with safety fusion constraint.
+- **Database & Storage:** PostgreSQL 16 (relational clinical data, DDL initialized via `init-db/01-init.sql`), Redis 7 (message broker & caching), MinIO / S3 Object Storage (raw ultrasound images & scanned paraclinical documents).
 - **Asynchronous Workers:** Celery (handling heavy tasks: paraclinical OCR/digitization, longitudinal growth trajectory calculations, clinical alert evaluations).
 - **Infrastructure:** Docker & Docker Compose (`docker-compose.yml`) for multi-container orchestration and local development.
 
@@ -50,7 +50,7 @@ AI agents MUST strictly adhere to these medical abbreviations, units, and storag
 ### Branching Strategy
 - `main`: Production-ready, protected branch.
 - `develop`: Integration branch for completed features.
-- Feature branches must branch off `develop` using the format:
+- Feature branches must branch off `develop` (or `main`) using the format:
   - `feat/<scope>-<short-description>` (e.g., `feat/be-hadlock-calculator`, `feat/fe-percentile-chart`)
   - `fix/<scope>-<short-description>` (e.g., `fix/celery-ocr-retry`)
   - `docs/<short-description>` (e.g., `docs/update-agents-rules`)
@@ -58,12 +58,12 @@ AI agents MUST strictly adhere to these medical abbreviations, units, and storag
 ### Commit Message Format (Conventional Commits)
 `<type>(<scope>): <imperative summary>`
 - **Types:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `ci`
-- **Scopes:** `be`, `fe`, `worker`, `db`, `docker`, `domain`
+- **Scopes:** `be`, `fe`, `worker`, `db`, `docker`, `domain`, `ml`
 - *Example:* `feat(be): add Hadlock IV EFW calculation and percentile lookup service`
 
 ### Pull Request & Code Review Checklist
 1. **Contract Sync:** Any change to FastAPI Pydantic schemas must be reflected in Frontend TypeScript interfaces within the same PR or linked immediately.
-2. **Database Migrations:** Schema modifications must include a tested Alembic migration script (both `upgrade` and `downgrade`).
+2. **Database Schema Updates:** Any schema change must update both the SQLAlchemy models (`backend/app/models/`) and `init-db/01-init.sql` (until the Alembic migration pipeline is formally initialized for production/staging).
 3. **Self-Contained Context:** If a PR introduces a new architectural pattern, shared utility, or domain rule, update the relevant `AGENTS.md` file in the same PR.
 
 ---
@@ -83,6 +83,7 @@ precare/
 │   │   ├── core/                    # Cấu hình hệ thống (config.py) và hằng số ngưỡng y tế (constants.py)
 │   │   └── engines/                 # Động cơ phân tích: Rule Engine lâm sàng & Model Engine (RACA-Net)
 │   ├── tests/                       # Unit test cho động cơ phân tích và kiểm thử an toàn Safety Override
+│   ├── AGENTS.md                    # Hướng dẫn kỹ thuật và quy tắc riêng cho Analysis & ML Service
 │   ├── Dockerfile                   # Dockerfile triển khai container analysis_service (Port 8001)
 │   └── requirements.txt             # Danh sách thư viện Python (FastAPI, NumPy, SciPy, Pydantic)
 ├── backend/                         # [Phân hệ Backend Gateway & Workers] API Gateway và điều phối tác vụ nền
@@ -145,16 +146,23 @@ precare/
 Để đảm bảo kiến trúc phân tách ranh giới rõ ràng, dễ bảo trì và mở rộng, AI agents và lập trình viên phải tuân thủ nghiêm ngặt các quy tắc đặt file theo từng phân hệ:
 
 #### 1. Backend Gateway & Workers (`backend/`)
+Dự án Backend áp dụng **kiến trúc 3 tầng chuẩn (3-Tier Architecture)**:
+$$\text{API Router (app/api/)} \longrightarrow \text{Domain Service (app/services/)} \longrightarrow \text{ORM Model (app/models/)}$$
+
+> [!IMPORTANT]
+> Backend **KHÔNG** sử dụng tầng `repositories/`. Toàn bộ thao tác truy vấn cơ sở dữ liệu qua SQLAlchemy Session (`db: Session`) và quản trị transaction được đặt trực tiếp trong tầng `app/services/`. Tuyệt đối không tự sinh thêm thư mục `repositories/`.
+
 - **API Endpoints (`backend/app/api/`):** Chỉ xử lý HTTP routing, request parsing, phân quyền RBAC/auth (`Depends(get_current_active_user)`), và trả HTTP response status code. **Tuyệt đối không viết câu truy vấn cơ sở dữ liệu (`select()`, raw SQL) hay công thức tính toán lâm sàng trong route.**
 - **Pydantic Schemas (`backend/app/schemas/`):** Tách bạch rõ ràng giữa request payload và response payload: `<Entity>Create`, `<Entity>Update`, `<Entity>Response`. Mọi schema phải validate chặt chẽ phạm vi giá trị y tế (ví dụ: `ga_days: int = Field(..., ge=14, le=310)`).
-- **ORM Database Models (`backend/app/models/`):** Khai báo các thực thể SQLAlchemy 2.0. Mọi bảng dữ liệu lâm sàng bắt buộc có khóa chính `UUID`, cột audit `created_at`, `updated_at`, và hỗ trợ soft-delete `deleted_at`.
-- **Domain Services (`backend/app/services/`):** Nơi chứa toàn bộ nghiệp vụ lõi phía Backend: điều phối tính toán tuổi thai (`pregnancy_calculator.py`), tương tác kho lưu trữ đối tượng MinIO (`storage_service.py`), tạo/xác thực mã OTP (`otp_service.py`), gửi email thông báo (`email_service.py`), và gọi tích hợp sang `analysis_service`.
+- **ORM Database Models (`backend/app/models/`):** Khai báo các thực thể SQLAlchemy 2.0. Mọi bảng dữ liệu lâm sàng bắt buộc có khóa chính `UUID`, cột audit `created_at`, `updated_at`, và hỗ trợ soft-delete `deleted_at` hoặc `is_deleted`.
+- **Domain Services (`backend/app/services/`):** Nơi chứa toàn bộ nghiệp vụ lõi phía Backend: điều phối tính toán tuổi thai (`pregnancy_calculator.py`), tương tác kho lưu trữ đối tượng MinIO (`storage_service.py`), tạo/xác thực mã OTP (`otp_service.py`), gửi email thông báo (`email_service.py`), và gọi HTTP client bất đồng bộ sang `analysis_service`.
 - **Asynchronous Workers (`backend/app/workers/`):** Khai báo Celery task (`celery_app.py`, `tasks.py`). Mọi task xử lý nặng (như OCR số hóa tài liệu `process_ocr_task`, tổng hợp quỹ đạo tăng trưởng) phải đảm bảo **tính bất biến/idempotency** và chỉ nhận tham số định danh nguyên thủy (`uploaded_file_id_str: str`), không truyền payload dữ liệu lớn qua Redis broker.
 
 #### 2. Clinical Analysis & Machine Learning Service (`analysis_service/` - Tương ứng phân hệ ML / Rule Engine)
+Microservice độc lập chịu trách nhiệm tính toán sinh trắc sản khoa và suy luận mô hình Deep Learning:
 - **API Endpoints (`analysis_service/app/api/`):** Định nghĩa các route microservice:
-  - `POST /api/v1/rules`: Đánh giá thuần túy theo luật lâm sàng (Hadlock & Intergrowth-21st) – dùng làm fallback khi mô hình ML không khả dụng.
   - `POST /api/v1/predict`: Endpoint chính thực thi suy luận mô hình RACA-Net kết hợp Safety Fusion.
+  - `POST /api/v1/rules`: Đánh giá thuần túy theo luật lâm sàng (Hadlock & Intergrowth-21st) – dùng làm fallback khi mô hình ML không khả dụng.
   - `GET /api/v1/health`: Kiểm tra sức khỏe dịch vụ và phiên bản `rule_version`, `model_version`.
 - **Core Configuration (`analysis_service/app/core/`):** Chứa thiết lập môi trường (`config.py`) và ngưỡng tham chiếu y tế chuẩn (`constants.py`).
 - **Engines (`analysis_service/app/engines/`):**
@@ -164,7 +172,7 @@ precare/
     $$\text{Final Warning Level} = \max(\text{Clinical Rule Level}, \text{Model Prediction Level})$$
     *Mô hình Deep Learning CHỈ ĐƯỢC PHÉP NÂNG MỨC CẢNH BÁO, TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP HẠ MỨC CẢNH BÁO LÂM SÀNG CỦA HỆ LUẬT.*
 
-#### 3. Web Dashboard Bác sĩ (`web_doctor/` - Tương ứng phân hệ Web Frontend)
+#### 3. Web Dashboard Bác sĩ (`web_doctor/` - Tương ứng phân hệ Frontend)
 - **Biểu đồ lâm sàng (`web_doctor/src/components/`):** Đặt các biểu đồ theo dõi tăng trưởng thai nhi (`TrajectoryChart.tsx`), bắt buộc trực quan hóa đủ 5 dải bách phân vị chuẩn (3rd, 10th, 50th, 90th, 97th) và hiển thị các mốc cảnh báo cờ đỏ.
 - **UI Components & Layouts (`web_doctor/src/components/` và `web_doctor/src/components/ui/`):** Các thành phần giao diện tái sử dụng: hàng đợi duyệt số hóa (`ReviewIngestQueue.tsx`), quản lý yêu cầu xóa dữ liệu (`DeletionRequestsReview.tsx`, `RequestDeletionModal.tsx`), và các controls cơ bản (button, input, alert, checkbox).
 - **Màn hình trang (`web_doctor/src/pages/`):** Mỗi trang đại diện cho một view hoàn chỉnh: `Dashboard.tsx` (tổng quan khám & hàng đợi duyệt), `PatientDetail.tsx` (chi tiết hồ sơ & biểu đồ thai phụ), `PregnancyProfile.tsx`, `Login.tsx`, `Register.tsx`.
@@ -183,7 +191,7 @@ precare/
 - **Design Tokens & Theme (`mobile_app/src/theme/`):** Bảng màu giao diện ấm áp, dễ đọc, giảm căng thẳng cho sản phụ (`colors.ts`), kích thước chữ và cài đặt hiển thị (`settings.ts`).
 
 #### 5. Cơ sở dữ liệu & Hạ tầng điều phối (`init-db/`, `docker-compose.yml`, `docs/`)
-- **Khởi tạo dữ liệu (`init-db/`):** File `01-init.sql` chứa cấu trúc bảng ban đầu và dữ liệu seed mẫu cho container PostgreSQL.
+- **Khởi tạo dữ liệu (`init-db/`):** File `01-init.sql` là nguồn DDL chính (Single Source of Truth) định nghĩa bảng và seed dữ liệu ban đầu cho PostgreSQL. Mọi sửa đổi schema phải được cập nhật đồng thời tại đây và trong `backend/app/models/`.
 - **Tài liệu hợp đồng API (`docs/API_Contract_Interface/`):** Mọi sự thay đổi về endpoint hay payload DTO giữa Backend và Frontend/Mobile phải được cập nhật tương ứng vào tài liệu contract tại đây.
 - **Điều phối Container (`docker-compose.yml`):** Cấu hình toàn bộ mạng lưới microservices cục bộ (`db`, `redis`, `minio`, `analysis_service`, `backend`, `celery_worker`, `web_doctor`).
 
@@ -193,6 +201,7 @@ precare/
 
 Khi thực hiện nhiệm vụ bên trong các thư mục con chuyên biệt, AI agents và lập trình viên phải đọc và tuân thủ các quy định chi tiết trong file `AGENTS.md` tương ứng của từng phân hệ:
 
-- [backend/AGENTS.md](file:///d:/IT/NCKH/precare/backend/AGENTS.md): Quy định chi tiết kiến trúc phân tầng FastAPI (Router $\rightarrow$ Service $\rightarrow$ Repository $\rightarrow$ ORM Model), chuẩn Pydantic v2, quản lý transaction với SQLAlchemy AsyncSession, quy chuẩn di chuyển dữ liệu Alembic, đảm bảo tính idempotent của Celery Task, và hướng dẫn tích hợp mô hình Machine Learning RACA-Net.
-- [web_doctor/AGENTS.md](file:///d:/IT/NCKH/precare/web_doctor/AGENTS.md): Quy định chi tiết cho Web Dashboard Bác sĩ (React 18, TypeScript Strict Mode, Vite, Tailwind CSS), quy tắc đồng bộ contract Pydantic, quản lý server state bằng TanStack Query, polling tác vụ số hóa OCR, và tiêu chuẩn trực quan hóa biểu đồ bách phân vị tăng trưởng thai nhi (3rd, 10th, 50th, 90th, 97th).
-- [mobile_app/AGENTS.md](file:///d:/IT/NCKH/precare/mobile_app/AGENTS.md): Quy định chi tiết cho ứng dụng di động Thai phụ (React Native / Expo), nguyên tắc truyền thông lâm sàng nhân văn (không gây hoang mang cho sản phụ), quy trình chụp ảnh/nén ảnh cận lâm sàng, bước xác nhận OCR bắt buộc, bảo mật lưu trữ token qua hardware-backed SecureStore, và thiết kế UI công thái học một tay.
+- [backend/AGENTS.md](backend/AGENTS.md): Quy định chi tiết kiến trúc 3 tầng FastAPI (Router $\rightarrow$ Service $\rightarrow$ ORM Model, không dùng `repositories/`), chuẩn Pydantic v2, quản lý database session & quy chuẩn cập nhật DDL qua `init-db/01-init.sql`, đảm bảo tính idempotent của Celery Task, và tích hợp HTTP client gọi sang `analysis_service`.
+- [analysis_service/AGENTS.md](analysis_service/AGENTS.md): Quy định chi tiết cho phân hệ ML & Phân tích lâm sàng (FastAPI microservice Port 8001), cài đặt công thức Hadlock & Intergrowth-21st trong `rule_engine.py`, wrapper mô hình Deep Learning RACA-Net trong `model_engine.py`, và bắt buộc tuân thủ ràng buộc an toàn **Safety Fusion Constraint** ($\max(\text{rule}, \text{model})$).
+- [web_doctor/AGENTS.md](web_doctor/AGENTS.md): Quy định chi tiết cho Web Dashboard Bác sĩ (React 18, TypeScript Strict Mode, Vite, Tailwind CSS), quy tắc đồng bộ contract Pydantic, quản lý server state bằng TanStack Query, polling tác vụ số hóa OCR, và tiêu chuẩn trực quan hóa biểu đồ bách phân vị tăng trưởng thai nhi (3rd, 10th, 50th, 90th, 97th).
+- [mobile_app/AGENTS.md](mobile_app/AGENTS.md): Quy định chi tiết cho ứng dụng di động Thai phụ (React Native / Expo), nguyên tắc truyền thông lâm sàng nhân văn (không gây hoang mang cho sản phụ), quy trình chụp ảnh/nén ảnh cận lâm sàng, bước xác nhận OCR bắt buộc, bảo mật lưu trữ token qua hardware-backed SecureStore, và thiết kế UI công thái học một tay.
