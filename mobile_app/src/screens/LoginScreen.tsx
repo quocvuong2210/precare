@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
@@ -50,14 +51,33 @@ export default function LoginScreen({ navigation }: Props) {
 
       if (!data.access_token) {
         throw new Error('API không trả về access_token.');
-      }   
+      }
       console.log('Đăng nhập thành công!');
 
-      const pregnancyProfile = await fetchPregnancyProfileFromDB(data.access_token, { throwOnError: true });
-      navigation.replace(pregnancyProfile ? 'Main' : 'PregnancySetup');
+      // Kiểm tra xem thai phụ đã có hồ sơ thai kỳ chưa (DB hoặc bộ nhớ máy)
+      let hasProfile = false;
+      try {
+        const pregnancyProfile = await fetchPregnancyProfileFromDB(data.access_token);
+        if (pregnancyProfile) {
+          hasProfile = true;
+        }
+      } catch (profileErr) {
+        console.log('Chưa lấy được hồ sơ thai kỳ từ backend:', profileErr);
+      }
 
-      // Chưa chuyển màn hình vì cần xác định tên màn hình chính
-      // trong AppNavigator trước.
+      if (!hasProfile) {
+        try {
+          const identifier = (data.user?.email || email).trim().toLowerCase();
+          const localRecord = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
+          if (localRecord) {
+            hasProfile = true;
+          }
+        } catch {
+          // Bỏ qua lỗi đọc bộ nhớ máy
+        }
+      }
+
+      navigation.replace(hasProfile ? 'Main' : 'PregnancySetup');
     } catch (err) {
       const message =
         err instanceof Error

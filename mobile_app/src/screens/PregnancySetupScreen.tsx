@@ -142,7 +142,14 @@ export default function PregnancySetupScreen({ navigation }: Props) {
     if (!payload) return;
     setLoading(true);
     try {
-      await savePregnancyProfileToDB({ ...payload, edd: preview?.edd });
+      // 1. Thử lưu lên Backend Database
+      try {
+        await savePregnancyProfileToDB({ ...payload, edd: preview?.edd });
+      } catch (backendError) {
+        console.log('Lỗi lưu backend profile (sẽ lưu bộ nhớ máy):', backendError);
+      }
+
+      // 2. Luôn lưu vào AsyncStorage để đảm bảo thông tin hiển thị liền mạch trên máy
       const account = currentUserProfile || (await restoreSession());
       const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
       const savedProfile = {
@@ -169,6 +176,8 @@ export default function PregnancySetupScreen({ navigation }: Props) {
         dueDate: displayDate(preview?.edd || ''),
         contacts: [],
       }));
+
+      // 3. Hoàn tất và vào màn hình chính
       navigation.replace('Main');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chưa lưu được hồ sơ. Mẹ thử lại nhé.');

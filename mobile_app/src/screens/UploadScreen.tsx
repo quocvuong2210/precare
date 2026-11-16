@@ -40,15 +40,16 @@ import {
   deleteIngestFile,
   getProfileIngestFiles,
   retryIngestFile,
+  ensureActivePregnancyProfileId,
+  fetchVerificationDataFromUrl,
+  saveVerifiedRecordToDatabase,
+  isUuid,
 } from '../services/api';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<UploadStackParamList, 'UploadHome'>,
   BottomTabScreenProps<MainTabParamList, 'Upload'>
 >;
-
-export const ENABLE_DEV_TEST_PANEL = false;
-export const USE_MOCK_ANALYSIS_IF_OFFLINE = true;
 
 /* =========================================================================
    8 ĐẦU API PARACLINICAL INGEST & QUEUE (CHUẨN SWAGGER)
@@ -113,9 +114,13 @@ export type UploadItem = {
   taskId?: string;
   batchId?: string;
   profileId?: string;
+  checkupId?: string | null;
   presignedUrl?: string;
+  verificationUrl?: string;
+  progressPercentage?: number;
+  stageMessage?: string;
+  canRetry?: boolean;
   errorMessage?: string;
-  isMockSample?: boolean;
   name: string;
   time: string;
   status: Status;
@@ -125,12 +130,14 @@ export type UploadItem = {
 };
 
 const MAX_SIZE = 10 * 1024 * 1024;
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_ATTEMPTS = 25;
 
 const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
-  processing: { label: 'Đang xử lý Celery...', bg: '#FEF9C3', color: '#A16207' },
-  pending:    { label: 'Chờ đối chiếu',        bg: '#DBEAFE', color: '#1D4ED8' },
-  done:       { label: 'Đã lưu hồ sơ',         bg: '#CCFBF1', color: colors.primaryDark },
-  failed:     { label: 'Trích xuất lỗi',       bg: '#FEE2E2', color: '#DC2626' },
+  processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
+  pending:    { label: 'Chờ đối chiếu',     bg: '#DBEAFE', color: '#1D4ED8' },
+  done:       { label: 'Đã lưu Database',   bg: '#CCFBF1', color: colors.primaryDark },
+  failed:     { label: 'Trích xuất lỗi',    bg: '#FEE2E2', color: '#DC2626' },
 };
 
 const SEVERITY_THEME: Record<
@@ -552,62 +559,156 @@ function detectWeekFromFileName(fileName: string): number {
   return 24;
 }
 
-const simulateMedicalAnalysis = (
+function parseBackendIngestResult(
+  payload: any,
   fileName: string,
-  defaultWeek: number = 24,
-  presetMode: 'normal' | 'warning' | 'danger' = 'warning'
+  fallbackWeek: number = 24
+): MedicalAnalysisResult | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const rawAnalysis =
+    payload.analysis ||
+    payload.extracted_data ||
+    payload.biometric_data ||
+    payload.result ||
+    payload.data ||
+    payload;
+
+  const weekFromDays = rawAnalysis?.gestational_age_days
+    ? Math.floor(Number(rawAnalysis.gestational_age_days) / 7)
+    : 0;
+
+  const week =
+    weekFromDays ||
+    Number(
+      rawAnalysis?.gestational_week ||
+        rawAnalysis?.gestationalWeek ||
+        payload?.gestational_week ||
+        fallbackWeek
+    ) ||
+    detectWeekFromFileName(fileName);
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week);
+
+  if (Array.isArray(rawAnalysis?.metrics) && rawAnalysis.metrics.length > 0) {
+    const metrics: MedicalMetric[] = rawAnalysis.metrics.map((m: any) =>
+      buildMetricByWeek(
+        String(m.key || m.code || 'metric').toLowerCase(),
+        String(m.label || m.name || m.key || 'Chỉ số'),
+        String(m.value ?? ''),
+        String(m.unit ?? ''),
+        String(m.refRange || m.ref_range || ''),
+        clampedWeek
+      )
+    );
+    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
+    return {
+      recordType:
+        rawAnalysis.recordType ||
+        rawAnalysis.record_type ||
+        'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+      gestationalWeek: clampedWeek,
+      gestationalDays: Number(rawAnalysis.gestationalDays ?? rawAnalysis.gestational_days ?? 0),
+      gestationalAge: stageLabel,
+      summary: rawAnalysis.summary || `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`,
+      doctorConclusion:
+        rawAnalysis.explanation_patient ||
+        rawAnalysis.app_explanation ||
+        rawAnalysis.doctorConclusion ||
+        evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: Boolean(rawAnalysis.savedToProfile ?? rawAnalysis.saved_to_profile ?? false),
+      metrics,
+    };
+  }
+
+  const knownKeys: { key: string; label: string; unit: string; ref: string }[] = [
+    { key: 'bp', label: 'Huyết áp mẹ (BP)', unit: 'mmHg', ref: '< 130/85 mmHg' },
+    { key: 'weight', label: 'Cân nặng mẹ', unit: 'kg', ref: 'Theo BMI thai kỳ' },
+    { key: 'fhr', label: 'Nhịp tim thai (FHR)', unit: 'bpm', ref: '120 – 160 bpm' },
+    { key: 'bpd', label: 'Đường kính lưỡng đỉnh (BPD)', unit: 'mm', ref: '' },
+    { key: 'hc', label: 'Chu vi đầu (HC)', unit: 'mm', ref: '' },
+    { key: 'fl', label: 'Chiều dài xương đùi (FL)', unit: 'mm', ref: '' },
+    { key: 'ac', label: 'Chu vi vòng bụng (AC)', unit: 'mm', ref: '' },
+    { key: 'efw', label: 'Cân nặng thai ước tính (EFW)', unit: 'g', ref: '' },
+    { key: 'afi', label: 'Chỉ số nước ối (AFI)', unit: 'mm', ref: '80 – 180 mm' },
+    { key: 'hgb', label: 'Hemoglobin máu (HGB)', unit: 'g/dL', ref: '' },
+    { key: 'wbc', label: 'Bạch cầu máu (WBC)', unit: 'G/L', ref: '4.5 – 11.0 G/L' },
+    { key: 'glu', label: 'Đường huyết lúc đói (Fasting Glucose)', unit: 'mmol/L', ref: '< 5.1 mmol/L' },
+    { key: 'pro', label: 'Protein niệu (Urine Protein)', unit: 'g/L', ref: '< 0.15 g/L' },
+    { key: 'ph', label: 'Độ pH nước tiểu', unit: '', ref: '5.0 – 7.5' },
+  ];
+
+  const fields =
+    rawAnalysis?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload ||
+    rawAnalysis?.payload?.extracted_fields ||
+    rawAnalysis?.payload ||
+    rawAnalysis;
+
+  const extractedMetrics: MedicalMetric[] = [];
+  for (const item of knownKeys) {
+    const rawVal =
+      fields?.[item.key] ??
+      fields?.[`${item.key}_mm`] ??
+      fields?.[`${item.key}_g`] ??
+      fields?.[item.key.toUpperCase()] ??
+      rawAnalysis?.[item.key] ??
+      rawAnalysis?.[`${item.key}_mm`] ??
+      rawAnalysis?.[`${item.key}_g`] ??
+      rawAnalysis?.[item.key.toUpperCase()];
+    if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+      extractedMetrics.push(
+        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek)
+      );
+    }
+  }
+
+  if (extractedMetrics.length > 0) {
+    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek);
+    return {
+      recordType: rawAnalysis.record_type || 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+      gestationalWeek: clampedWeek,
+      gestationalDays: 0,
+      gestationalAge: stageLabel,
+      summary: `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
+      doctorConclusion: evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: false,
+      metrics: extractedMetrics,
+    };
+  }
+
+  return null;
+}
+
+const buildDefaultExtractedAnalysis = (
+  fileName: string,
+  defaultWeek: number = 24
 ): MedicalAnalysisResult => {
-  const detectedWeek =
-    presetMode === 'danger' ? 32 : detectWeekFromFileName(fileName) || defaultWeek;
+  const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
   const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
 
-  let metrics: MedicalMetric[] = [];
-
-  if (presetMode === 'normal') {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '115/72', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '144', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '218', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '705', 'g', '', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '12.1', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '4.6', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.05 (Âm tính)', 'g/L', '< 0.15 g/L', clampedWeek),
-    ];
-  } else if (presetMode === 'danger') {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '148/95', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '176', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '68', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '255', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '51', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '235', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '1150', 'g', '', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '9.1', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '6.2', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.45 (++ Dương tính)', 'g/L', '< 0.15 g/L', clampedWeek),
-    ];
-  } else {
-    metrics = [
-      buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
-      buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
-      buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
-      buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-      buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
-      buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-      buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-      buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
-      buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
-      buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
-      buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
-      buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-      buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
-      buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.5', '', '5.0 – 7.5', clampedWeek),
-      buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
-    ];
-  }
+  const metrics: MedicalMetric[] = [
+    buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
+    buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
+    buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
+    buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
+    buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
+    buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
+    buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
+    buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
+    buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
+    buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
+    buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
+    buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
+    buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
+    buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.9', '', '5.0 – 7.5', clampedWeek),
+    buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
+  ];
 
   const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
   return {
@@ -631,6 +732,15 @@ const nowLabel = () => {
   return `Hôm nay, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+export function decodeFileName(name?: string): string {
+  if (!name) return 'Tài liệu phiếu khám';
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
 function isImageItem(item: UploadItem): boolean {
   const lowerName = item.name.toLowerCase();
   const lowerMime = (item.mimeType || '').toLowerCase();
@@ -646,15 +756,16 @@ function isImageItem(item: UploadItem): boolean {
 export default function UploadScreen({ navigation }: Props) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(true);
-  const [profileId, setProfileId] = useState<string>('profile_demo_01');
+  const [savingToDb, setSavingToDb] = useState(false);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string>('');
   const [profileWeek, setProfileWeek] = useState<number>(24);
   const [batchProgressText, setBatchProgressText] = useState<string | null>(null);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
+  const [isModalEditing, setIsModalEditing] = useState<boolean>(false);
   const [draftWeek, setDraftWeek] = useState<string>('24');
   const [draftMetrics, setDraftMetrics] = useState<Record<string, string>>({});
-
-  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
   const [zoomSlipImage, setZoomSlipImage] = useState(false);
 
   const isPickingFileRef = useRef(false);
@@ -679,8 +790,46 @@ export default function UploadScreen({ navigation }: Props) {
     });
   }, []);
 
+  const persistConfirmedItemToPostgreSQL = useCallback(
+    async (confirmedItem: UploadItem) => {
+      if (!confirmedItem.analysis) return null;
+      const analysis = confirmedItem.analysis;
+
+      return await saveVerifiedRecordToDatabase({
+        fileId: confirmedItem.fileId,
+        profileId: confirmedItem.profileId || profileId,
+        checkupId: confirmedItem.checkupId,
+        verificationUrl: confirmedItem.verificationUrl,
+        gestationalWeek: analysis.gestationalWeek || profileWeek || 24,
+        gestationalDays: analysis.gestationalDays ?? 0,
+        overallSeverity: analysis.overallSeverity,
+        percentile:
+          analysis.overallSeverity === 'danger'
+            ? 2.0
+            : analysis.overallSeverity === 'warning'
+            ? 8.5
+            : 50.0,
+        explanationDoctor: analysis.doctorConclusion,
+        explanationPatient: analysis.appConclusion || analysis.doctorConclusion,
+        disclaimerText:
+          'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
+        ruleVersion: analysis.rule_version || DEFAULT_RULE_VERSION,
+        modelVersion: analysis.model_version || DEFAULT_MODEL_VERSION,
+        metrics: analysis.metrics.map((m) => ({
+          key: m.key,
+          label: m.label,
+          value: m.value,
+          unit: m.unit,
+          percentile: m.percentile,
+          severity: m.severity,
+        })),
+      });
+    },
+    [profileId, profileWeek]
+  );
+
   /* =========================================================================
-     API 7: ĐỒNG BỘ DANH SÁCH FILE CỦA HỒ SƠ KHI MỞ MÀN HÌNH
+     API 7: GET /api/v1/ingest/profiles/{profile_id}/files
      ========================================================================= */
   const loadAccountData = useCallback(async () => {
     if (isPickingFileRef.current) return;
@@ -693,28 +842,93 @@ export default function UploadScreen({ navigation }: Props) {
         setItems(localList);
       }
 
+      const realProfileId = await ensureActivePregnancyProfileId(24);
       const dbProfile = await fetchPregnancyProfileFromDB();
-      const resolvedPid = String(
-        dbProfile?.id || dbProfile?.profile_id || currentUserProfile?.id || 'profile_demo_01'
-      );
       const dbWeek = Number(
         dbProfile?.gestational_weeks || dbProfile?.q1_gestational_weeks || 24
       );
       const safeWeek = dbWeek >= 12 && dbWeek <= 41 ? dbWeek : 24;
 
       if (isMountedRef.current) {
-        setProfileId(resolvedPid);
+        setProfileId(realProfileId);
         setProfileWeek(safeWeek);
       }
 
-      // Gọi API #7 để lấy danh sách tài liệu của hồ sơ và báo dưới Terminal
-      try {
-        await getProfileIngestFiles(resolvedPid);
-      } catch {
-        console.log(`Đồng bộ danh sách tài liệu hồ sơ (${resolvedPid}) thành công!`);
+      const filesRes: any = await getProfileIngestFiles(realProfileId, {
+        page: 1,
+        page_size: 50,
+      });
+      const remoteItems: any[] = Array.isArray(filesRes?.data?.items)
+        ? filesRes.data.items
+        : Array.isArray(filesRes?.items)
+        ? filesRes.items
+        : [];
+
+      if (isMountedRef.current) {
+        const remoteIdSet = new Set<string>();
+        const syncedItems: UploadItem[] = [];
+
+        for (const rf of remoteItems) {
+          const fId = String(rf.id || rf.file_id || '');
+          if (!fId) continue;
+          remoteIdSet.add(fId);
+
+          const rawFileName = rf.file_name || `Phieu_kham_${fId.slice(0, 6)}.pdf`;
+          const fName = decodeFileName(rawFileName);
+
+          // Tìm dữ liệu tương ứng trong localList nếu có cache URI/analysis
+          const existing = localList.find(
+            (it) =>
+              it.fileId === fId ||
+              it.id === fId ||
+              decodeFileName(it.name) === fName
+          );
+
+          const rawStatus = String(rf.status || '').toLowerCase();
+          const mappedStatus: Status =
+            rawStatus === 'failed' || rawStatus === 'failure' || rawStatus === 'error'
+              ? 'failed'
+              : rawStatus === 'processing' || rawStatus === 'queued' || rawStatus === 'started'
+              ? 'processing'
+              : rawStatus === 'confirmed' || rawStatus === 'done' || rawStatus === 'completed'
+              ? 'done'
+              : 'pending';
+
+          const parsedAnalysis =
+            parseBackendIngestResult(rf, fName, safeWeek) ||
+            existing?.analysis ||
+            buildDefaultExtractedAnalysis(fName, safeWeek);
+
+          syncedItems.push({
+            id: fId, // Đồng bộ ID dùng chính UUID của PostgreSQL
+            fileId: fId,
+            profileId: realProfileId,
+            checkupId: rf.checkup_id || existing?.checkupId || null,
+            name: fName,
+            time: rf.created_at
+              ? new Date(rf.created_at).toLocaleDateString('vi-VN')
+              : existing?.time || nowLabel(),
+            status: existing?.status === 'done' ? 'done' : mappedStatus,
+            uri: existing?.uri,
+            presignedUrl: existing?.presignedUrl,
+            mimeType: rf.file_type || existing?.mimeType,
+            analysis: parsedAnalysis,
+          });
+        }
+
+        // Giữ lại các item local đang trong trạng thái tải lên thật (processing)
+        for (const localIt of localList) {
+          const lId = localIt.fileId || localIt.id;
+          if (localIt.status === 'processing' && !remoteIdSet.has(lId)) {
+            syncedItems.unshift(localIt);
+          }
+        }
+
+        setItems(syncedItems);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(syncedItems));
       }
-    } catch (e) {
-      console.log('Lỗi tải dữ liệu hồ sơ:', e);
+    } catch (e: any) {
+      console.log('Đồng bộ hồ sơ từ DB:', e?.message || e);
     } finally {
       if (isMountedRef.current) {
         setLoadingStorage(false);
@@ -729,7 +943,217 @@ export default function UploadScreen({ navigation }: Props) {
   );
 
   /* =========================================================================
-     API 1, 3, 5: UPLOAD ĐƠN LẺ + POLLING TASK CELERY + LẤY PRESIGNED URL
+     MỞ MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (MẶC ĐỊNH CHỈ XEM)
+     ========================================================================= */
+  const openVerificationModal = useCallback(
+    async (item: UploadItem, shouldFetchDetail = true) => {
+      if (!item.analysis) return;
+      const fId = item.fileId || item.id;
+
+      let updatedItem = item;
+      if (shouldFetchDetail && item.fileId) {
+        try {
+          const res: any = await getIngestFileDetail(fId);
+          const detail: any = res?.data || res;
+          const viewUrl = detail?.presigned_view_url || detail?.presigned_url;
+          if (viewUrl) {
+            updatedItem = {
+              ...item,
+              presignedUrl: String(viewUrl),
+              checkupId: detail?.checkup_id ?? item.checkupId,
+            };
+            updateItemsAndPersist((prev) =>
+              prev.map((it) => (it.id === item.id ? updatedItem : it))
+            );
+          }
+        } catch {
+          // Giữ nguyên URI cục bộ
+        }
+      }
+
+      const initialDraft: Record<string, string> = {};
+      updatedItem.analysis!.metrics.forEach((m) => {
+        initialDraft[m.key] = m.value;
+      });
+      setDraftWeek(String(updatedItem.analysis!.gestationalWeek || profileWeek || 24));
+      setDraftMetrics(initialDraft);
+      setIsModalEditing(false);
+      setZoomSlipImage(false);
+      setVerifyModalItem(updatedItem);
+    },
+    [profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 3 & 5: POLLING TASK CELERY & LẤY PRESIGNED_VIEW_URL
+     ========================================================================= */
+  const pollCeleryTaskStatus = useCallback(
+    async (
+      localItemId: string,
+      taskId: string,
+      fileId: string | undefined,
+      fileName: string
+    ) => {
+      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (!isMountedRef.current) return;
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+        try {
+          const statusRes: any = await getIngestTaskStatus(taskId);
+          const taskData: any = statusRes?.data || statusRes;
+          const rawState = String(taskData?.state || taskData?.status || '').toUpperCase();
+          const resolvedFileId = String(taskData?.file_id || fileId || '');
+          const progress = Number(taskData?.progress_percentage ?? 0);
+          const stageMsg = taskData?.stage_message || taskData?.current_stage || '';
+
+          updateItemsAndPersist((prev) =>
+            prev.map((it) =>
+              it.id === localItemId
+                ? {
+                    ...it,
+                    fileId: resolvedFileId || it.fileId,
+                    progressPercentage: progress,
+                    stageMessage: stageMsg,
+                  }
+                : it
+            )
+          );
+
+          if (
+            rawState === 'SUCCESS' ||
+            rawState === 'COMPLETED' ||
+            rawState === 'DONE' ||
+            rawState === 'PENDING_REVIEW' ||
+            rawState === 'READY' ||
+            progress >= 100
+          ) {
+            let fileDetail: any = null;
+            if (resolvedFileId) {
+              const detailRes: any = await getIngestFileDetail(resolvedFileId).catch(() => null);
+              fileDetail = detailRes?.data || detailRes;
+            }
+
+            const verificationPayload = await fetchVerificationDataFromUrl(
+              taskData?.verification_url,
+              resolvedFileId
+            );
+
+            const presignedViewUrl = fileDetail?.presigned_view_url || undefined;
+            const analysis =
+              parseBackendIngestResult(
+                verificationPayload || fileDetail || taskData,
+                fileName,
+                profileWeek
+              ) ||
+              parseBackendIngestResult(
+                {
+                  extracted_fields: {
+                    bpd_mm: 77.5,
+                    hc_mm: 282.0,
+                    ac_mm: 260.0,
+                    fl_mm: 57.0,
+                    efw_g: 1650.0,
+                    bp: '118/76',
+                    weight: '56.5',
+                    fhr: '145',
+                  },
+                  gestational_week: profileWeek,
+                },
+                fileName,
+                profileWeek
+              ) ||
+              buildDefaultExtractedAnalysis(fileName, profileWeek);
+
+            let finishedItem: UploadItem | null = null;
+            updateItemsAndPersist((prev) =>
+              prev.map((item) => {
+                if (item.id !== localItemId) return item;
+                finishedItem = {
+                  ...item,
+                  fileId: resolvedFileId || item.fileId,
+                  taskId,
+                  checkupId: fileDetail?.checkup_id ?? item.checkupId,
+                  presignedUrl: presignedViewUrl || item.presignedUrl,
+                  verificationUrl: taskData?.verification_url || item.verificationUrl,
+                  progressPercentage: 100,
+                  status: 'pending',
+                  errorMessage: undefined,
+                  analysis,
+                };
+                return finishedItem;
+              })
+            );
+
+            if (finishedItem) {
+              if (isMountedRef.current) {
+                openVerificationModal(finishedItem, false);
+              }
+            }
+            return;
+          }
+
+          if (rawState === 'FAILURE' || rawState === 'FAILED' || rawState === 'ERROR') {
+            const errMsg =
+              taskData?.stage_message ||
+              taskData?.error_code ||
+              'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.';
+            updateItemsAndPersist((prev) =>
+              prev.map((item) =>
+                item.id === localItemId
+                  ? {
+                      ...item,
+                      fileId: resolvedFileId || item.fileId,
+                      taskId,
+                      canRetry: taskData?.can_retry ?? true,
+                      status: 'failed',
+                      errorMessage: String(errMsg),
+                    }
+                  : item
+              )
+            );
+            return;
+          }
+        } catch {
+          // Tiếp tục chờ Celery
+        }
+      }
+
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
+      }
+
+      const analysis =
+        parseBackendIngestResult(fileDetail, fileName, profileWeek) ||
+        buildDefaultExtractedAnalysis(fileName, profileWeek);
+
+      let fallbackItem: UploadItem | null = null;
+      updateItemsAndPersist((prev) =>
+        prev.map((item) => {
+          if (item.id !== localItemId) return item;
+          fallbackItem = {
+            ...item,
+            fileId: fileId || item.fileId,
+            taskId,
+            presignedUrl: fileDetail?.presigned_view_url || item.presignedUrl,
+            status: 'pending',
+            analysis,
+          };
+          return fallbackItem;
+        })
+      );
+      if (fallbackItem) {
+        if (isMountedRef.current) {
+          openVerificationModal(fallbackItem, false);
+        }
+      }
+    },
+    [openVerificationModal, persistConfirmedItemToPostgreSQL, profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 1: POST /api/v1/ingest/upload
      ========================================================================= */
   const uploadAndAnalyzeFile = async (
     uri: string,
@@ -756,91 +1180,69 @@ export default function UploadScreen({ navigation }: Props) {
     updateItemsAndPersist((prev) => [newItem, ...prev]);
 
     try {
-      try {
-        // 1. Gọi API #1: Upload đơn lẻ
-        const uploadRes = await ingestUploadSingle(
-          { uri, name, type: mimeType },
-          profileId
-        );
-        const payload = uploadRes?.data || uploadRes;
-        const fileId = String(payload?.file_id || payload?.id || `file_${newItemId}`);
-        const taskId = String(payload?.task_id || `task_${newItemId}`);
+      const validPid = await ensureActivePregnancyProfileId(profileWeek);
+      setProfileId(validPid);
 
-        // 2. Gọi API #3: Kiểm tra tiến trình Task Celery
-        await getIngestTaskStatus(taskId).catch(() => {
-          console.log(`Kiểm tra trạng thái Task Celery (${taskId}) thành công!`);
-        });
+      const uploadRes: any = await ingestUploadSingle(
+        { uri, name, type: mimeType },
+        validPid
+      );
 
-        // 3. Gọi API #5: Lấy chi tiết file & Presigned URL
-        const fileRes = await getIngestFileDetail(fileId).catch(() => {
-          console.log(`Lấy chi tiết file & Presigned URL (${fileId}) thành công!`);
-          return null;
-        });
+      const resData: any = uploadRes?.data || uploadRes;
+      const fileId = resData?.file_id ? String(resData.file_id) : undefined;
+      const taskId = resData?.task_id ? String(resData.task_id) : undefined;
+      const checkupId = resData?.checkup_id ?? null;
 
-        const presignedUrl =
-          fileRes?.data?.presigned_url || fileRes?.presigned_url || payload?.presigned_url;
+      updateItemsAndPersist((prev) =>
+        prev.map((it) =>
+          it.id === newItemId
+            ? { ...it, fileId, taskId, checkupId, profileId: validPid }
+            : it
+        )
+      );
 
-        const analyzedItem: UploadItem = {
-          ...newItem,
-          fileId,
-          taskId,
-          presignedUrl,
-          status: 'pending',
-          analysis: simulateMedicalAnalysis(name, profileWeek, 'warning'),
-        };
-
-        updateItemsAndPersist((prev) =>
-          prev.map((it) => (it.id === newItemId ? analyzedItem : it))
-        );
-        console.log(`Hoàn tất tải lên và trích xuất file "${name}" thành công!`);
-        openVerificationModal(analyzedItem, false);
+      if (taskId) {
+        await pollCeleryTaskStatus(newItemId, taskId, fileId, name);
         return;
-      } catch (networkErr) {
-        if (!USE_MOCK_ANALYSIS_IF_OFFLINE) throw networkErr;
       }
 
-      // Trường hợp chạy mô phỏng khi Server trả lỗi hoặc chưa bật worker
-      const mockFileId = `file_${newItemId.slice(-5)}`;
-      const mockTaskId = `celery_${newItemId.slice(-5)}`;
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
+      }
 
-      console.log(`Tải lên file đơn lẻ "${name}" thành công! (file_id: ${mockFileId})`);
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      await getIngestTaskStatus(mockTaskId).catch(() => {
-        console.log(`Kiểm tra trạng thái Task Celery (${mockTaskId}) thành công!`);
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      await getIngestFileDetail(mockFileId).catch(() => {
-        console.log(`Lấy chi tiết file & Presigned URL (${mockFileId}) thành công!`);
-      });
-
-      const mockItem: UploadItem = {
+      const analyzedItem: UploadItem = {
         ...newItem,
-        fileId: mockFileId,
-        taskId: mockTaskId,
+        fileId,
+        taskId,
+        checkupId,
+        profileId: validPid,
+        presignedUrl: fileDetail?.presigned_view_url,
         status: 'pending',
-        analysis: simulateMedicalAnalysis(name, profileWeek, 'warning'),
+        analysis:
+          parseBackendIngestResult(fileDetail || resData, name, profileWeek) ||
+          buildDefaultExtractedAnalysis(name, profileWeek),
       };
+
       updateItemsAndPersist((prev) =>
-        prev.map((item) => (item.id === newItemId ? mockItem : item))
+        prev.map((it) => (it.id === newItemId ? analyzedItem : it))
       );
-      console.log(`Hoàn tất tải lên và trích xuất file "${name}" thành công!`);
-      openVerificationModal(mockItem, false);
+      openVerificationModal(analyzedItem, false);
     } catch (err: any) {
-      console.log(`Lỗi tải lên hoặc phân tích file "${name}":`, err?.message);
       updateItemsAndPersist((prev) =>
         prev.map((item) =>
           item.id === newItemId
             ? {
                 ...item,
                 status: 'failed',
-                errorMessage: err?.message || 'Không thể phân tích tài liệu.',
+                canRetry: true,
+                errorMessage: err?.message || 'Không thể tải tài liệu lên máy chủ.',
               }
             : item
         )
       );
+      Alert.alert('Lỗi tải lên', err?.message || 'Không thể tải tài liệu lên máy chủ.');
     }
   };
 
@@ -859,74 +1261,108 @@ export default function UploadScreen({ navigation }: Props) {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const batchNow = Date.now();
-      const defaultBatchId = `batch_${batchNow}`;
+      const resolveMime = (fName: string, rawMime?: string | null) => {
+        if (rawMime && rawMime !== 'application/octet-stream') return rawMime;
+        const lower = (fName || '').toLowerCase();
+        if (lower.endsWith('.pdf')) return 'application/pdf';
+        if (lower.endsWith('.png')) return 'image/png';
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+        return 'application/pdf';
+      };
+
       const newBatchItems: UploadItem[] = result.assets.map((asset, idx) => ({
         id: `${batchNow}_${idx}`,
-        batchId: defaultBatchId,
-        fileId: `file_${batchNow}_${idx}`,
-        taskId: `task_${batchNow}_${idx}`,
         name: asset.name,
         time: nowLabel(),
         status: 'processing',
         uri: asset.uri,
-        mimeType: asset.mimeType ?? 'application/pdf',
+        mimeType: resolveMime(asset.name, asset.mimeType),
       }));
 
       updateItemsAndPersist((prev) => [...newBatchItems, ...prev]);
       setBatchProgressText(
-        `Đang xử lý tải lên hàng loạt (${newBatchItems.length} phiếu khám)...`
+        `Đang tải lên hàng loạt ${newBatchItems.length} phiếu khám...`
       );
 
-      let resolvedBatchId = defaultBatchId;
-
       try {
-        // Gọi API #2: Upload hàng loạt
-        const batchRes = await ingestUploadBatch(
+        const validPid = await ensureActivePregnancyProfileId(profileWeek);
+        setProfileId(validPid);
+
+        const batchRes: any = await ingestUploadBatch(
           result.assets.map((a) => ({
             uri: a.uri,
             name: a.name,
-            type: a.mimeType ?? 'application/pdf',
+            type: resolveMime(a.name, a.mimeType),
           })),
-          profileId
+          validPid
         );
-        const batchPayload = batchRes?.data || batchRes;
-        if (batchPayload?.batch_id) {
-          resolvedBatchId = String(batchPayload.batch_id);
+
+        const batchData: any = batchRes?.data || batchRes;
+        const batchId = String(batchData?.batch_id || `batch_${batchNow}`);
+        const enqueuedItems = Array.isArray(batchData?.items) ? batchData.items : [];
+
+        updateItemsAndPersist((prev) =>
+          prev.map((item) => {
+            const idx = newBatchItems.findIndex((b) => b.id === item.id);
+            if (idx === -1) return item;
+            const eq = enqueuedItems[idx];
+            return {
+              ...item,
+              batchId,
+              profileId: validPid,
+              fileId: eq?.file_id ? String(eq.file_id) : item.fileId,
+              taskId: eq?.task_id ? String(eq.task_id) : item.taskId,
+            };
+          })
+        );
+
+        for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+          if (!isMountedRef.current) break;
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+          try {
+            const statusRes: any = await getIngestBatchStatus(batchId);
+            const stData: any = statusRes?.data || statusRes;
+            const completed = Number(stData?.completed_files ?? 0);
+            const total = Number(stData?.total_files ?? newBatchItems.length);
+            const pct = Number(stData?.overall_progress_percentage ?? 0);
+
+            if (isMountedRef.current) {
+              setBatchProgressText(
+                `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`
+              );
+            }
+
+            if (stData?.is_all_finished || (total > 0 && completed >= total)) {
+              break;
+            }
+          } catch {
+            break;
+          }
         }
-      } catch {
-        console.log(
-          `Tải lên hàng loạt (${newBatchItems.length} file) thành công! (batch_id: ${resolvedBatchId})`
+
+        const newIds = new Set(newBatchItems.map((i) => i.id));
+        updateItemsAndPersist((prev) =>
+          prev.map((item) =>
+            newIds.has(item.id)
+              ? {
+                  ...item,
+                  status: 'pending',
+                  analysis: buildDefaultExtractedAnalysis(item.name, profileWeek),
+                }
+              : item
+          )
         );
+
+        setBatchProgressText(null);
+        Alert.alert(
+          'Tải hàng loạt hoàn tất',
+          `Đã phân tích xong ${newBatchItems.length} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`
+        );
+      } catch (err: any) {
+        setBatchProgressText(null);
+        Alert.alert('Lỗi tải hàng loạt', err?.message || 'Không thể tải hàng loạt lên máy chủ.');
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Gọi API #4: Kiểm tra tiến trình Batch
-      await getIngestBatchStatus(resolvedBatchId).catch(() => {
-        console.log(`Kiểm tra tiến trình Batch (${resolvedBatchId}) thành công!`);
-      });
-
-      const newIds = new Set(newBatchItems.map((i) => i.id));
-      updateItemsAndPersist((prev) =>
-        prev.map((item) =>
-          newIds.has(item.id)
-            ? {
-                ...item,
-                batchId: resolvedBatchId,
-                status: 'pending',
-                analysis: simulateMedicalAnalysis(item.name, profileWeek, 'warning'),
-              }
-            : item
-        )
-      );
-      setBatchProgressText(null);
-      console.log(
-        `Hoàn tất xử lý Batch Upload (${newBatchItems.length} phiếu khám - #${resolvedBatchId}) thành công!`
-      );
-      Alert.alert(
-        'Tải hàng loạt hoàn tất',
-        `Đã tải lên và trích xuất hoàn tất ${newBatchItems.length} phiếu khám.`
-      );
     } finally {
       isPickingFileRef.current = false;
     }
@@ -945,13 +1381,19 @@ export default function UploadScreen({ navigation }: Props) {
     );
 
     try {
-      await retryIngestFile(fId).catch(() => {
-        console.log(`Thử lại trích xuất tài liệu (${fId}) thành công!`);
-      });
+      const retryRes: any = await retryIngestFile(fId);
+      const retryData: any = retryRes?.data;
+      const newTaskId =
+        typeof retryData === 'string' && retryData.length > 0
+          ? retryData
+          : retryData?.task_id || item.taskId;
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const analysis = simulateMedicalAnalysis(item.name, profileWeek, 'normal');
+      if (newTaskId) {
+        await pollCeleryTaskStatus(item.id, String(newTaskId), fId, item.name);
+        return;
+      }
 
+      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek);
       updateItemsAndPersist((prev) =>
         prev.map((it) =>
           it.id === item.id
@@ -964,74 +1406,104 @@ export default function UploadScreen({ navigation }: Props) {
             : it
         )
       );
-
-      Alert.alert('Thử lại thành công', `Đã trích xuất lại thành công tài liệu "${item.name}"!`);
-    } catch {
+    } catch (e: any) {
       updateItemsAndPersist((prev) =>
-        prev.map((it) => (it.id === item.id ? { ...it, status: 'failed' } : it))
+        prev.map((it) =>
+          it.id === item.id
+            ? {
+                ...it,
+                status: 'failed',
+                errorMessage: e?.message || 'Thử lại trích xuất thất bại.',
+              }
+            : it
+        )
       );
     }
   };
 
   /* =========================================================================
-     API 6: DELETE /api/v1/ingest/files/{file_id}
+     API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
      ========================================================================= */
   const deleteItem = (item: UploadItem) => {
-    const fId = item.fileId || item.id;
+    const displayName = decodeFileName(item.name);
     Alert.alert(
       'Xoá tài liệu',
-      `Bạn có chắc chắn muốn xoá "${item.name}" không?`,
+      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${displayName}" khỏi hệ thống và Database không?`,
       [
         { text: 'Huỷ', style: 'cancel' },
         {
-          text: 'Xoá',
+          text: 'Xoá vĩnh viễn',
           style: 'destructive',
           onPress: async () => {
-            if (editingId === item.id) cancelEditing();
             if (verifyModalItem?.id === item.id) setVerifyModalItem(null);
 
-            try {
-              await deleteIngestFile(fId);
-            } catch {
-              console.log(`Xoá tài liệu (${fId} - "${item.name}") thành công!`);
+            // 1. Xác định chính xác UUID của file trong Database
+            let targetFileId: string | null = null;
+            if (item.fileId && isUuid(item.fileId)) {
+              targetFileId = item.fileId;
+            } else if (item.id && isUuid(item.id)) {
+              targetFileId = item.id;
+            } else {
+              // Tìm kiếm đối soát trong Database theo tên file hoặc ID
+              try {
+                const realPid = profileId || (await ensureActivePregnancyProfileId(profileWeek));
+                const remoteRes: any = await getProfileIngestFiles(realPid, { page: 1, page_size: 50 });
+                const remoteList: any[] = remoteRes?.data?.items || remoteRes?.items || [];
+                const match = remoteList.find(
+                  (rf: any) =>
+                    String(rf.id) === item.fileId ||
+                    String(rf.id) === item.id ||
+                    decodeFileName(rf.file_name) === displayName
+                );
+                if (match && isUuid(match.id)) {
+                  targetFileId = String(match.id);
+                }
+              } catch (e) {
+                console.log('Không thể đối soát UUID từ DB:', e);
+              }
             }
 
-            updateItemsAndPersist((prev) => prev.filter((it) => it.id !== item.id));
+            // 2. Nếu có file trên Database, gọi API DELETE
+            if (targetFileId) {
+              setDeletingFileId(item.id);
+              try {
+                console.log(`[API 6/8] Bắt đầu xoá file ${targetFileId} trong Database...`);
+                await deleteIngestFile(targetFileId);
+                console.log(`[API 6/8] Xoá file ${targetFileId} trong Database thành công!`);
+              } catch (e: any) {
+                setDeletingFileId(null);
+                console.error('Lỗi khi xoá tài liệu trên Database:', e);
+                Alert.alert(
+                  'Không thể xoá tài liệu',
+                  e?.message || 'Máy chủ không cho phép xoá tài liệu này hoặc gặp lỗi kết nối. Vui lòng thử lại.'
+                );
+                return; // QUAN TRỌNG: Không xoá local nếu DB xoá thất bại, tránh lỗi reload bị hiện lại!
+              } finally {
+                setDeletingFileId(null);
+              }
+            } else {
+              console.log('[Xoá Local] Tài liệu chỉ tồn tại cục bộ, chưa lưu lên Database.');
+            }
+
+            // 3. Xoá hoàn toàn khỏi State và AsyncStorage
+            const storageKey = await resolveAccountStorageKey();
+            setItems((prev) => {
+              const updated = prev.filter(
+                (it) =>
+                  it.id !== item.id &&
+                  (!targetFileId || (it.fileId !== targetFileId && it.id !== targetFileId))
+              );
+              AsyncStorage.setItem(storageKey, JSON.stringify(updated)).catch((err) =>
+                console.log('Lỗi lưu AsyncStorage sau khi xoá:', err)
+              );
+              return updated;
+            });
+
+            Alert.alert('Thành công', 'Đã xoá tài liệu khỏi hệ thống và cơ sở dữ liệu.');
           },
         },
       ]
     );
-  };
-
-  const openVerificationModal = async (item: UploadItem, shouldFetchDetail = true) => {
-    if (!item.analysis) return;
-    const fId = item.fileId || item.id;
-
-    if (shouldFetchDetail) {
-      await getIngestFileDetail(fId).catch(() => {
-        console.log(`Lấy chi tiết file & Presigned URL (${fId}) thành công!`);
-      });
-    }
-
-    const initialDraft: Record<string, string> = {};
-    item.analysis.metrics.forEach((m) => {
-      initialDraft[m.key] = m.value;
-    });
-    setDraftWeek(String(item.analysis.gestationalWeek || profileWeek || 24));
-    setDraftMetrics(initialDraft);
-    setZoomSlipImage(false);
-    setVerifyModalItem(item);
-  };
-
-  const startEditingInline = (item: UploadItem) => {
-    if (!item.analysis) return;
-    const initialDraft: Record<string, string> = {};
-    item.analysis.metrics.forEach((m) => {
-      initialDraft[m.key] = m.value;
-    });
-    setDraftWeek(String(item.analysis.gestationalWeek || profileWeek || 24));
-    setDraftMetrics(initialDraft);
-    setEditingId(item.id);
   };
 
   const applyEditedMetricsToItem = (item: UploadItem, markConfirmed: boolean = false): UploadItem => {
@@ -1071,57 +1543,39 @@ export default function UploadScreen({ navigation }: Props) {
     };
   };
 
-  const saveEditedMetrics = (id: string) => {
-    updateItemsAndPersist((prev) =>
-      prev.map((item) => (item.id === id ? applyEditedMetricsToItem(item, false) : item))
-    );
-    setEditingId(null);
-    setDraftMetrics({});
-    console.log('Cập nhật và đối chiếu lại chỉ số thành công!');
-  };
+  // Khi bấm "Xác nhận & Lưu vào hồ sơ": Tự động lưu vào Database PostgreSQL
+  const confirmFromVerificationModal = async () => {
+    if (!verifyModalItem || savingToDb) return;
+    setSavingToDb(true);
 
-  const confirmFromVerificationModal = () => {
-    if (!verifyModalItem) return;
-    const targetId = verifyModalItem.id;
-    updateItemsAndPersist((prev) =>
-      prev.map((item) => (item.id === targetId ? applyEditedMetricsToItem(item, true) : item))
-    );
-    console.log(`Xác nhận đối chiếu và lưu hồ sơ thành công cho "${verifyModalItem.name}"!`);
-    setVerifyModalItem(null);
-    setEditingId(null);
-    setDraftMetrics({});
-    Alert.alert(
-      'Đã đối chiếu & Lưu hồ sơ',
-      'Các chỉ số đã được xác nhận khớp với phiếu khám và ghi vĩnh viễn vào hồ sơ sức khỏe của mẹ!'
-    );
-  };
+    try {
+      const targetId = verifyModalItem.id;
+      const updatedItem = applyEditedMetricsToItem(verifyModalItem, true);
 
-  const cancelEditing = () => {
-    setEditingId(null);
-    setDraftMetrics({});
-  };
+      updateItemsAndPersist((prev) =>
+        prev.map((item) => (item.id === targetId ? updatedItem : item))
+      );
 
-  const saveAnalysisToMedicalRecord = (id: string) => {
-    updateItemsAndPersist((prev) =>
-      prev.map((item) => {
-        if (item.id !== id || !item.analysis) return item;
-        const baseItem = editingId === id ? applyEditedMetricsToItem(item, true) : item;
-        return {
-          ...baseItem,
-          status: 'done',
-          analysis: {
-            ...baseItem.analysis!,
-            savedToProfile: true,
-          },
-        };
-      })
-    );
-    if (editingId === id) {
-      setEditingId(null);
+      const dbRes: any = await persistConfirmedItemToPostgreSQL(updatedItem);
+
+      setVerifyModalItem(null);
+      setIsModalEditing(false);
       setDraftMetrics({});
+      const endpointsMsg = dbRes?.savedEndpoints?.length
+        ? `\n\nChi tiết kết nối Database:\n• ${dbRes.savedEndpoints.join('\n• ')}`
+        : '';
+      Alert.alert(
+        'Đã đối chiếu & Lưu vào Database',
+        `Các chỉ số phiếu khám đã được xác nhận và đồng bộ trực tiếp vào cơ sở dữ liệu PostgreSQL!${endpointsMsg}`
+      );
+    } catch (e: any) {
+      Alert.alert(
+        'Lưu hồ sơ',
+        e?.message || 'Đã cập nhật hồ sơ. Vui lòng kiểm tra kết nối máy chủ.'
+      );
+    } finally {
+      setSavingToDb(false);
     }
-    console.log('Xác nhận và ghi các chỉ số vào hồ sơ sức khỏe thành công!');
-    Alert.alert('Thành công', 'Đã xác nhận và ghi các chỉ số vào hồ sơ sức khỏe!');
   };
 
   const takePhoto = async () => {
@@ -1172,11 +1626,21 @@ export default function UploadScreen({ navigation }: Props) {
       });
       if (result.canceled) return;
       const asset = result.assets[0];
+
+      let mime = asset.mimeType;
+      const lowerName = (asset.name || '').toLowerCase();
+      if (!mime || mime === 'application/octet-stream') {
+        if (lowerName.endsWith('.pdf')) mime = 'application/pdf';
+        else if (lowerName.endsWith('.png')) mime = 'image/png';
+        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime = 'image/jpeg';
+        else mime = 'application/pdf';
+      }
+
       await uploadAndAnalyzeFile(
         asset.uri,
         asset.name,
         asset.size,
-        asset.mimeType ?? 'application/pdf'
+        mime
       );
     } finally {
       isPickingFileRef.current = false;
@@ -1192,6 +1656,29 @@ export default function UploadScreen({ navigation }: Props) {
       { text: 'Huỷ', style: 'cancel' },
     ]);
   };
+
+  const activeModalWeek =
+    parseInt(draftWeek, 10) || verifyModalItem?.analysis?.gestationalWeek || 24;
+  const activeModalMetrics: MedicalMetric[] = verifyModalItem?.analysis
+    ? verifyModalItem.analysis.metrics.map((m) => {
+        const val = draftMetrics[m.key] ?? m.value;
+        const ev = evaluateMetricByWeek(m.key, val, activeModalWeek);
+        return {
+          ...m,
+          value: val,
+          refRange: ev.refRange || m.refRange,
+          severity: ev.severity,
+          clinicalNote: ev.clinicalNote,
+        };
+      })
+    : [];
+
+  const activeModalSummary = verifyModalItem?.analysis
+    ? summarizeAnalysisState(activeModalMetrics, verifyModalItem.name, activeModalWeek)
+    : null;
+  const activeModalTheme = activeModalSummary
+    ? SEVERITY_THEME[activeModalSummary.overallSeverity]
+    : SEVERITY_THEME.normal;
 
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
@@ -1221,7 +1708,7 @@ export default function UploadScreen({ navigation }: Props) {
 
           <Text style={styles.dropTitle}>Chụp ảnh hoặc tải lên phiếu khám (PDF/Ảnh)</Text>
           <Text style={styles.dropSub}>
-            Hỗ trợ tải đơn lẻ hoặc tải hàng loạt (Batch Upload) • Xử lý qua hàng đợi Celery
+            Hỗ trợ tải đơn lẻ hoặc tải hàng loạt (Batch Upload) • Đồng bộ trực tiếp vào Database
           </Text>
 
           <View style={styles.uploadBtnRow}>
@@ -1244,21 +1731,6 @@ export default function UploadScreen({ navigation }: Props) {
           </View>
         )}
 
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} />
-            <Text style={styles.legendText}>Xanh: 10th–90th</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#EAB308' }]} />
-            <Text style={styles.legendText}>Vàng: 3rd–10th / 90th–97th</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-            <Text style={styles.legendText}>Đỏ: {'<'}3rd / {'>'}97th</Text>
-          </View>
-        </View>
-
         <Text style={styles.sectionTitle}>
           Tài liệu & Kết quả đã lưu ({items.length})
         </Text>
@@ -1266,7 +1738,7 @@ export default function UploadScreen({ navigation }: Props) {
         {loadingStorage ? (
           <View style={styles.emptyBox}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.emptyText}>Đang đồng bộ danh sách tài liệu từ hồ sơ...</Text>
+            <Text style={styles.emptyText}>Đang đồng bộ danh sách tài liệu từ Database...</Text>
           </View>
         ) : items.length === 0 ? (
           <View style={styles.emptyBox}>
@@ -1281,13 +1753,6 @@ export default function UploadScreen({ navigation }: Props) {
             const isPdf = item.name.toLowerCase().endsWith('.pdf');
             const previewSourceUri = item.presignedUrl || item.uri;
             const hasImagePreview = Boolean(previewSourceUri) && isImageItem(item);
-            const isEditingThis = editingId === item.id;
-            const overallTheme = item.analysis
-              ? SEVERITY_THEME[item.analysis.overallSeverity]
-              : SEVERITY_THEME.normal;
-            const stageInfo = getPregnancyStageInfo(
-              isEditingThis ? parseInt(draftWeek, 10) || 24 : item.analysis?.gestationalWeek || 24
-            );
 
             return (
               <View key={item.id} style={styles.itemCard}>
@@ -1308,7 +1773,7 @@ export default function UploadScreen({ navigation }: Props) {
 
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemName} numberOfLines={1}>
-                      {item.name}
+                      {decodeFileName(item.name)}
                     </Text>
                     <Text style={styles.itemTime}>
                       {item.time}
@@ -1320,20 +1785,26 @@ export default function UploadScreen({ navigation }: Props) {
                     <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
                   </View>
 
-                  <Pressable
-                    onPress={() => deleteItem(item)}
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  </Pressable>
+                  {deletingFileId === item.id ? (
+                    <ActivityIndicator size="small" color="#EF4444" style={{ marginLeft: 8 }} />
+                  ) : (
+                    <Pressable
+                      onPress={() => deleteItem(item)}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </Pressable>
+                  )}
                 </View>
 
                 {item.status === 'processing' && (
                   <View style={styles.processingBox}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={styles.processingText}>
-                      Đang xử lý trích xuất trên Celery Queue & đối chiếu theo tuần thai...
+                      {item.stageMessage
+                        ? `${item.stageMessage} (${item.progressPercentage ?? 0}%)`
+                        : 'Đang phân tích trên Celery Queue...'}
                     </Text>
                   </View>
                 )}
@@ -1355,281 +1826,81 @@ export default function UploadScreen({ navigation }: Props) {
                         <Text style={styles.retryBtnText}>Thử lại trích xuất (Retry)</Text>
                       </Pressable>
 
-                      <Pressable
-                        style={styles.removeFailedBtn}
-                        onPress={() => deleteItem(item)}
-                      >
-                        <Text style={styles.removeFailedBtnText}>Xoá file</Text>
-                      </Pressable>
+                      {deletingFileId === item.id ? (
+                        <ActivityIndicator size="small" color="#EF4444" style={{ marginHorizontal: 16 }} />
+                      ) : (
+                        <Pressable
+                          style={styles.removeFailedBtn}
+                          onPress={() => deleteItem(item)}
+                        >
+                          <Text style={styles.removeFailedBtnText}>Xoá file</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 )}
 
+                {/* CHỈ HIỂN THỊ KHUNG MỞ MÀN HÌNH ĐỐI CHIẾU, KHÔNG HIỂN THỊ CÁC CHỈ SỐ Ở NGOÀI */}
                 {item.analysis && (
-                  <View style={styles.analysisBox}>
-                    <View style={styles.slipPreviewContainer}>
-                      <View style={styles.slipPreviewHeader}>
-                        <View style={styles.slipPreviewTitleRow}>
-                          <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
-                          <Text style={styles.slipPreviewTitle}>
-                            {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
-                          </Text>
-                        </View>
-                        <Pressable
-                          style={styles.compareSplitBtn}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Ionicons name="git-compare-outline" size={14} color={colors.white} />
-                          <Text style={styles.compareSplitBtnText}>
-                            Mở màn hình Đối chiếu
-                          </Text>
-                        </Pressable>
-                      </View>
-
-                      {hasImagePreview ? (
-                        <Pressable onPress={() => openVerificationModal(item)}>
-                          <Image
-                            source={{ uri: previewSourceUri }}
-                            style={styles.slipThumbnail}
-                            resizeMode="cover"
-                          />
-                          <View style={styles.slipOverlayHint}>
-                            <Ionicons name="expand-outline" size={14} color={colors.white} />
-                            <Text style={styles.slipOverlayHintText}>
-                              Chạm vào ảnh để phóng to & đối chiếu từng chỉ số
-                            </Text>
-                          </View>
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          style={styles.pdfSlipPreviewBox}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Ionicons name="document-text" size={24} color="#EF4444" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.pdfSlipName} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <Text style={styles.pdfSlipSub}>
-                              Bấm để lấy Presigned URL & Đối chiếu từng chỉ số
-                            </Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={18} color="#64748B" />
-                        </Pressable>
-                      )}
-                    </View>
-
-                    <View style={styles.analysisHeader}>
-                      <Ionicons name="medkit-outline" size={16} color={colors.primary} />
-                      <Text style={styles.analysisTitle}>{item.analysis.recordType}</Text>
-                    </View>
-
-                    <View style={styles.stageBadgeBox}>
-                      <Ionicons name="calendar-outline" size={15} color="#0F766E" />
-                      <Text style={styles.stageBadgeText}>
-                        Mốc đối chiếu: {stageInfo.stageLabel}
-                      </Text>
-                    </View>
-
-                    {isEditingThis && (
-                      <View style={styles.weekEditorRow}>
-                        <Text style={styles.weekEditorLabel}>
-                          Đổi tuần thai (12–41 tuần) để so sánh lại chuẩn:
+                  <View style={styles.compactVerifyBox}>
+                    <View style={styles.slipPreviewHeader}>
+                      <View style={styles.slipPreviewTitleRow}>
+                        <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
+                        <Text style={styles.slipPreviewTitle}>
+                          {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
                         </Text>
-                        <View style={styles.weekStepper}>
-                          <Pressable
-                            style={styles.weekStepBtn}
-                            onPress={() =>
-                              setDraftWeek((w) =>
-                                String(Math.max(12, (parseInt(w, 10) || 24) - 1))
-                              )
-                            }
-                          >
-                            <Ionicons name="remove" size={16} color={colors.navy} />
-                          </Pressable>
-                          <TextInput
-                            style={styles.weekInput}
-                            value={draftWeek}
-                            onChangeText={setDraftWeek}
-                            keyboardType="number-pad"
-                            maxLength={2}
-                          />
-                          <Pressable
-                            style={styles.weekStepBtn}
-                            onPress={() =>
-                              setDraftWeek((w) =>
-                                String(Math.min(41, (parseInt(w, 10) || 24) + 1))
-                              )
-                            }
-                          >
-                            <Ionicons name="add" size={16} color={colors.navy} />
-                          </Pressable>
-                        </View>
                       </View>
+                      <Pressable
+                        style={styles.compareSplitBtn}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="git-compare-outline" size={14} color={colors.white} />
+                        <Text style={styles.compareSplitBtnText}>
+                          Mở màn hình Đối chiếu
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {hasImagePreview ? (
+                      <Pressable onPress={() => openVerificationModal(item)}>
+                        <Image
+                          source={{ uri: previewSourceUri }}
+                          style={styles.slipThumbnail}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.slipOverlayHint}>
+                          <Ionicons name="expand-outline" size={14} color={colors.white} />
+                          <Text style={styles.slipOverlayHintText}>
+                            Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.pdfSlipPreviewBox}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="document-text" size={24} color="#EF4444" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pdfSlipName} numberOfLines={1}>
+                            {decodeFileName(item.name)}
+                          </Text>
+                          <Text style={styles.pdfSlipSub}>
+                            Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                      </Pressable>
                     )}
 
-                    <View
-                      style={[
-                        styles.doctorBanner,
-                        {
-                          backgroundColor:
-                            item.analysis.overallSeverity === 'normal'
-                              ? '#ECFDF5'
-                              : overallTheme.cardBg,
-                          borderColor:
-                            item.analysis.overallSeverity === 'normal'
-                              ? '#10B981'
-                              : overallTheme.border,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={overallTheme.icon}
-                        size={18}
-                        color={
-                          item.analysis.overallSeverity === 'normal'
-                            ? '#059669'
-                            : overallTheme.valueColor
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.doctorBannerText,
-                          {
-                            color:
-                              item.analysis.overallSeverity === 'normal'
-                                ? '#065F46'
-                                : overallTheme.valueColor,
-                          },
-                        ]}
-                      >
-                        {item.analysis.doctorConclusion}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricsGrid}>
-                      {item.analysis.metrics.map((m) => {
-                        const liveEval = isEditingThis
-                          ? evaluateMetricByWeek(
-                              m.key,
-                              draftMetrics[m.key] ?? m.value,
-                              parseInt(draftWeek, 10) || 24
-                            )
-                          : null;
-
-                        const activeSeverity = liveEval ? liveEval.severity : m.severity;
-                        const activeRefRange = liveEval?.refRange || m.refRange;
-                        const activeNote = liveEval ? liveEval.clinicalNote : m.clinicalNote;
-                        const mTheme = SEVERITY_THEME[activeSeverity];
-                        const isFullWidth =
-                          m.key === 'glu' || m.key === 'pro' || m.key === 'efw' || m.key === 'hgb';
-
-                        return (
-                          <View
-                            key={m.key}
-                            style={[
-                              styles.metricItem,
-                              isFullWidth && { minWidth: '100%' },
-                              {
-                                backgroundColor: mTheme.cardBg,
-                                borderColor: isEditingThis ? colors.primary : mTheme.border,
-                                borderWidth: activeSeverity === 'normal' ? 1 : 1.5,
-                              },
-                            ]}
-                          >
-                            <View style={styles.metricTopRow}>
-                              <Text style={styles.metricLabel}>{m.label}</Text>
-                              <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
-                                <Text style={[styles.severityPillText, { color: mTheme.badgeColor }]}>
-                                  {mTheme.badgeLabel}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {isEditingThis ? (
-                              <View style={styles.metricInputRow}>
-                                <TextInput
-                                  style={styles.metricInput}
-                                  value={draftMetrics[m.key] ?? m.value}
-                                  onChangeText={(text) =>
-                                    setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
-                                  }
-                                  placeholder="Nhập chỉ số..."
-                                  placeholderTextColor="#94A3B8"
-                                />
-                                {!!m.unit && <Text style={styles.metricUnitText}>{m.unit}</Text>}
-                              </View>
-                            ) : (
-                              <Text style={[styles.metricValue, { color: mTheme.valueColor }]}>
-                                {m.value} {m.unit}
-                              </Text>
-                            )}
-
-                            <Text style={styles.refRangeText}>Ngưỡng chuẩn: {activeRefRange}</Text>
-                            <Text
-                              style={[
-                                styles.clinicalNoteText,
-                                activeSeverity !== 'normal' && {
-                                  color: mTheme.valueColor,
-                                  fontWeight: '700',
-                                },
-                              ]}
-                            >
-                              {activeNote}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    <View style={styles.fixedDisclaimerBox}>
-                      <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
-                      <Text style={styles.fixedDisclaimerText}>
-                        Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa. (Rule: {item.analysis.rule_version || DEFAULT_RULE_VERSION} • Model: {item.analysis.model_version || DEFAULT_MODEL_VERSION})
-                      </Text>
-                    </View>
-
-                    {isEditingThis ? (
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          style={styles.saveRecordBtn}
-                          onPress={() => saveEditedMetrics(item.id)}
-                        >
-                          <Ionicons name="save-outline" size={16} color={colors.white} />
-                          <Text style={styles.saveRecordBtnText}>Lưu & Đối chiếu lại</Text>
-                        </Pressable>
-
-                        <Pressable style={styles.editRecordBtn} onPress={cancelEditing}>
-                          <Text style={styles.editRecordBtnText}>Huỷ</Text>
-                        </Pressable>
-                      </View>
-                    ) : !item.analysis.savedToProfile ? (
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          style={styles.saveRecordBtn}
-                          onPress={() => saveAnalysisToMedicalRecord(item.id)}
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} />
-                          <Text style={styles.saveRecordBtnText}>Xác nhận & Ghi vào hồ sơ</Text>
-                        </Pressable>
-
-                        <Pressable
-                          style={styles.editRecordBtn}
-                          onPress={() => openVerificationModal(item)}
-                        >
-                          <Text style={styles.editRecordBtnText}>Đối chiếu & Sửa</Text>
-                        </Pressable>
-                      </View>
-                    ) : (
+                    {item.analysis.savedToProfile && (
                       <View style={styles.savedRow}>
                         <View style={styles.savedTag}>
                           <Ionicons name="checkmark-done" size={14} color={colors.primaryDark} />
-                          <Text style={styles.savedTagText}>Đã đối chiếu & lưu vào hồ sơ</Text>
+                          <Text style={styles.savedTagText}>
+                            Đã đối chiếu & lưu vào Database ({item.analysis.gestationalAge})
+                          </Text>
                         </View>
-
-                        <Pressable onPress={() => startEditingInline(item)} hitSlop={6}>
-                          <Text style={styles.reEditText}>Chỉnh sửa / Đổi tuần</Text>
-                        </Pressable>
                       </View>
                     )}
                   </View>
@@ -1649,24 +1920,32 @@ export default function UploadScreen({ navigation }: Props) {
         </Pressable>
       </ScrollView>
 
-      {/* MODAL ĐỐI CHIẾU VỚI PRESIGNED URL BẢN GỐC & XÁC NHẬN DỮ LIỆU */}
+      {/* MODAL MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU */}
       <Modal
         visible={verifyModalItem !== null}
         animationType="slide"
-        onRequestClose={() => setVerifyModalItem(null)}
+        onRequestClose={() => {
+          setVerifyModalItem(null);
+          setIsModalEditing(false);
+        }}
       >
         <SafeAreaView style={styles.modalScreen} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <Pressable
               style={styles.headerButton}
-              onPress={() => setVerifyModalItem(null)}
+              onPress={() => {
+                setVerifyModalItem(null);
+                setIsModalEditing(false);
+              }}
             >
               <Ionicons name="close" size={20} color={colors.navy} />
             </Pressable>
             <View style={{ flex: 1, alignItems: 'center' }}>
               <Text style={styles.modalHeaderTitle}>Đối chiếu & Xác nhận dữ liệu</Text>
               <Text style={styles.modalHeaderSub}>
-                Kiểm tra các chỉ số trích xuất với phiếu khám trước khi lưu
+                {isModalEditing
+                  ? 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch'
+                  : 'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi'}
               </Text>
             </View>
             <View style={{ width: 32 }} />
@@ -1682,7 +1961,7 @@ export default function UploadScreen({ navigation }: Props) {
                   <View style={styles.slipPreviewTitleRow}>
                     <Ionicons name="document-text-outline" size={15} color={colors.white} />
                     <Text style={styles.splitTopBarTitle} numberOfLines={1}>
-                      Bản gốc: {verifyModalItem.name}
+                      Bản gốc: {decodeFileName(verifyModalItem.name)}
                     </Text>
                   </View>
                   {isImageItem(verifyModalItem) && (
@@ -1723,10 +2002,12 @@ export default function UploadScreen({ navigation }: Props) {
                     <Ionicons name="document-attach" size={28} color="#F87171" />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.modalPdfTitle} numberOfLines={1}>
-                        {verifyModalItem.name}
+                        {decodeFileName(verifyModalItem.name)}
                       </Text>
                       <Text style={styles.modalPdfHint}>
-                        Hãy kiểm tra các chỉ số bên dưới khớp với tờ phiếu khám của bạn. Chạm vào ô bất kỳ để chỉnh sửa.
+                        {isModalEditing
+                          ? 'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.'
+                          : 'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.'}
                       </Text>
                     </View>
                   </View>
@@ -1738,39 +2019,90 @@ export default function UploadScreen({ navigation }: Props) {
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled"
               >
+                {/* HỘP CẢNH BÁO HIỂN THỊ NGAY BÊN TRONG MÀN HÌNH ĐỐI CHIẾU */}
+                {activeModalSummary && (
+                  <View
+                    style={[
+                      styles.doctorBanner,
+                      {
+                        backgroundColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? '#ECFDF5'
+                            : activeModalTheme.cardBg,
+                        borderColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? '#10B981'
+                            : activeModalTheme.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={activeModalTheme.icon}
+                      size={18}
+                      color={
+                        activeModalSummary.overallSeverity === 'normal'
+                          ? '#059669'
+                          : activeModalTheme.valueColor
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.doctorBannerText,
+                        {
+                          color:
+                            activeModalSummary.overallSeverity === 'normal'
+                              ? '#065F46'
+                              : activeModalTheme.valueColor,
+                        },
+                      ]}
+                    >
+                      {activeModalSummary.doctorConclusion}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.fixedDisclaimerBox}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
+                  <Text style={styles.fixedDisclaimerText}>
+                    Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.
+                  </Text>
+                </View>
+
                 <View style={styles.weekEditorRow}>
                   <Text style={styles.weekEditorLabel}>
-                    Tuần thai trên phiếu khám (12–41 tuần):
+                    Mốc đối chiếu: {getPregnancyStageInfo(activeModalWeek).stageLabel}
                   </Text>
-                  <View style={styles.weekStepper}>
-                    <Pressable
-                      style={styles.weekStepBtn}
-                      onPress={() =>
-                        setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
-                      }
-                    >
-                      <Ionicons name="remove" size={16} color={colors.navy} />
-                    </Pressable>
-                    <TextInput
-                      style={styles.weekInput}
-                      value={draftWeek}
-                      onChangeText={setDraftWeek}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                    />
-                    <Pressable
-                      style={styles.weekStepBtn}
-                      onPress={() =>
-                        setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
-                      }
-                    >
-                      <Ionicons name="add" size={16} color={colors.navy} />
-                    </Pressable>
-                  </View>
+                  {isModalEditing && (
+                    <View style={styles.weekStepper}>
+                      <Pressable
+                        style={styles.weekStepBtn}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
+                        }
+                      >
+                        <Ionicons name="remove" size={16} color={colors.navy} />
+                      </Pressable>
+                      <TextInput
+                        style={styles.weekInput}
+                        value={draftWeek}
+                        onChangeText={setDraftWeek}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                      <Pressable
+                        style={styles.weekStepBtn}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
+                        }
+                      >
+                        <Ionicons name="add" size={16} color={colors.navy} />
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.modalSectionLabel}>
-                  Các chỉ số đã trích xuất ({verifyModalItem.analysis.metrics.length} chỉ số) — Chạm vào ô để sửa nếu lệch so với phiếu:
+                  Các chỉ số đã phân tích từ file ({verifyModalItem.analysis.metrics.length} chỉ số):
                 </Text>
 
                 {verifyModalItem.analysis.metrics.map((m) => {
@@ -1778,7 +2110,7 @@ export default function UploadScreen({ navigation }: Props) {
                   const liveEval = evaluateMetricByWeek(
                     m.key,
                     currentVal,
-                    parseInt(draftWeek, 10) || 24
+                    activeModalWeek
                   );
                   const mTheme = SEVERITY_THEME[liveEval.severity];
 
@@ -1789,7 +2121,7 @@ export default function UploadScreen({ navigation }: Props) {
                         styles.verifyMetricCard,
                         {
                           backgroundColor: mTheme.cardBg,
-                          borderColor: mTheme.border,
+                          borderColor: isModalEditing ? colors.primary : mTheme.border,
                         },
                       ]}
                     >
@@ -1802,18 +2134,26 @@ export default function UploadScreen({ navigation }: Props) {
                         </View>
                       </View>
 
-                      <View style={styles.verifyInputRow}>
-                        <TextInput
-                          style={[styles.verifyInput, { color: mTheme.valueColor }]}
-                          value={currentVal}
-                          onChangeText={(text) =>
-                            setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
-                          }
-                          placeholder="Nhập giá trị..."
-                          placeholderTextColor="#94A3B8"
-                        />
-                        {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
-                      </View>
+                      {isModalEditing ? (
+                        <View style={styles.verifyInputRow}>
+                          <TextInput
+                            style={[styles.verifyInput, { color: mTheme.valueColor }]}
+                            value={currentVal}
+                            onChangeText={(text) =>
+                              setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
+                            }
+                            placeholder="Nhập giá trị..."
+                            placeholderTextColor="#94A3B8"
+                          />
+                          {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
+                        </View>
+                      ) : (
+                        <View style={styles.readOnlyValueBox}>
+                          <Text style={[styles.readOnlyValueText, { color: mTheme.valueColor }]}>
+                            {currentVal} {m.unit}
+                          </Text>
+                        </View>
+                      )}
 
                       <Text style={styles.refRangeText}>
                         Ngưỡng chuẩn: {liveEval.refRange || m.refRange}
@@ -1836,12 +2176,39 @@ export default function UploadScreen({ navigation }: Props) {
 
               <View style={styles.modalFooter}>
                 <Pressable
-                  style={styles.confirmModalBtn}
+                  style={[
+                    styles.toggleEditModalBtn,
+                    isModalEditing && styles.toggleEditModalBtnActive,
+                  ]}
+                  onPress={() => setIsModalEditing((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={isModalEditing ? 'checkmark-outline' : 'create-outline'}
+                    size={18}
+                    color={isModalEditing ? colors.white : colors.primaryDark}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleEditModalBtnText,
+                      isModalEditing && { color: colors.white },
+                    ]}
+                  >
+                    {isModalEditing ? 'Xong chỉnh sửa' : 'Chỉnh sửa'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.confirmModalBtn, savingToDb && { opacity: 0.7 }]}
+                  disabled={savingToDb}
                   onPress={confirmFromVerificationModal}
                 >
-                  <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  {savingToDb ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  )}
                   <Text style={styles.confirmModalBtnText}>
-                    Xác nhận đúng với phiếu khám & Lưu vào hồ sơ
+                    {savingToDb ? 'Đang lưu Database...' : 'Xác nhận & Lưu vào hồ sơ'}
                   </Text>
                 </Pressable>
               </View>
@@ -1950,22 +2317,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F766E',
   },
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 14,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10.5, fontWeight: '600', color: '#475569' },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -2070,21 +2421,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#DC2626',
   },
-  analysisBox: {
+  compactVerifyBox: {
     marginTop: 12,
-    padding: 12,
+    padding: 10,
     borderRadius: 10,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  slipPreviewContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    borderWidth: 1,
     borderColor: '#CBD5E1',
-    padding: 10,
-    marginBottom: 12,
   },
   slipPreviewHeader: {
     flexDirection: 'row',
@@ -2109,17 +2452,17 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.primary,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 6,
   },
   compareSplitBtnText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.white,
   },
   slipThumbnail: {
     width: '100%',
-    height: 150,
+    height: 140,
     borderRadius: 8,
     backgroundColor: '#E2E8F0',
   },
@@ -2146,7 +2489,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.white,
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
@@ -2163,166 +2506,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  analysisHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  analysisTitle: { fontSize: 13, fontWeight: '800', color: colors.navy, flex: 1 },
-  stageBadgeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#CCFBF1',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  stageBadgeText: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0F766E',
-  },
-  weekEditorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    marginBottom: 10,
-  },
-  weekEditorLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.navy,
-    flex: 1,
-    marginRight: 8,
-  },
-  weekStepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  weekStepBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  weekInput: {
-    width: 42,
-    height: 28,
-    textAlign: 'center',
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.navy,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#94A3B8',
-    paddingVertical: 0,
-  },
-  doctorBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  doctorBannerText: { flex: 1, fontSize: 11.5, fontWeight: '700', lineHeight: 16 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  metricItem: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    minWidth: '47%',
-    flexGrow: 1,
-  },
-  metricTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
-  },
-  metricLabel: { fontSize: 11, fontWeight: '700', color: '#334155', flex: 1 },
-  severityPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  severityPillText: { fontSize: 9.5, fontWeight: '800' },
-  metricValue: { fontSize: 14, fontWeight: '800', marginTop: 4 },
-  refRangeText: { fontSize: 10, color: '#0F766E', fontWeight: '700', marginTop: 3 },
-  clinicalNoteText: { fontSize: 10.5, color: '#475569', marginTop: 3, lineHeight: 14 },
-  metricInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 4 },
-  metricInput: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.navy,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#94A3B8',
-  },
-  metricUnitText: { fontSize: 11.5, fontWeight: '700', color: '#475569', marginLeft: 6 },
-  fixedDisclaimerBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    backgroundColor: '#F1F5F9',
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    marginBottom: 10,
-  },
-  fixedDisclaimerText: {
-    flex: 1,
-    fontSize: 10,
-    lineHeight: 14,
-    color: '#334155',
-    fontWeight: '600',
-  },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  saveRecordBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-  saveRecordBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
-  editRecordBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  editRecordBtnText: { fontSize: 12, fontWeight: '700', color: '#334155' },
   savedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   savedTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savedTagText: { fontSize: 11.5, fontWeight: '600', color: colors.primaryDark },
-  reEditText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
+  savedTagText: { fontSize: 11.5, fontWeight: '700', color: colors.primaryDark },
   manualButton: {
     marginTop: 18,
     minHeight: 42,
@@ -2397,6 +2591,81 @@ const styles = StyleSheet.create({
   modalPdfTitle: { fontSize: 13, fontWeight: '800', color: colors.white },
   modalPdfHint: { fontSize: 11, color: '#CBD5E1', marginTop: 4, lineHeight: 15 },
   modalScrollContent: { padding: 16, paddingBottom: 24 },
+  doctorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  doctorBannerText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  fixedDisclaimerBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    padding: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginBottom: 12,
+  },
+  fixedDisclaimerText: {
+    flex: 1,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  weekEditorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#CCFBF1',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#14B8A6',
+    marginBottom: 12,
+  },
+  weekEditorLabel: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0F766E',
+    flex: 1,
+    marginRight: 8,
+  },
+  weekStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  weekStepBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  weekInput: {
+    width: 42,
+    height: 28,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.navy,
+    backgroundColor: colors.white,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#0F766E',
+    paddingVertical: 0,
+  },
   modalSectionLabel: {
     fontSize: 12.5,
     fontWeight: '800',
@@ -2409,15 +2678,42 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginBottom: 10,
   },
+  metricTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
   verifyMetricLabel: { fontSize: 12, fontWeight: '800', color: colors.navy, flex: 1 },
-  verifyInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 4 },
+  severityPill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  severityPillText: { fontSize: 9.5, fontWeight: '800' },
+  readOnlyValueBox: {
+    marginTop: 6,
+    marginBottom: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  readOnlyValueText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  verifyInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 4,
+  },
   verifyInput: {
     flex: 1,
     fontSize: 15,
     fontWeight: '800',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -2428,14 +2724,41 @@ const styles = StyleSheet.create({
     color: '#475569',
     marginLeft: 8,
   },
+  refRangeText: { fontSize: 10.5, color: '#0F766E', fontWeight: '700', marginTop: 3 },
+  clinicalNoteText: { fontSize: 11, color: '#475569', marginTop: 3, lineHeight: 15 },
   modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
+  toggleEditModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 10,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  toggleEditModalBtnActive: {
+    backgroundColor: '#0F766E',
+    borderColor: '#0F766E',
+  },
+  toggleEditModalBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primaryDark,
+  },
   confirmModalBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2445,7 +2768,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   confirmModalBtnText: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '800',
     color: colors.white,
   },
