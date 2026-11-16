@@ -2019,39 +2019,90 @@ export default function UploadScreen({ navigation }: Props) {
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled"
               >
+                {/* HỘP CẢNH BÁO HIỂN THỊ NGAY BÊN TRONG MÀN HÌNH ĐỐI CHIẾU */}
+                {activeModalSummary && (
+                  <View
+                    style={[
+                      styles.doctorBanner,
+                      {
+                        backgroundColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? '#ECFDF5'
+                            : activeModalTheme.cardBg,
+                        borderColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? '#10B981'
+                            : activeModalTheme.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={activeModalTheme.icon}
+                      size={18}
+                      color={
+                        activeModalSummary.overallSeverity === 'normal'
+                          ? '#059669'
+                          : activeModalTheme.valueColor
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.doctorBannerText,
+                        {
+                          color:
+                            activeModalSummary.overallSeverity === 'normal'
+                              ? '#065F46'
+                              : activeModalTheme.valueColor,
+                        },
+                      ]}
+                    >
+                      {activeModalSummary.doctorConclusion}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.fixedDisclaimerBox}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
+                  <Text style={styles.fixedDisclaimerText}>
+                    Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.
+                  </Text>
+                </View>
+
                 <View style={styles.weekEditorRow}>
                   <Text style={styles.weekEditorLabel}>
-                    Tuần thai trên phiếu khám (12–41 tuần):
+                    Mốc đối chiếu: {getPregnancyStageInfo(activeModalWeek).stageLabel}
                   </Text>
-                  <View style={styles.weekStepper}>
-                    <Pressable
-                      style={styles.weekStepBtn}
-                      onPress={() =>
-                        setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
-                      }
-                    >
-                      <Ionicons name="remove" size={16} color={colors.navy} />
-                    </Pressable>
-                    <TextInput
-                      style={styles.weekInput}
-                      value={draftWeek}
-                      onChangeText={setDraftWeek}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                    />
-                    <Pressable
-                      style={styles.weekStepBtn}
-                      onPress={() =>
-                        setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
-                      }
-                    >
-                      <Ionicons name="add" size={16} color={colors.navy} />
-                    </Pressable>
-                  </View>
+                  {isModalEditing && (
+                    <View style={styles.weekStepper}>
+                      <Pressable
+                        style={styles.weekStepBtn}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
+                        }
+                      >
+                        <Ionicons name="remove" size={16} color={colors.navy} />
+                      </Pressable>
+                      <TextInput
+                        style={styles.weekInput}
+                        value={draftWeek}
+                        onChangeText={setDraftWeek}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                      <Pressable
+                        style={styles.weekStepBtn}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
+                        }
+                      >
+                        <Ionicons name="add" size={16} color={colors.navy} />
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.modalSectionLabel}>
-                  Các chỉ số đã trích xuất ({verifyModalItem.analysis.metrics.length} chỉ số) — Chạm vào ô để sửa nếu lệch so với phiếu:
+                  Các chỉ số đã phân tích từ file ({verifyModalItem.analysis.metrics.length} chỉ số):
                 </Text>
 
                 {verifyModalItem.analysis.metrics.map((m) => {
@@ -2059,7 +2110,7 @@ export default function UploadScreen({ navigation }: Props) {
                   const liveEval = evaluateMetricByWeek(
                     m.key,
                     currentVal,
-                    parseInt(draftWeek, 10) || 24
+                    activeModalWeek
                   );
                   const mTheme = SEVERITY_THEME[liveEval.severity];
 
@@ -2070,7 +2121,7 @@ export default function UploadScreen({ navigation }: Props) {
                         styles.verifyMetricCard,
                         {
                           backgroundColor: mTheme.cardBg,
-                          borderColor: mTheme.border,
+                          borderColor: isModalEditing ? colors.primary : mTheme.border,
                         },
                       ]}
                     >
@@ -2083,18 +2134,26 @@ export default function UploadScreen({ navigation }: Props) {
                         </View>
                       </View>
 
-                      <View style={styles.verifyInputRow}>
-                        <TextInput
-                          style={[styles.verifyInput, { color: mTheme.valueColor }]}
-                          value={currentVal}
-                          onChangeText={(text) =>
-                            setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
-                          }
-                          placeholder="Nhập giá trị..."
-                          placeholderTextColor="#94A3B8"
-                        />
-                        {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
-                      </View>
+                      {isModalEditing ? (
+                        <View style={styles.verifyInputRow}>
+                          <TextInput
+                            style={[styles.verifyInput, { color: mTheme.valueColor }]}
+                            value={currentVal}
+                            onChangeText={(text) =>
+                              setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
+                            }
+                            placeholder="Nhập giá trị..."
+                            placeholderTextColor="#94A3B8"
+                          />
+                          {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
+                        </View>
+                      ) : (
+                        <View style={styles.readOnlyValueBox}>
+                          <Text style={[styles.readOnlyValueText, { color: mTheme.valueColor }]}>
+                            {currentVal} {m.unit}
+                          </Text>
+                        </View>
+                      )}
 
                       <Text style={styles.refRangeText}>
                         Ngưỡng chuẩn: {liveEval.refRange || m.refRange}
@@ -2117,12 +2176,39 @@ export default function UploadScreen({ navigation }: Props) {
 
               <View style={styles.modalFooter}>
                 <Pressable
-                  style={styles.confirmModalBtn}
+                  style={[
+                    styles.toggleEditModalBtn,
+                    isModalEditing && styles.toggleEditModalBtnActive,
+                  ]}
+                  onPress={() => setIsModalEditing((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={isModalEditing ? 'checkmark-outline' : 'create-outline'}
+                    size={18}
+                    color={isModalEditing ? colors.white : colors.primaryDark}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleEditModalBtnText,
+                      isModalEditing && { color: colors.white },
+                    ]}
+                  >
+                    {isModalEditing ? 'Xong chỉnh sửa' : 'Chỉnh sửa'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.confirmModalBtn, savingToDb && { opacity: 0.7 }]}
+                  disabled={savingToDb}
                   onPress={confirmFromVerificationModal}
                 >
-                  <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  {savingToDb ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  )}
                   <Text style={styles.confirmModalBtnText}>
-                    Xác nhận đúng với phiếu khám & Lưu vào hồ sơ
+                    {savingToDb ? 'Đang lưu Database...' : 'Xác nhận & Lưu vào hồ sơ'}
                   </Text>
                 </Pressable>
               </View>
@@ -2231,22 +2317,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F766E',
   },
-  legendRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 14,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 10.5, fontWeight: '600', color: '#475569' },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -2351,21 +2421,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#DC2626',
   },
-  analysisBox: {
+  compactVerifyBox: {
     marginTop: 12,
-    padding: 12,
+    padding: 10,
     borderRadius: 10,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  slipPreviewContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    borderWidth: 1,
     borderColor: '#CBD5E1',
-    padding: 10,
-    marginBottom: 12,
   },
   slipPreviewHeader: {
     flexDirection: 'row',
@@ -2390,17 +2452,17 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.primary,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 6,
   },
   compareSplitBtnText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.white,
   },
   slipThumbnail: {
     width: '100%',
-    height: 150,
+    height: 140,
     borderRadius: 8,
     backgroundColor: '#E2E8F0',
   },
