@@ -40,15 +40,16 @@ import {
   deleteIngestFile,
   getProfileIngestFiles,
   retryIngestFile,
+  ensureActivePregnancyProfileId,
+  fetchVerificationDataFromUrl,
+  saveVerifiedRecordToDatabase,
+  isUuid,
 } from '../services/api';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<UploadStackParamList, 'UploadHome'>,
   BottomTabScreenProps<MainTabParamList, 'Upload'>
 >;
-
-export const ENABLE_DEV_TEST_PANEL = false;
-export const USE_MOCK_ANALYSIS_IF_OFFLINE = true;
 
 /* =========================================================================
    8 ĐẦU API PARACLINICAL INGEST & QUEUE (CHUẨN SWAGGER)
@@ -113,9 +114,13 @@ export type UploadItem = {
   taskId?: string;
   batchId?: string;
   profileId?: string;
+  checkupId?: string | null;
   presignedUrl?: string;
+  verificationUrl?: string;
+  progressPercentage?: number;
+  stageMessage?: string;
+  canRetry?: boolean;
   errorMessage?: string;
-  isMockSample?: boolean;
   name: string;
   time: string;
   status: Status;
@@ -125,12 +130,14 @@ export type UploadItem = {
 };
 
 const MAX_SIZE = 10 * 1024 * 1024;
+const POLL_INTERVAL_MS = 2000;
+const MAX_POLL_ATTEMPTS = 25;
 
 const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
-  processing: { label: 'Đang xử lý Celery...', bg: '#FEF9C3', color: '#A16207' },
-  pending:    { label: 'Chờ đối chiếu',        bg: '#DBEAFE', color: '#1D4ED8' },
-  done:       { label: 'Đã lưu hồ sơ',         bg: '#CCFBF1', color: colors.primaryDark },
-  failed:     { label: 'Trích xuất lỗi',       bg: '#FEE2E2', color: '#DC2626' },
+  processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
+  pending:    { label: 'Chờ đối chiếu',     bg: '#DBEAFE', color: '#1D4ED8' },
+  done:       { label: 'Đã lưu Database',   bg: '#CCFBF1', color: colors.primaryDark },
+  failed:     { label: 'Trích xuất lỗi',    bg: '#FEE2E2', color: '#DC2626' },
 };
 
 const SEVERITY_THEME: Record<
@@ -552,7 +559,8 @@ function detectWeekFromFileName(fileName: string): number {
   return 24;
 }
 
-const simulateMedicalAnalysis = (
+function parseBackendIngestResult(
+  payload: any,
   fileName: string,
   defaultWeek: number = 24,
   presetMode: 'normal' | 'warning' | 'danger' = 'warning'
