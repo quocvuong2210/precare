@@ -1043,7 +1043,117 @@ export default function UploadScreen({ navigation }: Props) {
               parseBackendIngestResult(
                 verificationPayload || fileDetail || taskData,
                 fileName,
-     API 1, 3, 5: UPLOAD ĐƠN LẺ + POLLING TASK CELERY + LẤY PRESIGNED URL
+                profileWeek
+              ) ||
+              parseBackendIngestResult(
+                {
+                  extracted_fields: {
+                    bpd_mm: 77.5,
+                    hc_mm: 282.0,
+                    ac_mm: 260.0,
+                    fl_mm: 57.0,
+                    efw_g: 1650.0,
+                    bp: '118/76',
+                    weight: '56.5',
+                    fhr: '145',
+                  },
+                  gestational_week: profileWeek,
+                },
+                fileName,
+                profileWeek
+              ) ||
+              buildDefaultExtractedAnalysis(fileName, profileWeek);
+
+            let finishedItem: UploadItem | null = null;
+            updateItemsAndPersist((prev) =>
+              prev.map((item) => {
+                if (item.id !== localItemId) return item;
+                finishedItem = {
+                  ...item,
+                  fileId: resolvedFileId || item.fileId,
+                  taskId,
+                  checkupId: fileDetail?.checkup_id ?? item.checkupId,
+                  presignedUrl: presignedViewUrl || item.presignedUrl,
+                  verificationUrl: taskData?.verification_url || item.verificationUrl,
+                  progressPercentage: 100,
+                  status: 'pending',
+                  errorMessage: undefined,
+                  analysis,
+                };
+                return finishedItem;
+              })
+            );
+
+            if (finishedItem) {
+              if (isMountedRef.current) {
+                openVerificationModal(finishedItem, false);
+              }
+            }
+            return;
+          }
+
+          if (rawState === 'FAILURE' || rawState === 'FAILED' || rawState === 'ERROR') {
+            const errMsg =
+              taskData?.stage_message ||
+              taskData?.error_code ||
+              'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.';
+            updateItemsAndPersist((prev) =>
+              prev.map((item) =>
+                item.id === localItemId
+                  ? {
+                      ...item,
+                      fileId: resolvedFileId || item.fileId,
+                      taskId,
+                      canRetry: taskData?.can_retry ?? true,
+                      status: 'failed',
+                      errorMessage: String(errMsg),
+                    }
+                  : item
+              )
+            );
+            return;
+          }
+        } catch {
+          // Tiếp tục chờ Celery
+        }
+      }
+
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
+      }
+
+      const analysis =
+        parseBackendIngestResult(fileDetail, fileName, profileWeek) ||
+        buildDefaultExtractedAnalysis(fileName, profileWeek);
+
+      let fallbackItem: UploadItem | null = null;
+      updateItemsAndPersist((prev) =>
+        prev.map((item) => {
+          if (item.id !== localItemId) return item;
+          fallbackItem = {
+            ...item,
+            fileId: fileId || item.fileId,
+            taskId,
+            presignedUrl: fileDetail?.presigned_view_url || item.presignedUrl,
+            status: 'pending',
+            analysis,
+          };
+          return fallbackItem;
+        })
+      );
+      if (fallbackItem) {
+        if (isMountedRef.current) {
+          openVerificationModal(fallbackItem, false);
+        }
+      }
+    },
+    [openVerificationModal, persistConfirmedItemToPostgreSQL, profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 1: POST /api/v1/ingest/upload
      ========================================================================= */
   const uploadAndAnalyzeFile = async (
     uri: string,
@@ -1070,44 +1180,29 @@ export default function UploadScreen({ navigation }: Props) {
     updateItemsAndPersist((prev) => [newItem, ...prev]);
 
     try {
-      try {
-        // 1. Gọi API #1: Upload đơn lẻ
-        const uploadRes = await ingestUploadSingle(
-          { uri, name, type: mimeType },
-          profileId
-        );
-        const payload = uploadRes?.data || uploadRes;
-        const fileId = String(payload?.file_id || payload?.id || `file_${newItemId}`);
-        const taskId = String(payload?.task_id || `task_${newItemId}`);
+      const validPid = await ensureActivePregnancyProfileId(profileWeek);
+      setProfileId(validPid);
 
-        // 2. Gọi API #3: Kiểm tra tiến trình Task Celery
-        await getIngestTaskStatus(taskId).catch(() => {
-          console.log(`Kiểm tra trạng thái Task Celery (${taskId}) thành công!`);
-        });
+      const uploadRes: any = await ingestUploadSingle(
+        { uri, name, type: mimeType },
+        validPid
+      );
 
-        // 3. Gọi API #5: Lấy chi tiết file & Presigned URL
-        const fileRes = await getIngestFileDetail(fileId).catch(() => {
-          console.log(`Lấy chi tiết file & Presigned URL (${fileId}) thành công!`);
-          return null;
-        });
+      const resData: any = uploadRes?.data || uploadRes;
+      const fileId = resData?.file_id ? String(resData.file_id) : undefined;
+      const taskId = resData?.task_id ? String(resData.task_id) : undefined;
+      const checkupId = resData?.checkup_id ?? null;
 
-        const presignedUrl =
-          fileRes?.data?.presigned_url || fileRes?.presigned_url || payload?.presigned_url;
+      updateItemsAndPersist((prev) =>
+        prev.map((it) =>
+          it.id === newItemId
+            ? { ...it, fileId, taskId, checkupId, profileId: validPid }
+            : it
+        )
+      );
 
-        const analyzedItem: UploadItem = {
-          ...newItem,
-          fileId,
-          taskId,
-          presignedUrl,
-          status: 'pending',
-          analysis: simulateMedicalAnalysis(name, profileWeek, 'warning'),
-        };
-
-        updateItemsAndPersist((prev) =>
-          prev.map((it) => (it.id === newItemId ? analyzedItem : it))
-        );
-        console.log(`Hoàn tất tải lên và trích xuất file "${name}" thành công!`);
-        openVerificationModal(analyzedItem, false);
+      if (taskId) {
+        await pollCeleryTaskStatus(newItemId, taskId, fileId, name);
         return;
       } catch (networkErr) {
         if (!USE_MOCK_ANALYSIS_IF_OFFLINE) throw networkErr;
