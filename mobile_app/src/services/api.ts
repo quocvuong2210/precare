@@ -827,28 +827,38 @@ export async function uploadParaclinicalFile<T = any>(
 // 1. POST /api/v1/ingest/upload — Tải lên đơn lẻ phiếu khám cận lâm sàng & sinh task Celery
 export async function ingestUploadSingle(
   file: IngestFilePayload,
-  profileId?: string
-) {
-  console.log(`[API 1/8] Đang tải lên file đơn lẻ: "${file.name}" (POST /api/v1/ingest/upload)...`);
-  const headers = await getIngestAuthHeaders(false);
+  profileId?: string,
+  options?: { checkupId?: string | null; documentType?: string }
+): Promise<{ success: boolean; data: IngestUploadResponseData; message: string }> {
+  const validProfileId =
+    profileId && profileId !== 'profile_demo_01'
+      ? profileId
+      : await ensureActivePregnancyProfileId();
+
+  console.log(
+    `[API 1/8] Đang tải lên file đơn lẻ: "${file.name}" (pregnancy_profile_id=${validProfileId})...`
+  );
+
   const formData = new FormData();
   formData.append('file', {
     uri: file.uri,
     name: file.name,
-    type: file.type,
+    type: file.type || 'application/pdf',
   } as any);
+  formData.append('pregnancy_profile_id', validProfileId);
 
-  if (profileId) {
-    formData.append('profile_id', profileId);
+  if (options?.checkupId) {
+    formData.append('checkup_id', options.checkupId);
+  }
+  if (options?.documentType) {
+    formData.append('document_type', options.documentType);
   }
 
-  const response = await fetch(`${API_BASE_URL}/ingest/upload`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  const data: any = await uploadParaclinicalFile(
+    `${API_BASE_URL}/ingest/upload`,
+    formData
+  );
 
-  const data = await handleResponse(response);
   console.log(`Tải lên file đơn lẻ "${file.name}" thành công!`);
   return data;
 }
@@ -856,39 +866,48 @@ export async function ingestUploadSingle(
 // 2. POST /api/v1/ingest/upload-batch — Tải lên hàng loạt nhiều phiếu khám (Batch Upload)
 export async function ingestUploadBatch(
   files: IngestFilePayload[],
-  profileId?: string
-) {
-  console.log(
-    `[API 2/8] Đang tải lên hàng loạt ${files.length} file (POST /api/v1/ingest/upload-batch)...`
-  );
-  const headers = await getIngestAuthHeaders(false);
-  const formData = new FormData();
+  profileId?: string,
+  options?: { checkupId?: string | null; documentType?: string }
+): Promise<{ success: boolean; data: IngestBatchResponseData; message: string }> {
+  const validProfileId =
+    profileId && profileId !== 'profile_demo_01'
+      ? profileId
+      : await ensureActivePregnancyProfileId();
 
+  console.log(
+    `[API 2/8] Đang tải lên hàng loạt ${files.length} file (pregnancy_profile_id=${validProfileId})...`
+  );
+
+  const formData = new FormData();
   files.forEach((f) => {
     formData.append('files', {
       uri: f.uri,
       name: f.name,
-      type: f.type,
+      type: f.type || 'application/pdf',
     } as any);
   });
+  formData.append('pregnancy_profile_id', validProfileId);
 
-  if (profileId) {
-    formData.append('profile_id', profileId);
+  if (options?.checkupId) {
+    formData.append('checkup_id', options.checkupId);
+  }
+  if (options?.documentType) {
+    formData.append('document_type', options.documentType);
   }
 
-  const response = await fetch(`${API_BASE_URL}/ingest/upload-batch`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  const data: any = await uploadParaclinicalFile(
+    `${API_BASE_URL}/ingest/upload-batch`,
+    formData
+  );
 
-  const data = await handleResponse(response);
   console.log(`Tải lên hàng loạt (${files.length} file) thành công!`);
   return data;
 }
 
 // 3. GET /api/v1/ingest/tasks/{task_id}/status — Polling tiến trình tác vụ Celery đơn lẻ
-export async function getIngestTaskStatus(taskId: string) {
+export async function getIngestTaskStatus(
+  taskId: string
+): Promise<{ success: boolean; data: IngestTaskStatusData }> {
   console.log(
     `[API 3/8] Đang kiểm tra trạng thái Task Celery: ${taskId} (GET /api/v1/ingest/tasks/${taskId}/status)...`
   );
@@ -901,13 +920,15 @@ export async function getIngestTaskStatus(taskId: string) {
     }
   );
 
-  const data = await handleResponse(response);
+  const data: any = await handleResponse(response);
   console.log(`Kiểm tra trạng thái Task Celery (${taskId}) thành công!`);
   return data;
 }
 
 // 4. GET /api/v1/ingest/batches/{batch_id}/status — Polling tiến trình tổng hợp của đợt tải hàng loạt
-export async function getIngestBatchStatus(batchId: string) {
+export async function getIngestBatchStatus(
+  batchId: string
+): Promise<{ success: boolean; data: IngestBatchStatusData }> {
   console.log(
     `[API 4/8] Đang kiểm tra tiến trình Batch: ${batchId} (GET /api/v1/ingest/batches/${batchId}/status)...`
   );
@@ -920,13 +941,15 @@ export async function getIngestBatchStatus(batchId: string) {
     }
   );
 
-  const data = await handleResponse(response);
+  const data: any = await handleResponse(response);
   console.log(`Kiểm tra tiến trình Batch (${batchId}) thành công!`);
   return data;
 }
 
 // 5. GET /api/v1/ingest/files/{file_id} — Chi tiết file & lấy Presigned URL xem trước bản gốc
-export async function getIngestFileDetail(fileId: string) {
+export async function getIngestFileDetail(
+  fileId: string
+): Promise<{ success: boolean; data: IngestFileDetailData }> {
   console.log(
     `[API 5/8] Đang lấy chi tiết file & Presigned URL: ${fileId} (GET /api/v1/ingest/files/${fileId})...`
   );
@@ -939,13 +962,12 @@ export async function getIngestFileDetail(fileId: string) {
     }
   );
 
-  const data = await handleResponse(response);
+  const data: any = await handleResponse(response);
   console.log(`Lấy chi tiết file & Presigned URL (${fileId}) thành công!`);
   return data;
 }
 
 // 6. DELETE /api/v1/ingest/files/{file_id} — Xóa tài liệu tải lên nhầm (khi status là pending hoặc failed)
-export async function deleteIngestFile(fileId: string) {
   console.log(`[API 6/8] Đang xoá tài liệu: ${fileId} (DELETE /api/v1/ingest/files/${fileId})...`);
   const headers = await getIngestAuthHeaders(false);
   const response = await fetch(
