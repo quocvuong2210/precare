@@ -15,8 +15,6 @@ export interface UserAccountInfo {
   birthday?: string;
 }
 
-
-
 // Lưu thông tin tài khoản hiện tại trong phiên
 export let currentAccessToken: string = '';
 export let currentUserProfile: UserAccountInfo | null = null;
@@ -41,22 +39,20 @@ export async function restoreSession(): Promise<UserAccountInfo | null> {
   return currentUserProfile;
 }
 
-// End the local session even if the server is offline. Preserve account records
-// and device preferences; only authentication data belongs to this operation.
+// Đăng xuất và xóa thông tin phiên cục bộ
 export async function logout(): Promise<void> {
   sessionRevision += 1;
-  const token = currentAccessToken || await AsyncStorage.getItem('precare_access_token');
+  const token = currentAccessToken || (await AsyncStorage.getItem('precare_access_token'));
   const refreshToken = await AsyncStorage.getItem('precare_refresh_token');
   await AsyncStorage.multiRemove([
     'precare_access_token',
     'precare_current_user',
-    'precare_refresh_token'
+    'precare_refresh_token',
   ]);
   sessionRevision += 1;
   currentAccessToken = '';
   currentUserProfile = null;
 
-  // Older installations may not have stored a refresh token.
   if (!token || !refreshToken) return;
 
   const controller = new AbortController();
@@ -64,35 +60,45 @@ export async function logout(): Promise<void> {
   try {
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ refresh_token: refreshToken }),
       signal: controller.signal,
     });
   } catch {
-    // Local credentials have already been removed; network failure must not
-    // keep the user signed in on this device.
+    // Bỏ qua lỗi mạng khi đã xóa token trên máy
   } finally {
     clearTimeout(timeout);
   }
 }
 
-// Hàm dùng chung để xử lý response từ backend
-async function handleResponse(response: Response) {
-  let data;
+// Hàm đọc JSON an toàn tránh lỗi crash khi Backend trả về text thuần
+async function safeParseJson(response: Response): Promise<any> {
+  const rawText = await response.text();
   try {
-    data = await response.json();
+    return rawText ? JSON.parse(rawText) : {};
   } catch {
-    throw new Error(response.status >= 500
-      ? 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.'
-      : `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}).`);
+    return {
+      detail: rawText.includes('Internal Server Error')
+        ? 'Máy chủ đang gặp lỗi (HTTP 500). Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.'
+        : rawText || `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}).`,
+    };
   }
+}
+
+// Hàm dùng chung để xử lý response từ backend
+async function handleResponse(response: Response): Promise<any> {
+  const data: any = await safeParseJson(response);
 
   if (!response.ok) {
-    const detail = data.detail;
+    const detail = data?.detail;
     const message = Array.isArray(detail)
       ? detail.map((d: any) => d.msg).join('; ')
       : typeof detail === 'string'
-        ? detail : detail?.message || data.message || 'Yêu cầu thất bại';
+      ? detail
+      : detail?.message || data?.message || `Yêu cầu thất bại (HTTP ${response.status})`;
     throw new Error(message);
   }
 
@@ -100,7 +106,7 @@ async function handleResponse(response: Response) {
 }
 
 // Hàm dùng chung để gọi API xác thực (chức năng Quên mật khẩu)
-async function postAuth(path: string, body: object) {
+async function postAuth(path: string, body: object): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/auth/${path}`, {
     method: 'POST',
     headers: {
@@ -110,13 +116,13 @@ async function postAuth(path: string, body: object) {
     body: JSON.stringify(body),
   });
 
-  const data = await response.json();
+  const data: any = await safeParseJson(response);
 
   if (!response.ok) {
     throw new Error(
-      typeof data.detail === 'string'
+      typeof data?.detail === 'string'
         ? data.detail
-        : data.message || JSON.stringify(data.detail || data),
+        : data?.message || JSON.stringify(data?.detail || data)
     );
   }
 
@@ -208,7 +214,7 @@ export interface SendOtpResponse {
   retry_after: number;
 }
 
-export async function sendOtp(email: string, role: string = 'pregnant_woman') {
+export async function sendOtp(email: string, _role: string = 'pregnant_woman'): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
     method: 'POST',
     headers: {
@@ -216,12 +222,13 @@ export async function sendOtp(email: string, role: string = 'pregnant_woman') {
     },
     body: JSON.stringify({
       email,
-      role: 'pregnant_woman', // Ép cứng luôn là mẹ bầu
+      role: 'pregnant_woman',
     }),
   });
 
   return handleResponse(response);
 }
+
 // 2. Xác thực OTP (đăng ký)
 export interface VerifyOtpResponse {
   status: string;
@@ -231,7 +238,7 @@ export interface VerifyOtpResponse {
 
 export async function verifyOtp(
   email: string,
-  otp: string,
+  otp: string
 ): Promise<VerifyOtpResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
     method: 'POST',
@@ -258,8 +265,8 @@ export interface RegisterRequest {
 
 export async function register(
   user: RegisterRequest,
-  verificationToken: string,
-) {
+  verificationToken: string
+): Promise<any> {
   const response = await fetch(
     `${API_BASE_URL}/auth/register?verification_token=${encodeURIComponent(verificationToken)}`,
     {
@@ -268,36 +275,29 @@ export async function register(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(user),
-    },
+    }
   );
 
   return handleResponse(response);
 }
 
-// Gửi yêu cầu quên mật khẩu (Của bạn)
-export function forgotPassword(email: string) {
+// Gửi yêu cầu quên mật khẩu
+export function forgotPassword(email: string): Promise<any> {
   return postAuth('forgot-password', {
     email: email.trim(),
   });
 }
 
-// Đổi mật khẩu bằng email và mã OTP (Của bạn)
+// Đổi mật khẩu bằng email và mã OTP
 export function resetPassword(
   email: string,
   otp_code: string,
-  new_password: string,
-) {
+  new_password: string
+): Promise<any> {
   return postAuth('reset-password', {
     email: email.trim(),
     otp_code: otp_code.trim(),
     new_password,
-  });
-}
-
-
-// --- TÍNH TOÁN HỒ SƠ THAI KỲ (TUỔI THAI & EDD) ---
-async function medicalRequest(path: string, body?: object) {
-  if (!currentAccessToken) await restoreSession();
   if (!currentAccessToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
