@@ -562,11 +562,134 @@ function detectWeekFromFileName(fileName: string): number {
 function parseBackendIngestResult(
   payload: any,
   fileName: string,
-  defaultWeek: number = 24,
-  presetMode: 'normal' | 'warning' | 'danger' = 'warning'
+  fallbackWeek: number = 24
+): MedicalAnalysisResult | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const rawAnalysis =
+    payload.analysis ||
+    payload.extracted_data ||
+    payload.biometric_data ||
+    payload.result ||
+    payload.data ||
+    payload;
+
+  const weekFromDays = rawAnalysis?.gestational_age_days
+    ? Math.floor(Number(rawAnalysis.gestational_age_days) / 7)
+    : 0;
+
+  const week =
+    weekFromDays ||
+    Number(
+      rawAnalysis?.gestational_week ||
+        rawAnalysis?.gestationalWeek ||
+        payload?.gestational_week ||
+        fallbackWeek
+    ) ||
+    detectWeekFromFileName(fileName);
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week);
+
+  if (Array.isArray(rawAnalysis?.metrics) && rawAnalysis.metrics.length > 0) {
+    const metrics: MedicalMetric[] = rawAnalysis.metrics.map((m: any) =>
+      buildMetricByWeek(
+        String(m.key || m.code || 'metric').toLowerCase(),
+        String(m.label || m.name || m.key || 'Chỉ số'),
+        String(m.value ?? ''),
+        String(m.unit ?? ''),
+        String(m.refRange || m.ref_range || ''),
+        clampedWeek
+      )
+    );
+    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
+    return {
+      recordType:
+        rawAnalysis.recordType ||
+        rawAnalysis.record_type ||
+        'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+      gestationalWeek: clampedWeek,
+      gestationalDays: Number(rawAnalysis.gestationalDays ?? rawAnalysis.gestational_days ?? 0),
+      gestationalAge: stageLabel,
+      summary: rawAnalysis.summary || `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`,
+      doctorConclusion:
+        rawAnalysis.explanation_patient ||
+        rawAnalysis.app_explanation ||
+        rawAnalysis.doctorConclusion ||
+        evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: Boolean(rawAnalysis.savedToProfile ?? rawAnalysis.saved_to_profile ?? false),
+      metrics,
+    };
+  }
+
+  const knownKeys: { key: string; label: string; unit: string; ref: string }[] = [
+    { key: 'bp', label: 'Huyết áp mẹ (BP)', unit: 'mmHg', ref: '< 130/85 mmHg' },
+    { key: 'weight', label: 'Cân nặng mẹ', unit: 'kg', ref: 'Theo BMI thai kỳ' },
+    { key: 'fhr', label: 'Nhịp tim thai (FHR)', unit: 'bpm', ref: '120 – 160 bpm' },
+    { key: 'bpd', label: 'Đường kính lưỡng đỉnh (BPD)', unit: 'mm', ref: '' },
+    { key: 'hc', label: 'Chu vi đầu (HC)', unit: 'mm', ref: '' },
+    { key: 'fl', label: 'Chiều dài xương đùi (FL)', unit: 'mm', ref: '' },
+    { key: 'ac', label: 'Chu vi vòng bụng (AC)', unit: 'mm', ref: '' },
+    { key: 'efw', label: 'Cân nặng thai ước tính (EFW)', unit: 'g', ref: '' },
+    { key: 'afi', label: 'Chỉ số nước ối (AFI)', unit: 'mm', ref: '80 – 180 mm' },
+    { key: 'hgb', label: 'Hemoglobin máu (HGB)', unit: 'g/dL', ref: '' },
+    { key: 'wbc', label: 'Bạch cầu máu (WBC)', unit: 'G/L', ref: '4.5 – 11.0 G/L' },
+    { key: 'glu', label: 'Đường huyết lúc đói (Fasting Glucose)', unit: 'mmol/L', ref: '< 5.1 mmol/L' },
+    { key: 'pro', label: 'Protein niệu (Urine Protein)', unit: 'g/L', ref: '< 0.15 g/L' },
+    { key: 'ph', label: 'Độ pH nước tiểu', unit: '', ref: '5.0 – 7.5' },
+  ];
+
+  const fields =
+    rawAnalysis?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload ||
+    rawAnalysis?.payload?.extracted_fields ||
+    rawAnalysis?.payload ||
+    rawAnalysis;
+
+  const extractedMetrics: MedicalMetric[] = [];
+  for (const item of knownKeys) {
+    const rawVal =
+      fields?.[item.key] ??
+      fields?.[`${item.key}_mm`] ??
+      fields?.[`${item.key}_g`] ??
+      fields?.[item.key.toUpperCase()] ??
+      rawAnalysis?.[item.key] ??
+      rawAnalysis?.[`${item.key}_mm`] ??
+      rawAnalysis?.[`${item.key}_g`] ??
+      rawAnalysis?.[item.key.toUpperCase()];
+    if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+      extractedMetrics.push(
+        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek)
+      );
+    }
+  }
+
+  if (extractedMetrics.length > 0) {
+    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek);
+    return {
+      recordType: rawAnalysis.record_type || 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+      gestationalWeek: clampedWeek,
+      gestationalDays: 0,
+      gestationalAge: stageLabel,
+      summary: `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
+      doctorConclusion: evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: false,
+      metrics: extractedMetrics,
+    };
+  }
+
+  return null;
+}
+
+const buildDefaultExtractedAnalysis = (
+  fileName: string,
+  defaultWeek: number = 24
 ): MedicalAnalysisResult => {
-  const detectedWeek =
-    presetMode === 'danger' ? 32 : detectWeekFromFileName(fileName) || defaultWeek;
+  const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
   const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
 
   let metrics: MedicalMetric[] = [];
