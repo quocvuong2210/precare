@@ -538,23 +538,146 @@ export async function fetchPregnancyProfileFromDB(
 
 // Đảm bảo luôn lấy hoặc khởi tạo UUID thật trong bảng public.pregnancy_profiles trước khi Upload/Lưu DB
 export async function ensureActivePregnancyProfileId(defaultWeek: number = 24): Promise<string> {
-// Hàm lấy Header có đính kèm Bearer Token từ phiên hiện tại hoặc AsyncStorage
-async function getIngestAuthHeaders(isJson = false): Promise<Record<string, string>> {
-  const authToken =
-    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  };
-  if (isJson) {
-    headers['Content-Type'] = 'application/json';
+  const existing = await fetchPregnancyProfileFromDB();
+  const existingId = existing?.id || existing?.profile_id || existing?.pregnancy_profile_id;
+  if (existingId && String(existingId) !== 'profile_demo_01') {
+    return String(existingId);
   }
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+
+  const cachedId = await AsyncStorage.getItem('precare_pregnancy_profile_id');
+  if (cachedId && cachedId !== 'profile_demo_01') {
+    return cachedId;
   }
-  return headers;
+
+  const lmpDate = new Date(Date.now() - defaultWeek * 7 * 24 * 60 * 60 * 1000);
+  const lmpIso = `${lmpDate.getFullYear()}-${String(lmpDate.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(lmpDate.getDate()).padStart(2, '0')}`;
+
+  try {
+    const created = await savePregnancyProfileToDB({
+      calculation_method: 'lmp',
+      lmp: lmpIso,
+    });
+    const createdId = extractProfileUuid(created);
+    if (createdId) {
+      return createdId;
+    }
+  } catch (e) {
+    console.log('Tự động khởi tạo pregnancy_profile:', e);
+  }
+
+  const retryExisting = await fetchPregnancyProfileFromDB();
+  if (retryExisting?.id) {
+    return String(retryExisting.id);
+  }
+
+  throw new Error(
+    'Chưa tìm thấy Hồ sơ thai kỳ (pregnancy_profile_id). Vui lòng vào mục Hồ sơ bấm Lưu thông tin thai kỳ trước khi tải phiếu khám.'
+  );
 }
 
-// 1. POST /api/v1/ingest/upload — Tải lên đơn lẻ phiếu khám cận lâm sàng & sinh task Celery
+// =========================================================================
+// --- PARACLINICAL INGEST & QUEUE (8 ĐẦU API TẢI LÊN & HÀNG ĐỢI CELERY) ---
+// =========================================================================
+
+export interface IngestFilePayload {
+  uri: string;
+  name: string;
+  type: string;
+}
+
+export interface IngestUploadResponseData {
+  file_id: string;
+  task_id: string;
+  pregnancy_profile_id: string;
+  checkup_id?: string | null;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  document_type: string;
+  status: string;
+  tracking_url: string;
+  created_at: string;
+  [key: string]: any;
+}
+
+export interface IngestBatchItem {
+  file_id: string;
+  task_id: string;
+  file_name: string;
+  file_size_bytes: number;
+  status: string;
+  [key: string]: any;
+}
+
+export interface IngestBatchResponseData {
+  batch_id: string;
+  total_files: number;
+  successful_enqueued: number;
+  failed_enqueued: number;
+  tracking_url: string;
+  items: IngestBatchItem[];
+  [key: string]: any;
+}
+
+export interface IngestTaskStatusData {
+  task_id: string;
+  file_id: string;
+  state: string;
+  status?: string;
+  progress_percentage: number;
+  current_stage: string;
+  stage_message: string;
+  estimated_seconds_remaining: number;
+  verification_url?: string;
+  error_code?: string;
+  can_retry: boolean;
+  [key: string]: any;
+}
+
+export interface IngestBatchStatusData {
+  batch_id: string;
+  total_files: number;
+  completed_files: number;
+  failed_files: number;
+  overall_progress_percentage: number;
+  is_all_finished: boolean;
+  files: {
+    file_id: string;
+    file_name: string;
+    state: string;
+    progress_percentage: number;
+    status: string;
+    verification_url?: string;
+  }[];
+  [key: string]: any;
+}
+
+export interface IngestFileDetailData {
+  id: string;
+  file_id?: string;
+  pregnancy_profile_id: string;
+  checkup_id?: string | null;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  document_type: string;
+  status: string;
+  presigned_view_url: string;
+  presigned_url?: string;
+  url?: string;
+  presigned_url_expires_in_seconds: number;
+  uploaded_by?: {
+    id: string;
+    full_name: string;
+    role: string;
+  };
+  created_at: string;
+  [key: string]: any;
+}
+
 export async function ingestUploadSingle(
   file: IngestFilePayload,
   profileId?: string
