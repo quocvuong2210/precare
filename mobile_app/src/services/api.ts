@@ -298,7 +298,15 @@ export function resetPassword(
     email: email.trim(),
     otp_code: otp_code.trim(),
     new_password,
-  if (!currentAccessToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  });
+}
+
+// --- TÍNH TOÁN HỒ SƠ THAI KỲ (TUỔI THAI & EDD) ---
+async function medicalRequest(path: string, body?: object): Promise<any> {
+  if (!currentAccessToken) await restoreSession();
+  if (!currentAccessToken) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
@@ -318,19 +326,24 @@ export function resetPassword(
   }
 }
 
-export async function requestPregnancyDeletion(reason: string, allowResearch: boolean): Promise<string> {
-  if (reason.trim().length < 10) throw new Error('Lý do cần có ít nhất 10 ký tự.');
+export async function requestPregnancyDeletion(
+  reason: string,
+  allowResearch: boolean
+): Promise<string> {
+  if (reason.trim().length < 10) {
+    throw new Error('Lý do cần có ít nhất 10 ký tự.');
+  }
   if (!currentAccessToken) await restoreSession();
-  if (!currentAccessToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  if (!currentAccessToken) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
 
-  // 1. Lấy hồ sơ thai kỳ đang hoạt động qua GET /pregnancy-profiles/active
   const profile = await fetchPregnancyProfileFromDB(currentAccessToken);
   const profileId = profile?.id ? String(profile.id).trim() : '';
   if (!profileId) {
     throw new Error('Không tìm thấy hồ sơ thai kỳ hiện tại để gửi yêu cầu xóa.');
   }
 
-  // 2. Gửi yêu cầu xóa với đúng profileId và checkup_id = null
   const result = await medicalRequest('/deletion-requests', {
     pregnancy_profile_id: profileId,
     checkup_id: null,
@@ -339,8 +352,10 @@ export async function requestPregnancyDeletion(reason: string, allowResearch: bo
     allow_anonymized_research: allowResearch,
   });
 
-  if (!result.success || result.data?.status !== 'pending' || !result.data?.request_id) {
-    throw new Error('Chưa xác nhận được yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi gửi lại.');
+  if (!result?.success || result?.data?.status !== 'pending' || !result?.data?.request_id) {
+    throw new Error(
+      'Chưa xác nhận được yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi gửi lại.'
+    );
   }
   return result.data.request_id;
 }
@@ -359,8 +374,8 @@ export type PregnancyCalculationMethod = 'lmp' | 'q1_ultrasound' | 'crl' | 'dire
 
 export async function calculatePregnancyProfile(
   payload: PregnancyCalculateRequest,
-  token?: string,
-) {
+  token?: string
+): Promise<any> {
   const authToken = token || currentAccessToken;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -371,24 +386,47 @@ export async function calculatePregnancyProfile(
     headers.Authorization = `Bearer ${authToken}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/pregnancy-profiles/calculate`,
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    },
-  );
+  const response = await fetch(`${API_BASE_URL}/pregnancy-profiles/calculate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
 
   return handleResponse(response);
 }
 
+// Hàm phụ trợ bóc tách đúng đối tượng và UUID của hồ sơ thai kỳ từ Backend
+function extractProfileObject(raw: any): any {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw.data !== undefined ? raw.data : raw;
+  if (!d) return null;
+  if (Array.isArray(d)) return d[0] || null;
+  if (Array.isArray(d.items)) return d.items[0] || null;
+  if (Array.isArray(d.profiles)) return d.profiles[0] || null;
+  if (d.profile && typeof d.profile === 'object') return d.profile;
+  if (d.pregnancy_profile && typeof d.pregnancy_profile === 'object') return d.pregnancy_profile;
+  return d;
+}
+
+function extractProfileUuid(raw: any): string | null {
+  const obj = extractProfileObject(raw);
+  const candidate = obj?.id || obj?.profile_id || obj?.pregnancy_profile_id;
+  if (candidate && typeof candidate === 'string' && candidate !== 'profile_demo_01') {
+    return candidate.trim();
+  }
+  return null;
+}
+
 // Lưu hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
 export async function savePregnancyProfileToDB(
-  payload: PregnancyCalculateRequest & { edd?: string; calculation_method?: PregnancyCalculationMethod },
-  token?: string,
-) {
-  const authToken = token || currentAccessToken;
+  payload: PregnancyCalculateRequest & {
+    edd?: string;
+    calculation_method?: PregnancyCalculationMethod;
+  },
+  token?: string
+): Promise<any> {
+  const authToken =
+    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
   if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
   const headers: Record<string, string> = {
@@ -397,13 +435,27 @@ export async function savePregnancyProfileToDB(
     Authorization: `Bearer ${authToken}`,
   };
 
-  // Chuẩn hóa body gửi lên khớp với CreatePregnancyProfileRequest của Backend
   const requestBody: Record<string, any> = {};
-  if (payload.calculation_method) requestBody.calculation_method = payload.calculation_method;
+  if (payload.calculation_method) {
+    requestBody.calculation_method = payload.calculation_method;
+  } else if (payload.lmp) {
+    requestBody.calculation_method = 'lmp';
+  } else if (payload.q1_ultrasound_date) {
+    requestBody.calculation_method = 'q1_ultrasound';
+  } else if (payload.crl_mm !== undefined) {
+    requestBody.calculation_method = 'crl';
+  } else if (payload.override_edd || payload.edd) {
+    requestBody.calculation_method = 'direct_edd';
+  }
+
   if (payload.lmp) requestBody.lmp = payload.lmp;
   if (payload.q1_ultrasound_date) requestBody.q1_ultrasound_date = payload.q1_ultrasound_date;
-  if (payload.q1_gestational_weeks !== undefined) requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
-  if (payload.q1_gestational_days !== undefined) requestBody.q1_gestational_days = payload.q1_gestational_days;
+  if (payload.q1_gestational_weeks !== undefined) {
+    requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
+  }
+  if (payload.q1_gestational_days !== undefined) {
+    requestBody.q1_gestational_days = payload.q1_gestational_days;
+  }
   if (payload.crl_mm !== undefined) requestBody.crl_mm = payload.crl_mm;
   if (payload.override_edd) {
     requestBody.override_edd = payload.override_edd;
@@ -418,10 +470,12 @@ export async function savePregnancyProfileToDB(
   });
 
   if (!res.ok && (res.status === 400 || res.status === 409)) {
-    const existingProfile = await fetchPregnancyProfileFromDB(authToken, { throwOnError: true });
-    if (existingProfile?.id) {
+    const existingProfile = await fetchPregnancyProfileFromDB(authToken);
+    const existingId =
+      existingProfile?.id || (await AsyncStorage.getItem('precare_pregnancy_profile_id'));
+    if (existingId) {
       const { calculation_method: _method, ...updateBody } = requestBody;
-      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingProfile.id}`, {
+      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ ...updateBody, recalculate_edd: true }),
@@ -429,15 +483,21 @@ export async function savePregnancyProfileToDB(
     }
   }
 
-  return handleResponse(res);
+  const savedData = await handleResponse(res);
+  const savedId = extractProfileUuid(savedData);
+  if (savedId) {
+    await AsyncStorage.setItem('precare_pregnancy_profile_id', savedId);
+  }
+  return savedData;
 }
 
 // Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
 export async function fetchPregnancyProfileFromDB(
   token?: string,
-  options: { throwOnError?: boolean } = {},
-) {
-  const authToken = token || currentAccessToken;
+  options: { throwOnError?: boolean } = {}
+): Promise<any> {
+  const authToken =
+    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
   if (!authToken) {
     if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
     return null;
@@ -455,29 +515,29 @@ export async function fetchPregnancyProfileFromDB(
     });
 
     if (res.ok) {
-      const json = await res.json();
-      const data = json?.data || json;
-      return Array.isArray(data) ? data[0] : data;
+      const json: any = await safeParseJson(res);
+      const profileObj = extractProfileObject(json);
+      const pid = extractProfileUuid(json);
+      if (pid) {
+        await AsyncStorage.setItem('precare_pregnancy_profile_id', pid);
+        return { ...profileObj, id: pid };
+      }
+      return profileObj;
     }
-    if (res.status === 404) return null;
+
+    // Nếu tài khoản chưa tạo hồ sơ (404) hoặc endpoint active gặp lỗi 500, không chặn luồng Login
+    if (res.status === 404 || res.status >= 500) {
+      return null;
+    }
     if (options.throwOnError) await handleResponse(res);
   } catch (e) {
-    if (options.throwOnError) throw e;
     console.log('Tải DB pregnancy_profiles:', e);
   }
   return null;
 }
 
-// =========================================================================
-// --- PARACLINICAL INGEST & QUEUE (8 ĐẦU API TẢI LÊN & HÀNG ĐỢI CELERY) ---
-// =========================================================================
-
-export interface IngestFilePayload {
-  uri: string;
-  name: string;
-  type: string;
-}
-
+// Đảm bảo luôn lấy hoặc khởi tạo UUID thật trong bảng public.pregnancy_profiles trước khi Upload/Lưu DB
+export async function ensureActivePregnancyProfileId(defaultWeek: number = 24): Promise<string> {
 // Hàm lấy Header có đính kèm Bearer Token từ phiên hiện tại hoặc AsyncStorage
 async function getIngestAuthHeaders(isJson = false): Promise<Record<string, string>> {
   const authToken =
