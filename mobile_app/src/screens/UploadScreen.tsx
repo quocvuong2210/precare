@@ -943,6 +943,106 @@ export default function UploadScreen({ navigation }: Props) {
   );
 
   /* =========================================================================
+     MỞ MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (MẶC ĐỊNH CHỈ XEM)
+     ========================================================================= */
+  const openVerificationModal = useCallback(
+    async (item: UploadItem, shouldFetchDetail = true) => {
+      if (!item.analysis) return;
+      const fId = item.fileId || item.id;
+
+      let updatedItem = item;
+      if (shouldFetchDetail && item.fileId) {
+        try {
+          const res: any = await getIngestFileDetail(fId);
+          const detail: any = res?.data || res;
+          const viewUrl = detail?.presigned_view_url || detail?.presigned_url;
+          if (viewUrl) {
+            updatedItem = {
+              ...item,
+              presignedUrl: String(viewUrl),
+              checkupId: detail?.checkup_id ?? item.checkupId,
+            };
+            updateItemsAndPersist((prev) =>
+              prev.map((it) => (it.id === item.id ? updatedItem : it))
+            );
+          }
+        } catch {
+          // Giữ nguyên URI cục bộ
+        }
+      }
+
+      const initialDraft: Record<string, string> = {};
+      updatedItem.analysis!.metrics.forEach((m) => {
+        initialDraft[m.key] = m.value;
+      });
+      setDraftWeek(String(updatedItem.analysis!.gestationalWeek || profileWeek || 24));
+      setDraftMetrics(initialDraft);
+      setIsModalEditing(false);
+      setZoomSlipImage(false);
+      setVerifyModalItem(updatedItem);
+    },
+    [profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 3 & 5: POLLING TASK CELERY & LẤY PRESIGNED_VIEW_URL
+     ========================================================================= */
+  const pollCeleryTaskStatus = useCallback(
+    async (
+      localItemId: string,
+      taskId: string,
+      fileId: string | undefined,
+      fileName: string
+    ) => {
+      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (!isMountedRef.current) return;
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+        try {
+          const statusRes: any = await getIngestTaskStatus(taskId);
+          const taskData: any = statusRes?.data || statusRes;
+          const rawState = String(taskData?.state || taskData?.status || '').toUpperCase();
+          const resolvedFileId = String(taskData?.file_id || fileId || '');
+          const progress = Number(taskData?.progress_percentage ?? 0);
+          const stageMsg = taskData?.stage_message || taskData?.current_stage || '';
+
+          updateItemsAndPersist((prev) =>
+            prev.map((it) =>
+              it.id === localItemId
+                ? {
+                    ...it,
+                    fileId: resolvedFileId || it.fileId,
+                    progressPercentage: progress,
+                    stageMessage: stageMsg,
+                  }
+                : it
+            )
+          );
+
+          if (
+            rawState === 'SUCCESS' ||
+            rawState === 'COMPLETED' ||
+            rawState === 'DONE' ||
+            rawState === 'PENDING_REVIEW' ||
+            rawState === 'READY' ||
+            progress >= 100
+          ) {
+            let fileDetail: any = null;
+            if (resolvedFileId) {
+              const detailRes: any = await getIngestFileDetail(resolvedFileId).catch(() => null);
+              fileDetail = detailRes?.data || detailRes;
+            }
+
+            const verificationPayload = await fetchVerificationDataFromUrl(
+              taskData?.verification_url,
+              resolvedFileId
+            );
+
+            const presignedViewUrl = fileDetail?.presigned_view_url || undefined;
+            const analysis =
+              parseBackendIngestResult(
+                verificationPayload || fileDetail || taskData,
+                fileName,
      API 1, 3, 5: UPLOAD ĐƠN LẺ + POLLING TASK CELERY + LẤY PRESIGNED URL
      ========================================================================= */
   const uploadAndAnalyzeFile = async (
