@@ -37,8 +37,9 @@ import {
   removeVietnameseAccents,
   getUniqueDoctorsFromRecords,
   getUniquePatientsFromRecords,
+  fetchEligiblePatientsApi,
+  EligiblePatient,
 } from '../services/pregnancyProfile.service';
-import { UNREGISTERED_PREGNANT_WOMEN } from '../services/patient.service';
 import { CalculationMethod } from '../types';
 import {
   calculatePregnancyDates,
@@ -90,6 +91,24 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const [eligiblePatients, setEligiblePatients] = useState<EligiblePatient[]>([]);
+  const [isLoadingEligible, setIsLoadingEligible] = useState(false);
+
+  const loadEligiblePatients = async () => {
+    setIsLoadingEligible(true);
+    try {
+      const data = await fetchEligiblePatientsApi();
+      setEligiblePatients(data);
+    } catch {
+      setEligiblePatients([]);
+    } finally {
+      setIsLoadingEligible(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEligiblePatients();
+  }, []);
 
   // Clinical calculation mode
   const [calcMode, setCalcMode] = useState<CalculationMode>('lmp');
@@ -179,11 +198,11 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
     return list;
   }, [records, currentUser]);
 
-  // Danh sách thai phụ chưa có hồ sơ thai kỳ (các user role pregnant_woman mới trong DB)
+  // Danh sách thai phụ chưa có hồ sơ thai kỳ (nạp động từ bảng users qua API)
   const unregisteredPatients = useMemo(() => {
     const registeredIds = new Set(records.map((r) => r.patientId));
-    return UNREGISTERED_PREGNANT_WOMEN.filter((p) => !registeredIds.has(p.id));
-  }, [records]);
+    return eligiblePatients.filter((p) => !registeredIds.has(p.id));
+  }, [records, eligiblePatients]);
 
   // Danh sách thai phụ đã có hồ sơ thai kỳ thực tế từ CSDL
   const existingPatients = useMemo(() => {
@@ -331,6 +350,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    loadEligiblePatients();
     const firstPat = unregisteredPatients[0]?.id || existingPatients[0]?.id || '';
     const firstDoc = doctorsList[0]?.id || currentUser?.id || '';
     setSelectedPatientId(firstPat);
@@ -480,6 +500,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
       });
 
       setRecords((prev) => [created, ...prev]);
+      setEligiblePatients((prev) => prev.filter((p) => p.id !== created.patientId));
       setIsCreateModalOpen(false);
 
       setToastMessage(`Đã khởi tạo hồ sơ thai kỳ thành công cho ${created.patientName}!`);
@@ -645,7 +666,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
         {/* Card 2: Đang theo dõi */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Đang hoạt động (Active)</span>
+            <span className="text-xs font-medium text-slate-500">Đang hoạt động</span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
               <Activity className="w-4 h-4" />
             </div>
@@ -663,7 +684,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
         {/* Card 3: Đã sinh */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Đã sinh (Completed)</span>
+            <span className="text-xs font-medium text-slate-500">Đã sinh</span>
             <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
               <Baby className="w-4 h-4" />
             </div>
@@ -681,7 +702,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
         {/* Card 4: Đình chỉ thai kỳ */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Đình chỉ (Terminated)</span>
+            <span className="text-xs font-medium text-slate-500">Đình chỉ</span>
             <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
               <AlertCircle className="w-4 h-4" />
             </div>
@@ -1116,12 +1137,12 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
                       {item.status === 'completed' ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#E0F2FE] text-[#0369A1] border border-sky-200/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7]"></span>
-                          {item.statusLabel || 'Đã sinh (Completed)'}
+                          {item.statusLabel || 'Đã sinh'}
                         </span>
                       ) : item.status === 'terminated' ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#FFE4E6] text-[#BE123C] border border-rose-200/60">
                           <span className="w-1.5 h-1.5 rounded-sm bg-[#E11D48]"></span>
-                          {item.statusLabel || 'Đình chỉ (Terminated)'}
+                          {item.statusLabel || 'Đình chỉ'}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#DCFCE7] text-[#15803D] border border-emerald-200/60">
@@ -1302,7 +1323,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Thai phụ (patient_id) <span className="text-rose-500">*</span>
+                    Thai phụ <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={selectedPatientId}
@@ -1317,20 +1338,26 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
                     }`}
                   >
                     <option value="">-- Chọn thai phụ từ hệ thống --</option>
-                    {unregisteredPatients.length > 0 && (
-                      <optgroup label="✨ THAI PHỤ CHƯA CÓ HỒ SƠ (Khuyên dùng tạo mới)">
+                    {isLoadingEligible ? (
+                      <option disabled>Đang tải danh sách thai phụ từ CSDL...</option>
+                    ) : unregisteredPatients.length > 0 ? (
+                      <optgroup label="Thai phụ chưa có hồ sơ thai kỳ">
                         {unregisteredPatients.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.fullName} ({p.phoneNumber}) — [Chưa có hồ sơ thai kỳ]
+                            {p.fullName} {p.phoneNumber ? `(${p.phoneNumber})` : ''} — [Chưa có hồ sơ thai kỳ]
                           </option>
                         ))}
+                      </optgroup>
+                    ) : (
+                      <optgroup label="Thai phụ chưa có hồ sơ thai kỳ">
+                        <option disabled>Không có tài khoản thai phụ nào chưa có hồ sơ</option>
                       </optgroup>
                     )}
                     {existingPatients.length > 0 && (
                       <optgroup label="Thai phụ đã có hồ sơ thai kỳ">
                         {existingPatients.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.fullName} ({p.phoneNumber}) — [Đã có hồ sơ]
+                            {p.fullName} {p.phoneNumber ? `(${p.phoneNumber})` : ''} — [Đã có hồ sơ]
                           </option>
                         ))}
                       </optgroup>

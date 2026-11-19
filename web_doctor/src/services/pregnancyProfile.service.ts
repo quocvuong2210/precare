@@ -67,7 +67,7 @@ export interface PregnancyRecordItem {
   history?: MedicalHistory;
   
   status: PregnancyStatus;
-  statusLabel: 'Đang hoạt động' | 'Hoàn thành' | 'Đã kết thúc' | 'Đình chỉ (Terminated)' | string;
+  statusLabel: 'Đang hoạt động' | 'Hoàn thành' | 'Đã kết thúc' | 'Đình chỉ' | string;
   createdAt: string;
 }
 
@@ -144,7 +144,7 @@ export const INITIAL_PREGNANCY_RECORDS: PregnancyRecordItem[] = [
     trimesterDisplay: 'Quý 2 (193 ngày)',
     primaryMethod: 'lmp',
     status: 'terminated',
-    statusLabel: 'Đình chỉ (Terminated)',
+    statusLabel: 'Đình chỉ',
     createdAt: '2026-04-10T09:30:00Z',
   },
   {
@@ -326,9 +326,9 @@ export function createNewPregnancyRecord(
   const status: PregnancyStatus = input.status || 'active';
   const statusLabel =
     status === 'completed'
-      ? 'Đã sinh (Completed)'
+      ? 'Đã sinh'
       : status === 'terminated'
-      ? 'Đình chỉ (Terminated)'
+      ? 'Đình chỉ'
       : 'Đang hoạt động';
 
   const newRecord: PregnancyRecordItem = {
@@ -424,9 +424,9 @@ export function updatePregnancyStatus(
 
   const statusLabel =
     newStatus === 'completed'
-      ? 'Đã sinh (Completed)'
+      ? 'Đã sinh'
       : newStatus === 'terminated'
-      ? 'Đình chỉ (Terminated)'
+      ? 'Đình chỉ'
       : 'Đang hoạt động';
 
   const updatedRecord: PregnancyRecordItem = {
@@ -468,7 +468,7 @@ export function mapBackendToRecordItem(
     status === 'completed'
       ? 'Đã sinh (Completed)'
       : status === 'terminated'
-      ? 'Đình chỉ (Terminated)'
+      ? 'Đình chỉ'
       : 'Đang hoạt động';
 
   const baseItem: PregnancyRecordItem = {
@@ -840,5 +840,32 @@ export function getUniquePatientsFromRecords(
 
   return Array.from(map.values());
 }
+
+export interface EligiblePatient {
+  id: string;
+  fullName: string;
+  phoneNumber?: string;
+  email: string;
+}
+
+/**
+ * 8. GET /api/v1/pregnancy-profiles/eligible-patients — Lấy Danh sách Thai phụ Chưa có Hồ sơ Thai kỳ
+ */
+export async function fetchEligiblePatientsApi(): Promise<EligiblePatient[]> {
+  try {
+    const response = await apiClient.get<ApiResponse<any>>('/pregnancy-profiles/eligible-patients');
+    const rawList = response.data?.data || [];
+    return rawList.map((p: any) => ({
+      id: p.id,
+      fullName: p.full_name || p.fullName || 'Thai phụ',
+      phoneNumber: p.phone_number || p.phoneNumber || '',
+      email: p.email || '',
+    }));
+  } catch (err) {
+    console.warn('Không thể tải danh sách thai phụ chưa có hồ sơ từ API:', err);
+    return [];
+  }
+}
+
 
 

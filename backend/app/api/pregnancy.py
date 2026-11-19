@@ -19,6 +19,7 @@ from app.schemas.pregnancy_profile import (
     CreatePregnancyProfileRequest,
     CreatePregnancyProfileResponse,
     DoctorSummary,
+    EligiblePatientsResponse,
     PaginationMeta,
     PatientSummary,
     PregnancyProfileCreatedData,
@@ -369,6 +370,55 @@ def list_pregnancy_profiles(
                 total_pages=total_pages
             )
         )
+    )
+
+
+# ==============================================================================
+# 4.1. GET /eligible-patients - Lấy Danh sách Thai phụ Chưa có Hồ sơ Active
+# ==============================================================================
+@router.get(
+    "/eligible-patients",
+    response_model=EligiblePatientsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Lấy danh sách thai phụ chưa có hồ sơ hoạt động (dành cho Bác sĩ)"
+)
+def get_eligible_patients(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(["doctor", "admin"]))
+):
+    """
+    Truy vấn bảng users để lấy danh sách tài khoản thai phụ (role='pregnant_woman')
+    chưa có hồ sơ thai kỳ active trong hệ thống.
+    """
+    active_patient_ids = (
+        db.query(PregnancyProfile.patient_id)
+        .filter(
+            PregnancyProfile.status == "active",
+            PregnancyProfile.is_deleted == False
+        )
+        .scalar_subquery()
+    )
+
+    eligible_users = db.query(User).filter(
+        User.role == "pregnant_woman",
+        ~User.id.in_(active_patient_ids)
+    ).order_by(User.full_name.asc()).all()
+
+    patient_summaries = [
+        PatientSummary(
+            id=u.id,
+            full_name=u.full_name,
+            phone_number=u.phone_number,
+            email=u.email
+        )
+        for u in eligible_users
+    ]
+
+    return EligiblePatientsResponse(
+        success=True,
+        total=len(patient_summaries),
+        data=patient_summaries,
+        message="Lấy danh sách thai phụ chưa có hồ sơ thành công"
     )
 
 

@@ -299,3 +299,10 @@ class PregnancyProfileListResponse(BaseModel):
     total: int
     data: List[PregnancyProfileListItem]
     message: str = "Lấy danh sách hồ sơ thai kỳ thành công"
+
+
+class EligiblePatientsResponse(BaseModel):
+    success: bool = True
+    total: int
+    data: List[PatientSummary]
+    message: str = "Lấy danh sách thai phụ chưa có hồ sơ thai kỳ thành công"

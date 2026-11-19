@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
@@ -98,3 +98,8 @@ class CheckupResponse(BaseModel):
     success: bool = True
     data: CheckupDetailData
     message: str = "Ghi nhận lần khám thành công"
+
+
+class CheckupHistoryResponse(BaseModel):
+    success: bool = True
+    data: List[CheckupDetailData]
