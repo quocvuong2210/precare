@@ -31,7 +31,7 @@ class MinioStorageService:
         try:
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
-        except S3Error as e:
+        except Exception as e:
             # Ghi log nếu gặp lỗi kết nối storage
             print(f"[MinIO] Cảnh báo khởi tạo Bucket: {e}")
 
@@ -78,6 +78,19 @@ class MinioStorageService:
             object_name=storage_key,
             expires=timedelta(seconds=expires_in_seconds)
         )
+
+    def get_file_bytes(self, storage_key: str) -> bytes:
+        """Tải dữ liệu nhị phân của file từ Object Storage để phục vụ xử lý ngầm trong worker"""
+        response = None
+        try:
+            response = self.client.get_object(self.bucket_name, storage_key)
+            return response.read()
+        except Exception as e:
+            raise RuntimeError(f"Lỗi tải file từ MinIO: {e}")
+        finally:
+            if response:
+                response.close()
+                response.release_conn()
 
     def delete_file(self, storage_key: str) -> bool:
         """Xóa file khỏi Object Storage khi người dùng hủy bỏ hoặc xóa file nhầm"""
