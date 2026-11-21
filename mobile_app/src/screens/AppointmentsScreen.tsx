@@ -23,15 +23,6 @@ type Appointment = {
 };
 
 const APPOINTMENTS: Appointment[] = [
-  {
-    id: '1',
-    date: '2026-06-15',
-    title: 'Khám định kỳ + Siêu âm',
-    doctor: 'BS. Lê Minh',
-    pregnancyWeek: 28,
-    time: '08:30 AM',
-    status: 'upcoming',
-  },
 ];
 
 /* ================= HÀM HỖ TRỢ LỊCH ================= */
@@ -63,9 +54,11 @@ function buildMonth(year: number, month: number): Cell[][] {
 }
 
 export default function AppointmentsScreen({ navigation }: Props) {
-  // Mặc định mở tháng 6/2026, chọn ngày 15 giống thiết kế
-  const [view, setView] = useState({ year: 2026, month: 5 }); // month: 0-11
-  const [selected, setSelected] = useState(new Date(2026, 5, 15));
+  const [view, setView] = useState(() => {
+    const today = new Date();
+    return { year: today.getFullYear(), month: today.getMonth() };
+  });
+  const [selected, setSelected] = useState(() => new Date());
   const [reminder, setReminder] = useState(true);
 
   const rows = buildMonth(view.year, view.month);
