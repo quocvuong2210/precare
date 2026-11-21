@@ -2,18 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { RequestDeletionModal } from '../components/RequestDeletionModal';
 import { VisitTimeline } from '../components/VisitTimeline';
+import { TrajectoryChart } from '../components/TrajectoryChart';
+import { CheckupTimelineRecord, fetchCheckupHistory } from '../services/checkup.service';
 import {
-  getStoredPregnancyRecords,
   PregnancyRecordItem,
   PregnancyStatus,
-  updatePregnancyStatus,
   fetchPregnancyProfileByIdApi,
   fetchActivePregnancyProfileApi,
   updatePregnancyProfileStatusApi,
 } from '../services/pregnancyProfile.service';
-import {
-  getStoredPatients,
-} from '../services/patient.service';
 import {
   calculatePregnancyDates,
   PregnancyCalculationParams,
@@ -37,6 +34,105 @@ interface PatientDetailProps {
   patientId: string;
   onBack: () => void;
 }
+
+type GrowthBiometricKey = 'efw' | 'ac' | 'bpd' | 'hc' | 'fl';
+
+const GROWTH_METRICS: {
+  key: GrowthBiometricKey;
+  type: 'EFW' | 'AC' | 'BPD' | 'HC' | 'FL';
+}[] = [
+  { key: 'efw', type: 'EFW' },
+  { key: 'ac', type: 'AC' },
+  { key: 'bpd', type: 'BPD' },
+  { key: 'hc', type: 'HC' },
+  { key: 'fl', type: 'FL' },
+];
+
+const GrowthCharts: React.FC<{ pregnancyProfileId: string }> = ({ pregnancyProfileId }) => {
+  const [checkups, setCheckups] = useState<CheckupTimelineRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const loadCheckups = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await fetchCheckupHistory(pregnancyProfileId);
+        if (isCurrent) setCheckups(data);
+      } catch (err: any) {
+        const detail = err.response?.data?.detail;
+        if (isCurrent) {
+          setCheckups([]);
+          setError(
+            (typeof detail === 'string' ? detail : detail?.message) ||
+            err.message ||
+            'Không thể tải dữ liệu tăng trưởng từ máy chủ.'
+          );
+        }
+      } finally {
+        if (isCurrent) setIsLoading(false);
+      }
+    };
+    void loadCheckups();
+    return () => {
+      isCurrent = false;
+    };
+  }, [pregnancyProfileId, refreshKey]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-12 text-sm text-slate-600">
+        <Loader2 className="h-4 w-4 animate-spin text-[#275248]" />
+        Đang tải chỉ số siêu âm...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+        <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4" />{error}</span>
+        <button type="button" onClick={() => setRefreshKey((current) => current + 1)} className="font-semibold underline underline-offset-2">
+          Thử lại
+        </button>
+      </div>
+    );
+  }
+
+  const charts = GROWTH_METRICS.flatMap((metric) => {
+    const patientData = checkups.flatMap((checkup) => {
+      const value = checkup.biometric_data?.[metric.key];
+      return typeof value === 'number'
+        ? [{
+            ga_weeks: checkup.gestational_age.weeks + checkup.gestational_age.remaining_days / 7,
+            val: value,
+            date: checkup.checkup_date.slice(0, 10),
+          }]
+        : [];
+    });
+    return patientData.length > 0 ? [{ metric, patientData }] : [];
+  });
+
+  if (charts.length === 0) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+        <p className="text-sm font-semibold text-slate-800">Chưa có chỉ số siêu âm để vẽ biểu đồ</p>
+        <p className="mt-1 text-xs text-slate-500">Biểu đồ sẽ xuất hiện khi hồ sơ có dữ liệu BPD, HC, AC, FL hoặc EFW.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {charts.map(({ metric, patientData }) => (
+        <TrajectoryChart key={metric.type} biometricType={metric.type} patientData={patientData} />
+      ))}
+    </div>
+  );
+};
 
 export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack }) => {
   // 1. Quản lý bản ghi hồ sơ thai kỳ & Loading/Error states
