@@ -17,6 +17,7 @@ import {
   calculatePregnancyProfile,
   currentAccessToken,
   currentUserProfile,
+  fetchPregnancyProfileFromDB,
   restoreSession,
 } from '../services/api';
 
@@ -69,6 +70,7 @@ export default function HomeScreen() {
     trimester: '',
     dueDate: '',
   });
+  const [assignedDoctorName, setAssignedDoctorName] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -77,6 +79,20 @@ export default function HomeScreen() {
       async function loadPregnancySummary() {
         try {
           const account = currentUserProfile || (await restoreSession());
+          try {
+            const dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
+            const doctor = dbProfile?.primary_doctor || dbProfile?.doctor || null;
+            const doctorName =
+              doctor?.full_name ||
+              doctor?.fullName ||
+              dbProfile?.primary_doctor_name ||
+              dbProfile?.doctor_name ||
+              '';
+            if (isActive) setAssignedDoctorName(String(doctorName || '').trim());
+          } catch (doctorError) {
+            console.log('Không tải được bác sĩ phụ trách:', doctorError);
+            if (isActive) setAssignedDoctorName('');
+          }
           const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
           const raw = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
           if (!raw) {
@@ -218,6 +234,46 @@ export default function HomeScreen() {
               style={styles.pregnancyImage}
               resizeMode="cover"
             />
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.doctorCard,
+            !assignedDoctorName && styles.doctorCardUnassigned,
+          ]}
+        >
+          <View
+            style={[
+              styles.doctorIcon,
+              !assignedDoctorName && styles.doctorIconUnassigned,
+            ]}
+          >
+            <Ionicons
+              name={assignedDoctorName ? 'medical' : 'person-add-outline'}
+              size={21}
+              color={assignedDoctorName ? '#FFFFFF' : colors.textMuted}
+            />
+          </View>
+          <View style={styles.doctorInfo}>
+            <Text style={styles.doctorLabel}>BÁC SĨ PHỤ TRÁCH</Text>
+            <View style={styles.doctorNameRow}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.assignedDoctorName,
+                  !assignedDoctorName && styles.assignedDoctorNameUnassigned,
+                ]}
+              >
+                {assignedDoctorName || 'Chưa phân công'}
+              </Text>
+              {assignedDoctorName ? (
+                <View style={styles.assignedBadge}>
+                  <View style={styles.assignedDot} />
+                  <Text style={styles.assignedBadgeText}>Đang phụ trách</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
 
