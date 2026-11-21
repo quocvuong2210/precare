@@ -1,0 +1,20 @@
+GHI CHÚ CHỈNH SỬA TRANG CHI TIẾT HỒ SƠ THAI PHỤ
+
+Phạm vi: web_doctor; không chỉnh sửa backend.
+
+1. web_doctor/src/pages/PatientDetail.tsx
+- Thêm 3 tab trong trang chi tiết hồ sơ thai phụ theo ảnh: "Tổng quan", "Kết quả xét nghiệm", "Biểu đồ tăng trưởng".
+- Tab đang chọn có khung viền xanh ngọc đậm và chữ xanh; bấm tab khác sẽ chuyển phần nội dung tương ứng.
+- Đưa nội dung tuổi thai/tiến trình và dữ liệu lâm sàng vào tab "Tổng quan".
+- Đưa lịch sử các lần khám, sinh hiệu và chỉ số siêu âm vào tab "Kết quả xét nghiệm".
+- Tab "Biểu đồ tăng trưởng" tải lịch sử khám từ API hiện có và dựng biểu đồ cho các chỉ số EFW, AC, BPD, HC, FL nếu dữ liệu có sẵn; có trạng thái đang tải, lỗi/thử lại và chưa có dữ liệu.
+- Khi đổi hồ sơ bệnh nhân, tab được đưa về "Tổng quan".
+
+2. web_doctor/src/components/TrajectoryChart.tsx
+- Chỉnh giao diện biểu đồ tăng trưởng sang nền trắng, chữ/trục dễ đọc để phù hợp trang hồ sơ; dữ liệu đo vẫn lấy từ các lần khám của hồ sơ.
+
+3. web_doctor/src/App.tsx
+- Giữ mục "Hồ sơ thai kỳ" màu xanh đậm ở menu trái cả khi đang mở chi tiết bệnh nhân.
+- Ẩn thanh tiêu đề trên cùng khi mở trang chi tiết để phần chi tiết bắt đầu gọn hơn; thanh tiêu đề vẫn hiện ở các trang danh sách và trang khác.
+
+Kiểm tra: `npm run build` chạy thành công trong thư mục web_doctor. Đã thử mở trang bằng trình duyệt nhưng API chi tiết hồ sơ hết thời gian chờ, nên chưa xác nhận được nội dung tab với dữ liệu thật.

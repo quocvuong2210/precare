@@ -3,7 +3,6 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Line,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -70,34 +69,36 @@ export const TrajectoryChart: React.FC<TrajectoryChartProps> = ({ biometricType,
   const unit = biometricType === 'EFW' ? 'g' : 'mm';
 
   return (
-    <div className="glass-card" style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 style={{ fontSize: '1.1rem', color: '#F8FAFC' }}>Đường cong tăng trưởng sinh trắc học thai nhi - {biometricType}</h3>
-          <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Tiêu chuẩn tăng trưởng Hadlock (Bách phân vị thứ 5, 50, 95)</p>
+          <h3 className="text-sm font-bold text-slate-900">Tăng trưởng thai nhi - {biometricType}</h3>
+          <p className="mt-1 text-xs text-slate-500">Đường tham chiếu Hadlock (bách phân vị 5, 50, 95)</p>
         </div>
-        <span className="badge badge-green">Tiêu chuẩn: Hadlock 1984</span>
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-800">
+          Hadlock 1984
+        </span>
       </div>
 
       <div style={{ width: '100%', height: 340 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
             <XAxis
               dataKey="ga_weeks"
               unit="w"
-              stroke="#94A3B8"
-              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              stroke="#64748B"
+              tick={{ fill: '#64748B', fontSize: 12 }}
             />
             <YAxis
               unit={` ${unit}`}
-              stroke="#94A3B8"
-              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              stroke="#64748B"
+              tick={{ fill: '#64748B', fontSize: 12 }}
             />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#F8FAFC' }}
+              contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: '8px', color: '#1E293B' }}
             />
-            <Legend wrapperStyle={{ paddingTop: '10px' }} />
+            <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
             
             {/* Centile Band Lines */}
             <Line type="monotone" dataKey="p95" name="Bách phân vị 95 (p95)" stroke="#F59E0B" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />

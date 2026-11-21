@@ -41,7 +41,13 @@ function parseLocation(pathname: string): ParsedRoute {
   }
 
   const path = pathname.toLowerCase().trim();
-  const token = localStorage.getItem('precare_token');
+  let token = localStorage.getItem('precare_token');
+  if (token?.startsWith('mock')) {
+    localStorage.removeItem('precare_token');
+    localStorage.removeItem('precare_refresh_token');
+    localStorage.removeItem('precare_user');
+    token = null;
+  }
 
   // 1. Tuyến đường công khai (Auth)
   if (path === '/register' || path.startsWith('/register')) {
@@ -289,7 +295,7 @@ export const App: React.FC = () => {
           <nav className="space-y-1.5">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id && !selectedPatientId;
+              const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
@@ -312,22 +318,14 @@ export const App: React.FC = () => {
         <div className="space-y-2">
           <div className="border border-slate-200/80 rounded-2xl p-3 bg-white flex items-center gap-3 shadow-xs">
             <div className="w-11 h-11 rounded-full bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center text-teal-800">
-              <img
-                src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
-                alt="BS. Lê Minh"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-              <Stethoscope className="w-5 h-5 text-teal-700 hidden only:block" />
+              <Stethoscope className="w-5 h-5 text-teal-700" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-bold text-slate-800 truncate">
-                {storedUser?.full_name ? `BS. ${storedUser.full_name}` : 'BS. Lê Minh'}
+                {storedUser?.full_name || 'Tài khoản'}
               </div>
               <div className="text-[11px] text-slate-500 truncate">
-                {storedUser?.email || 'Khoa Sản - Sản Phụ Khoa'}
+                {storedUser?.email || 'Chưa có email'}
               </div>
             </div>
           </div>
@@ -350,6 +348,7 @@ export const App: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
+        {!selectedPatientId && (
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-5 sticky top-0 z-30 flex items-center justify-between">
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">
             {selectedPatientId
@@ -381,6 +380,7 @@ export const App: React.FC = () => {
             </div>
           </div>
         </header>
+        )}
 
         {/* Page Content Body */}
         <main className="p-8 max-w-[1440px] w-full mx-auto">
