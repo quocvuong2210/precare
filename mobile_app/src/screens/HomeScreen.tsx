@@ -17,6 +17,7 @@ import {
   calculatePregnancyProfile,
   currentAccessToken,
   currentUserProfile,
+  fetchPregnancyProfileFromDB,
   restoreSession,
 } from '../services/api';
 
@@ -69,6 +70,7 @@ export default function HomeScreen() {
     trimester: '',
     dueDate: '',
   });
+  const [assignedDoctorName, setAssignedDoctorName] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -77,6 +79,20 @@ export default function HomeScreen() {
       async function loadPregnancySummary() {
         try {
           const account = currentUserProfile || (await restoreSession());
+          try {
+            const dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
+            const doctor = dbProfile?.primary_doctor || dbProfile?.doctor || null;
+            const doctorName =
+              doctor?.full_name ||
+              doctor?.fullName ||
+              dbProfile?.primary_doctor_name ||
+              dbProfile?.doctor_name ||
+              '';
+            if (isActive) setAssignedDoctorName(String(doctorName || '').trim());
+          } catch (doctorError) {
+            console.log('Không tải được bác sĩ phụ trách:', doctorError);
+            if (isActive) setAssignedDoctorName('');
+          }
           const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
           const raw = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
           if (!raw) {
@@ -221,6 +237,46 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <View
+          style={[
+            styles.doctorCard,
+            !assignedDoctorName && styles.doctorCardUnassigned,
+          ]}
+        >
+          <View
+            style={[
+              styles.doctorIcon,
+              !assignedDoctorName && styles.doctorIconUnassigned,
+            ]}
+          >
+            <Ionicons
+              name={assignedDoctorName ? 'medical' : 'person-add-outline'}
+              size={21}
+              color={assignedDoctorName ? '#FFFFFF' : colors.textMuted}
+            />
+          </View>
+          <View style={styles.doctorInfo}>
+            <Text style={styles.doctorLabel}>BÁC SĨ PHỤ TRÁCH</Text>
+            <View style={styles.doctorNameRow}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.assignedDoctorName,
+                  !assignedDoctorName && styles.assignedDoctorNameUnassigned,
+                ]}
+              >
+                {assignedDoctorName || 'Chưa phân công'}
+              </Text>
+              {assignedDoctorName ? (
+                <View style={styles.assignedBadge}>
+                  <View style={styles.assignedDot} />
+                  <Text style={styles.assignedBadgeText}>Đang phụ trách</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
         {/* ================= QUICK ACCESS ================= */}
         <Text style={styles.sectionTitle}>Lối tắt nhanh</Text>
 
@@ -258,15 +314,9 @@ export default function HomeScreen() {
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Appointments')}
         >
-          <View style={styles.dateBox}>
-            <Text style={styles.dateMonth}>T06</Text>
-            <Text style={styles.dateNumber}>15</Text>
-          </View>
-
           <View style={styles.appointmentInfo}>
-            <Text style={styles.appointmentTitle}>Khám định kỳ lúc 08:30 AM</Text>
-            <Text style={styles.doctor}>BS. Lê Minh</Text>
-            <Text style={styles.location}>Phòng khám 402 - BV Phụ sản TW</Text>
+            <Text style={styles.appointmentTitle}>Chưa có lịch khám nào</Text>
+            <Text style={styles.appointmentNote}>Lịch hẹn sẽ hiển thị tại đây sau khi được tạo.</Text>
           </View>
         </TouchableOpacity>
       </ScrollView>
@@ -359,6 +409,61 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   pregnancyImage: { width: '100%', height: '100%' },
+  doctorCard: {
+    marginTop: 12,
+    minHeight: 72,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#DDE8E5',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.055,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  doctorCardUnassigned: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  doctorIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  doctorIconUnassigned: {
+    backgroundColor: '#EEF2F5',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  doctorInfo: { flex: 1, marginLeft: 12 },
+  doctorLabel: { fontSize: 8.5, lineHeight: 12, color: '#748995', fontWeight: '800', letterSpacing: 0.7 },
+  doctorNameRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
+  assignedDoctorName: { flexShrink: 1, fontSize: 13.5, lineHeight: 19, color: colors.navy, fontWeight: '800' },
+  assignedDoctorNameUnassigned: { color: colors.textMuted },
+  assignedBadge: {
+    marginLeft: 8,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#EAF8F4',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  assignedDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5, backgroundColor: '#18A878' },
+  assignedBadgeText: { fontSize: 8.5, color: '#3C7668', fontWeight: '700' },
   sectionTitle: {
     marginTop: 18,
     marginBottom: 10,
@@ -408,18 +513,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  dateBox: {
-    width: 39,
-    height: 45,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateMonth: { fontSize: 8, color: colors.white, fontWeight: '600' },
-  dateNumber: { marginTop: 1, fontSize: 18, color: colors.white, fontWeight: '800' },
-  appointmentInfo: { flex: 1, marginLeft: 10 },
+  appointmentInfo: { flex: 1 },
   appointmentTitle: { fontSize: 10.5, color: colors.primaryDark, fontWeight: '700' },
-  doctor: { marginTop: 2, fontSize: 10.5, color: colors.navy, fontWeight: '600' },
-  location: { marginTop: 2, fontSize: 8.5, color: '#7B8C99' },
+  appointmentNote: { marginTop: 3, fontSize: 9, color: '#7B8C99' },
 });

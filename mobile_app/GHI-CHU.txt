@@ -1,0 +1,21 @@
+GHI CHÚ CHỈNH SỬA MOBILE TRANG CHỦ
+
+Ngày: 21/11/2026
+
+1. Màn hình Trang chủ
+- Hiển thị bác sĩ phụ trách bằng dữ liệu từ hồ sơ thai kỳ đang hoạt động của database.
+- Card bác sĩ có giao diện chuyên nghiệp: nền trắng, icon tròn, badge "Đang phụ trách".
+- Khi chưa có bác sĩ phụ trách, hiển thị "Chưa phân công" bằng trạng thái xám.
+- Không tạo tên bác sĩ hoặc dữ liệu bác sĩ mặc định giả.
+
+2. Màn hình Lịch hẹn
+- Đã bỏ lịch khám mẫu và tên bác sĩ giả khỏi dữ liệu màn hình.
+- Lịch mở ở tháng/ngày hiện tại thay vì ngày mẫu cố định.
+- Giữ trạng thái chưa có lịch khám thật vì màn hình chưa kết nối API lịch hẹn.
+
+3. Phạm vi
+- Chỉ thay đổi mobile_app.
+- Không thay đổi backend, web_doctor hoặc dữ liệu cơ sở dữ liệu.
+
+4. Kiểm tra
+- Cần chạy TypeScript hoặc Expo trước khi tạo release.
