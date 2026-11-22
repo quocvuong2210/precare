@@ -210,7 +210,7 @@ class PdfFastPathExtractor:
         # 10. Tuổi thai GA trên phiếu (14 - 310 ngày)
         # Hỗ trợ cả tiếng Việt có dấu, không dấu hoặc font lỗi nhẹ (Tuổi thai / Tuan / Week)
         ga_pattern = re.compile(
-            r"(?i)(?:Tu[^\s:]*\s*thai|GA|Thai\s*kho[^\s:]*|Thai\s*t[^\s:]*)\s*(?:theo\s*siêu\s*âm)?\s*(?:\([^)]{1,20}\))?[\)\]]?\s*[:=~]?\s*([0-9]{1,2})\s*(?:tu[^\s0-9]+|w|weeks?)\s*(?:([0-9])\s*(?:ng[^\s0-9]+|d|days?))?",
+            r"(?i)(?:Tu[^\s:]*\s*thai|GA|Thai\s*kho[^\s:]*|Thai\s*t[^\s:]*)\s*(?:(?:theo\s*)?siêu\s*âm)?\s*(?:\([^)]{1,20}\))?[\)\]]?\s*[:=~]?\s*([0-9]{1,2})\s*(?:tu[^\s0-9]+|w|weeks?)\s*(?:([0-9])\s*(?:ng[^\s0-9]+|d|days?))?",
             re.UNICODE,
         )
         match = ga_pattern.search(raw_text)
