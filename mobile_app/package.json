@@ -16,9 +16,9 @@
     "@react-navigation/native-stack": "^7.20.0",
     "@types/react": "~19.2.4",
     "axios": "^1.20.0",
-    "expo": "^57.0.26",
+    "expo": "~57.0.33",
     "expo-document-picker": "~57.0.3",
-    "expo-image-picker": "~57.0.20",
+    "expo-image-picker": "~57.0.21",
     "expo-linear-gradient": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.4",
+    "babel-preset-expo": "~57.0.17",
     "typescript": "~6.0.3"
   }
 }
