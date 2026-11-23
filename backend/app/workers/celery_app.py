@@ -4,8 +4,11 @@ from app.core.config import settings
 celery_app = Celery(
     "precare_workers",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=["app.workers.tasks"]
 )
+
+celery_app.set_default()
 
 celery_app.conf.update(
     task_serializer="json",
@@ -13,4 +16,5 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    result_backend=settings.REDIS_URL,
 )

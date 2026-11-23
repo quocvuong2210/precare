@@ -1,6 +1,5 @@
 import os
-from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "PreCare Backend Gateway"
@@ -32,6 +31,11 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "precare-paraclinical-files"
     MINIO_SECURE: bool = False
 
-    model_config = ConfigDict(env_file=".env", extra="ignore")
+    # Cấu hình OCR Engine (PaddleOCR)
+    OCR_LANG: str = "vi"
+    OCR_USE_ANGLE_CLS: bool = True
+    OCR_USE_GPU: bool = False
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

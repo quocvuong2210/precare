@@ -16,6 +16,7 @@ from app.models.user import User
 from app.models.pregnancy_profile import PregnancyProfile
 from app.models.uploaded_file import UploadedFile
 from app.services.storage_service import storage_service
+from app.workers.celery_app import celery_app
 from app.workers.tasks import process_ocr_task
 from app.schemas.ingest import (
     UploadSingleResponse,
@@ -266,11 +267,33 @@ async def upload_documents_batch(
     response_model=TaskStatusResponse,
     summary="Polling tiến trình tác vụ Celery đơn lẻ"
 )
+@router.get(
+    "/task-status/{task_id}",
+    response_model=TaskStatusResponse,
+    summary="Alias polling tiến trình tác vụ Celery đơn lẻ"
+)
 def get_task_status(task_id: str, db: Session = Depends(get_db)):
-    task_res = AsyncResult(task_id)
     uploaded_file = db.query(UploadedFile).filter(UploadedFile.celery_task_id == task_id).first()
 
-    state = task_res.state
+    state = "PENDING"
+    info = {}
+    try:
+        task_res = AsyncResult(task_id, app=celery_app)
+        state = task_res.state
+        if isinstance(task_res.info, dict):
+            info = task_res.info
+    except Exception:
+        # Fallback an toàn theo trạng thái lưu trong cơ sở dữ liệu nếu backend không sẵn sàng
+        if uploaded_file:
+            if uploaded_file.status == "extracted":
+                state = "SUCCESS"
+            elif uploaded_file.status == "failed":
+                state = "FAILURE"
+            elif uploaded_file.status == "processing":
+                state = "PROCESSING"
+            else:
+                state = "PENDING"
+
     progress_percentage = 0
     current_stage = "queued"
     stage_message = "Đang chờ worker tiếp nhận..."
@@ -284,7 +307,6 @@ def get_task_status(task_id: str, db: Session = Depends(get_db)):
         current_stage = "queued"
         stage_message = "Tài liệu đang nằm trong hàng đợi Redis..."
     elif state == "PROCESSING" or state == "STARTED":
-        info = task_res.info if isinstance(task_res.info, dict) else {}
         progress_percentage = info.get("progress_percentage", 50)
         current_stage = info.get("current_stage", "extracting_ocr_layout")
         stage_message = info.get("stage_message", "Đang phân tích bảng biểu và nhận dạng chỉ số...")
@@ -298,7 +320,11 @@ def get_task_status(task_id: str, db: Session = Depends(get_db)):
     elif state in ["FAILURE", "REVOKED"]:
         progress_percentage = 100
         current_stage = "failed"
-        stage_message = "Xử lý thất bại. Ảnh chụp quá mờ hoặc lỗi hệ thống bóc tách."
+        stage_message = (
+            uploaded_file.error_message
+            if uploaded_file and uploaded_file.error_message
+            else "Xử lý thất bại. Ảnh chụp quá mờ hoặc lỗi hệ thống bóc tách."
+        )
         error_code = "OCR_PROCESSING_FAILED"
         can_retry = True
 
@@ -339,12 +365,26 @@ def get_batch_status(batch_id: uuid.UUID, db: Session = Depends(get_db)):
 
     for item in file_task_pairs:
         t_id = item["task_id"]
-        task_res = AsyncResult(t_id)
         f_id = uuid.UUID(item["file_id"])
         db_file = db.query(UploadedFile).filter(UploadedFile.id == f_id).first()
 
         prog = 0
-        state = task_res.state
+        state = "PENDING"
+        info = {}
+        try:
+            task_res = AsyncResult(t_id, app=celery_app)
+            state = task_res.state
+            if isinstance(task_res.info, dict):
+                info = task_res.info
+        except Exception:
+            if db_file:
+                if db_file.status == "extracted":
+                    state = "SUCCESS"
+                elif db_file.status == "failed":
+                    state = "FAILURE"
+                elif db_file.status == "processing":
+                    state = "PROCESSING"
+
         st = db_file.status if db_file else "pending"
         v_url = None
 
@@ -431,6 +471,7 @@ def get_file_detail(
             presigned_view_url=presigned_url,
             presigned_url_expires_in_seconds=1800,
             uploaded_by=uploader_info,
+            ocr_raw_payload=db_file.ocr_raw_payload,
             created_at=db_file.created_at
         )
     }
