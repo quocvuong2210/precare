@@ -471,6 +471,7 @@ def get_file_detail(
             presigned_view_url=presigned_url,
             presigned_url_expires_in_seconds=1800,
             uploaded_by=uploader_info,
+            ocr_raw_payload=db_file.ocr_raw_payload,
             created_at=db_file.created_at
         )
     }

@@ -1,7 +1,7 @@
 # backend/app/schemas/ingest.py
 import uuid
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 
 
@@ -119,6 +119,7 @@ class FileDetailResponseData(BaseModel):
     presigned_view_url: str
     presigned_url_expires_in_seconds: int = 1800
     uploaded_by: Optional[UploaderInfo] = None
+    ocr_raw_payload: Optional[Dict[str, Any]] = None
     created_at: datetime
 
 

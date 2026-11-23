@@ -4,7 +4,8 @@ from app.core.config import settings
 celery_app = Celery(
     "precare_workers",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=["app.workers.tasks"]
 )
 
 celery_app.set_default()

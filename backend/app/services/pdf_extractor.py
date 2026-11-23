@@ -140,16 +140,27 @@ class PdfFastPathExtractor:
                 confidence["fl"] = 0.99 if match.group(2) else 0.98
 
         # 5. Cân nặng thai ước tính EFW (50.0 - 6000.0 g)
+        # Hỗ trợ cả tiếng Việt chuẩn và kết quả OCR thiếu dấu (Cân nng thai ưc tính / Trọng lượng thai)
         efw_pattern = re.compile(
-            r"(?i)(?:Trọng\s*lượng\s*thai|Cân\s*nặng(?:\s*ước\s*tính)?|EFW)\s*(?:\([^)]{1,25}\))?[\)\]]?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*(g|gram|gr)?",
+            r"(?i)(?:Tr[^\s:]*ng\s*l[^\s:]*ng\s*thai|Cân\s*n[^\s:]*ng\s*(?:thai\s*)?[uư][^\s:]*c\s*t[^\s:]*nh|Cân\s*n[^\s:]*ng\s*thai|EFW)\s*(?:\([^)]{1,25}\))?[\)\]]?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*(g|gram|gr|kg)?",
             re.UNICODE,
         )
-        match = efw_pattern.search(raw_text)
-        if match:
-            val = self._normalize_float(match.group(1))
-            if val is not None and 50.0 <= val <= 6000.0:
-                extracted["efw_g"] = round(val, 2)
-                confidence["efw"] = 0.99 if match.group(2) else 0.98
+        for match in efw_pattern.finditer(raw_text):
+            raw_val_str = match.group(1)
+            unit = (match.group(2) or "").lower()
+            val = self._normalize_float(raw_val_str)
+            if val is not None:
+                # Xử lý đơn vị kg (vd 1.48kg -> 1480g) hoặc dấu chấm phân cách hàng nghìn (1.480g -> 1480g)
+                if unit == "kg":
+                    val = val * 1000.0
+                elif val < 10.0 and "." in raw_val_str and len(raw_val_str.split(".")[1]) == 3:
+                    val = val * 1000.0
+                elif val < 10.0 and unit in ("g", "gram", "gr"):
+                    val = val * 1000.0
+                if 50.0 <= val <= 6000.0:
+                    extracted["efw_g"] = round(val, 2)
+                    confidence["efw"] = 0.99 if match.group(2) else 0.98
+                    break
 
         # 6. Chiều dài đầu mông CRL (5.0 - 120.0 mm - siêu âm Quý 1)
         crl_pattern = re.compile(

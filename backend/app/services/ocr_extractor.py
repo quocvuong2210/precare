@@ -44,19 +44,30 @@ class OcrPipelineExtractor:
 
         if self._engine is None:
             try:
+                import os
+                os.environ["FLAGS_use_mkldnn"] = "0"
+                os.environ["PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT"] = "0"
                 import importlib
                 paddle_mod = importlib.import_module("paddleocr")
                 paddle_ocr_class = getattr(paddle_mod, "PaddleOCR")
                 logger.info(
-                    f"[OCR Engine] Đang khởi tạo PaddleOCR (lang={settings.OCR_LANG}, "
-                    f"use_angle_cls={settings.OCR_USE_ANGLE_CLS}, use_gpu={settings.OCR_USE_GPU})..."
+                    f"[OCR Engine] Đang khởi tạo PaddleOCR (lang={settings.OCR_LANG})..."
                 )
-                self._engine = paddle_ocr_class(
-                    use_angle_cls=settings.OCR_USE_ANGLE_CLS,
-                    lang=settings.OCR_LANG,
-                    use_gpu=settings.OCR_USE_GPU,
-                    show_log=False,
-                )
+                try:
+                    self._engine = paddle_ocr_class(
+                        lang=settings.OCR_LANG,
+                        enable_mkldnn=False,
+                    )
+                except Exception:
+                    try:
+                        self._engine = paddle_ocr_class(
+                            use_angle_cls=settings.OCR_USE_ANGLE_CLS,
+                            lang=settings.OCR_LANG,
+                            use_gpu=settings.OCR_USE_GPU,
+                            show_log=False,
+                        )
+                    except Exception:
+                        self._engine = paddle_ocr_class(lang=settings.OCR_LANG)
                 logger.info("[OCR Engine] Khởi tạo PaddleOCR thành công.")
             except (ImportError, ModuleNotFoundError) as err:
                 logger.warning(
@@ -230,10 +241,37 @@ class OcrPipelineExtractor:
         img_bytes = buf.getvalue()
 
         try:
-            # PaddleOCR returns a list of results (one per image/page)
-            ocr_output = engine.ocr(img_bytes, cls=True)
-            if ocr_output and len(ocr_output) > 0 and ocr_output[0] is not None:
-                return ocr_output[0]
+            # Kiểm tra phương thức suy luận hiện đại (PaddleOCR v3+)
+            if hasattr(engine, "predict"):
+                try:
+                    import numpy as np
+                    np_img = np.array(image.convert("RGB"))
+                    preds = list(engine.predict(np_img))
+                    if preds and len(preds) > 0 and isinstance(preds[0], dict):
+                        p = preds[0]
+                        polys = p.get("dt_polys")
+                        if polys is None:
+                            polys = p.get("rec_polys")
+                        texts = p.get("rec_texts") or []
+                        scores = p.get("rec_scores") or []
+                        parsed_boxes = []
+                        for i in range(len(texts)):
+                            poly = polys[i] if polys is not None and i < len(polys) else [[0, 0], [0, 0], [0, 0], [0, 0]]
+                            score = float(scores[i]) if i < len(scores) else 0.95
+                            parsed_boxes.append([poly, (texts[i], score)])
+                        if parsed_boxes:
+                            return parsed_boxes
+                except Exception as pred_err:
+                    logger.debug(f"[OCR Pipeline] engine.predict fallback: {pred_err}")
+
+            # PaddleOCR legacy/mock returns a list of results (one per image/page)
+            if hasattr(engine, "ocr"):
+                try:
+                    ocr_output = engine.ocr(img_bytes, cls=True)
+                except TypeError:
+                    ocr_output = engine.ocr(img_bytes)
+                if ocr_output and len(ocr_output) > 0 and ocr_output[0] is not None:
+                    return ocr_output[0]
             return []
         except Exception as e:
             logger.error(f"[OCR Pipeline] Lỗi trong quá trình suy luận PaddleOCR: {e}", exc_info=True)

@@ -4,7 +4,15 @@ import time
 import uuid
 
 from app.core.database import SessionLocal
+from app.models.user import User
+from app.models.pregnancy_profile import PregnancyProfile
+from app.models.checkup import Checkup
+from app.models.biometric_data import BiometricData
+from app.models.deletion_request import DeletionRequest
 from app.models.uploaded_file import UploadedFile
+from app.models.audit_log import AuditLog
+from app.models.refresh_token import RefreshToken
+from app.models.password_reset import PasswordReset
 from app.services.ocr_extractor import ocr_extractor
 from app.services.pdf_extractor import pdf_extractor
 from app.services.storage_service import storage_service
