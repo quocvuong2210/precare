@@ -80,40 +80,14 @@ const STORAGE_KEY = 'precare_pregnancy_records_v2';
  * Đọc danh sách hồ sơ thai kỳ từ LocalStorage (hoặc nạp mặc định nếu lần đầu)
  */
 export function getStoredPregnancyRecords(): PregnancyRecordItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PREGNANCY_RECORDS));
-      return INITIAL_PREGNANCY_RECORDS;
-    }
-    const parsed: PregnancyRecordItem[] = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Đảm bảo hồ sơ prof-104963 tồn tại và cập nhật chỉ số chuẩn 7w1d / EDD 2027-06-24
-      const idx = parsed.findIndex((r) => r.id === 'prof-104963' || r.patientName === 'Bùi Kim Ngân');
-      if (idx === -1) {
-        parsed.unshift(INITIAL_PREGNANCY_RECORDS[0]);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      } else if (parsed[idx].gestationalAgeFormatted !== '7w1d' || parsed[idx].edd !== '2027-06-24') {
-        parsed[idx] = { ...parsed[idx], ...INITIAL_PREGNANCY_RECORDS[0] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      }
-      return parsed;
-    }
-    return INITIAL_PREGNANCY_RECORDS;
-  } catch {
-    return INITIAL_PREGNANCY_RECORDS;
-  }
+  return [];
 }
 
 /**
  * Lưu danh sách hồ sơ vào LocalStorage
  */
 export function savePregnancyRecordsToStorage(records: PregnancyRecordItem[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch (e) {
-    console.error('Không thể lưu hồ sơ thai kỳ vào LocalStorage', e);
-  }
+  void records;
 }
 
 export interface CreatePregnancyRecordInput {
@@ -199,7 +173,7 @@ export function createNewPregnancyRecord(
     email: input.email?.trim(),
     birthDate: input.birthDate,
     doctorId: input.doctorId,
-    doctorName: input.doctorName || 'BS. Lê Minh',
+    doctorName: input.doctorName || '',
     
     lmp: input.lmp,
     q1UltrasoundDate: input.q1UltrasoundDate,
@@ -624,41 +598,19 @@ export function removeVietnameseAccents(str: string): string {
 /**
  * Danh sách bác sĩ hệ thống có role 'doctor' từ CSDL PreCare
  */
-export const SYSTEM_DOCTORS: { id: string; name: string }[] = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'BS. Lê Minh' },
-  { id: '60ad56ea-437e-47bd-839a-d97333790da0', name: 'BS. Nguyễn Na' },
-  { id: '77777777-7777-7777-7777-777777777777', name: 'BS. Chung Duy' },
-  { id: 'ebe0d1ff-abdb-4528-97ba-f23c7c478674', name: 'BS. Nguyễn Anh Thư' },
-  { id: 'cebf0255-886c-41c8-a6aa-78f8df38cc9d', name: 'BS. Nguyễn Nhi' },
-];
-
 /**
- * Trích xuất danh sách bác sĩ duy nhất từ dữ liệu thực tế của các hồ sơ thai kỳ & hệ thống
+ * Trích xuất danh sách bác sĩ duy nhất từ dữ liệu hồ sơ đã tải từ CSDL
  */
 export function getUniqueDoctorsFromRecords(
   records: PregnancyRecordItem[]
 ): { id: string; name: string }[] {
   const map = new Map<string, { id: string; name: string }>();
-
-  // 1. Nạp danh sách bác sĩ chuẩn hệ thống
-  SYSTEM_DOCTORS.forEach((doc) => {
-    map.set(doc.name.toLowerCase().trim(), doc);
-    map.set(doc.id, doc);
-  });
-
-  // 2. Bổ sung các bác sĩ xuất hiện trong các bản ghi hồ sơ
   records.forEach((r) => {
     const rawName = r.doctorName?.trim();
     if (rawName) {
       const formattedName = rawName.startsWith('BS.') ? rawName : `BS. ${rawName}`;
-      const matched = SYSTEM_DOCTORS.find(
-        (sd) =>
-          (r.doctorId && sd.id === r.doctorId) ||
-          sd.name.toLowerCase() === rawName.toLowerCase() ||
-          sd.name.toLowerCase() === formattedName.toLowerCase()
-      );
-      const id = r.doctorId || matched?.id || rawName;
-      const name = matched?.name || formattedName;
+      const id = r.doctorId || rawName;
+      const name = formattedName;
       if (!map.has(id)) {
         map.set(id, { id, name });
       }
