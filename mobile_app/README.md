@@ -482,71 +482,12 @@ npx expo start -c --android
 
 ```cmd
 adb devices
+```
 
-- Nếu thấy dòng thiết bị có trạng thái device, ADB đã nhận thiết bị.
-- Nếu thấy offline hoặc không thấy emulator, máy ảo/ADB chưa sẵn sàng.
-- Nếu PowerShell báo không nhận lệnh adb, dùng đường dẫn ADB đầy đủ nếu Android
-  SDK đang được cài tại vị trí mặc định:
-  C:\Users\LENOVO\AppData\Local\Android\Sdk\platform-tools\adb.exe devices
+**Dừng Expo:**
 
-LỖI C — Terminal hiện QR code nhưng app chưa mở
-- Đảm bảo máy ảo đã khởi động hoàn toàn.
-- Nhấp vào terminal Expo rồi nhấn a.
-- Chờ một lúc và quan sát màn hình máy ảo.
+```text
+Ctrl + C
+```
 
-LỖI D — Ứng dụng mở nhưng không thấy dữ liệu từ backend
-- Giao diện mobile có thể chạy độc lập với backend.
-- Kiểm tra backend có đang chạy không, địa chỉ API, cổng và nhật ký lỗi.
-- Không tự đổi địa chỉ API nếu chưa xác định backend đang chạy ở đâu.
-
-LỖI E — Muốn dừng ứng dụng
-- Trong terminal đang chạy Expo, nhấn Ctrl+C.
-- Nếu muốn chạy lại, dùng lệnh npm run android như hướng dẫn ở trên.
-
-
-8. QUY TRÌNH CHẠY HẰNG NGÀY — BẢN NGẮN GỌN
------------------------------------------------------------------------------------------------------------
-Mỗi lần mở dự án, làm theo thứ tự:
-
-1. Mở Android Studio và khởi động máy ảo Medium_Phone.
-2. Chờ máy ảo vào màn hình chính Android.
-3. Mở VS Code và mở thư mục mobile_app.
-4. Chọn Terminal > New Terminal.
-5. Nhập:
-   cd D:\HOC-TAP\NCKH\precare\mobile_app
-6. Nhập:
-   npm run android
-7. Nếu hỏi dùng cổng 8082, nhập y rồi Enter.
-8. Nếu Expo chạy mà app chưa mở, nhấn a trong terminal Expo.
-9. Thao tác thử các màn hình trên máy ảo.
-10. Khi hoàn thành, quay về terminal và nhấn Ctrl+C để dừng Expo nếu không dùng nữa.
-
-
-9. LƯU Ý KHI PHÁT TRIỂN
------------------------------------------------------------------------------------------------------------
-- Chỉ sửa code khi biết file đó phụ trách phần nào.
-- Trước khi chỉnh sửa, nên lưu thay đổi và kiểm tra Git nếu dự án đang dùng Git.
-- Không xóa node_modules hoặc file cấu hình chỉ để thử sửa lỗi thông thường.
-- Nếu màn hình không chuyển được, kiểm tra AppNavigator.tsx và các sự kiện onPress.
-- Nếu màn hình mở nhưng thao tác không có phản hồi, cần kiểm tra logic trong file
-  màn hình; không phải cứ chạy được Expo là mọi chức năng đã hoàn thiện.
-- Để xác nhận tính năng hoàn chỉnh, cần thử thao tác thực tế và kiểm tra kết nối
-  backend/API khi tính năng có sử dụng dữ liệu máy chủ.
-
-Cách hoạt động
-------------------------------------------------------------------------------------------------------------
-Lệnh chạy chính:
-------------------------------------------------------------------------------------------------------------
-Bước 1: npm run android  
-- đợi trong vài phút 
-- sau đó nhấn phím a sau đó máy ảo sẽ tự chạy lên
-------------------------------------------------------------------------------------------------------------
-sau khi máy ảo đã chạy lên thêm 1 terminal mới để chạy tiếp Bước 2
-------------------------------------------------------------------------------------------------------------
-Bước 2: npx expo start -c 
-- lúc đầu sẽ hiện ra (y,n)
-- nhấn y nếu hiện ra như này √ (Use port 8082 instead? ... yes) ĐÚNG
-- đợi trong vài phút để chạy cài 
-- sau đó nhấn phím a 
-------------------------------------------------------------------------------------------------------------
-
+**Quy trình ngắn gọn nhất:** Bật Android Emulator → mở VS Code tại `mobile_app` → chạy `npm run android` → chờ ứng dụng mở trên máy ảo.
