@@ -289,51 +289,43 @@ npm run android
 7. Chờ cửa sổ **PreCare Expo** mở và ứng dụng tải trên máy ảo.
 8. Nếu ứng dụng chưa tự mở, nhấp vào cửa sổ Expo và nhấn `a`.
 
-   - File màn hình giới thiệu ban đầu (Onboarding).
-   - Có thể dùng để giới thiệu mục đích ứng dụng trước khi người dùng vào phần
-     đăng nhập/đăng ký.
-   - Cần chạy ứng dụng để kiểm tra chính xác giao diện và thao tác thực tế.
+Không cần chạy lại `npm ci` mỗi ngày.
 
-2. LoginScreen.tsx
-   - File màn hình đăng nhập.
-   - Dùng để hiển thị giao diện đăng nhập.
-   - Không được mặc định rằng đăng nhập thật đã hoạt động; cần kiểm tra phần
-     xử lý nút và kết nối API trong mã nguồn.
+### Dừng ứng dụng
 
-3. RegisterScreen.tsx
-   - File màn hình đăng ký tài khoản.
-   - File giao diện đã có trong dự án.
-   - Cần kiểm tra luồng đăng ký và API trước khi kết luận đăng ký tài khoản thật
-     đã hoàn thiện.
+Khi muốn dừng Expo Server:
 
-4. HomeScreen.tsx
-   - File màn hình chính (Home) đã có trong thư mục screens.
-   - Việc file tồn tại không đảm bảo màn hình này đã được nối vào luồng điều
-     hướng hoặc người dùng đã chuyển tới được màn hình đó.
+1. Nhấp vào cửa sổ CMD **PreCare Expo**.
+2. Nhấn **Ctrl + C**.
+3. Nếu CMD hỏi xác nhận, làm theo nội dung hiển thị.
 
-5. AppNavigator.tsx
-   - File điều hướng giữa các màn hình.
-   - Khi muốn biết nút nào chuyển sang màn hình nào, kiểm tra cấu hình tại đây.
+Đóng hoặc dừng Expo sẽ ngắt máy chủ phát triển; muốn chạy lại thì bật máy ảo và chạy `npm run android`.
 
-6. App.tsx
-   - File đầu vào cấp ứng dụng, thường dùng để gọi phần điều hướng chính.
+---
 
-7. src/services/
-   - Thư mục chứa các phần dịch vụ, ví dụ phần gọi API.
-   - Cấu hình địa chỉ API cần phù hợp với môi trường đang chạy.
+## 7. Các màn hình và cấu trúc mã nguồn đang có
 
-TÓM TẮT TRẠNG THÁI:
-- Đã có các file màn hình: Onboarding, Login, Register và Home.
-- Đã có file điều hướng AppNavigator và file App.tsx.
-- Cần chạy thực tế để xác nhận luồng điều hướng từng màn hình.
-- Không khẳng định đăng nhập, đăng ký, lưu dữ liệu hay kết nối backend đã hoạt
-  động nếu chưa kiểm tra và thử thành công.
+Dựa trên các file được ghi nhận trong dự án:
 
+| File/thư mục | Vai trò |
+|---|---|
+| `OnboardingScreen.tsx` | Màn hình giới thiệu ban đầu |
+| `LoginScreen.tsx` | Màn hình đăng nhập |
+| `RegisterScreen.tsx` | Màn hình đăng ký |
+| `HomeScreen.tsx` | Màn hình chính |
+| `AppNavigator.tsx` | Cấu hình điều hướng giữa các màn hình |
+| `App.tsx` | Điểm vào cấp ứng dụng |
+| `src/services/` | Các dịch vụ của ứng dụng, ví dụ phần gọi API |
 
-6. ĐỊA CHỈ API KHI CHẠY TRÊN ANDROID
------------------------------------------------------------------------------------------------------------
-Trong cấu hình dự án đã được ghi nhận, địa chỉ API dành cho Android Emulator là:
+**Lưu ý:** File màn hình tồn tại không có nghĩa chức năng đã hoàn thiện. Cần chạy ứng dụng, thao tác thực tế và kiểm tra logic/API để xác nhận từng luồng.
 
+---
+
+## 8. Kết nối Backend và địa chỉ API
+
+Địa chỉ API dành cho Android Emulator được ghi nhận trong cấu hình dự án là:
+
+```text
 http://10.0.2.2:8000/api/v1
 
 Địa chỉ 10.0.2.2 cho phép Android Emulator truy cập máy tính đang chạy backend.
