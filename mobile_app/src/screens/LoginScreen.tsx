@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
@@ -25,6 +26,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
+const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
+
 export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,6 +35,37 @@ export default function LoginScreen({ navigation }: Props) {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRememberedCredentials = async () => {
+      try {
+        const savedEmail = await SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(true);
+        } else {
+          await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY);
+        }
+      } catch {
+        if (isMounted) {
+          setError('Không thể tải thông tin đăng nhập đã lưu.');
+        }
+      }
+    };
+
+    void loadRememberedCredentials();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (loading) {
@@ -53,6 +87,17 @@ export default function LoginScreen({ navigation }: Props) {
         throw new Error('API không trả về access_token.');
       }
       console.log('Đăng nhập thành công!');
+
+      let credentialStorageFailed = false;
+      try {
+        if (rememberMe) {
+          await SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, email.trim());
+        } else {
+          await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY);
+        }
+      } catch {
+        credentialStorageFailed = true;
+      }
 
       // Kiểm tra xem thai phụ đã có hồ sơ thai kỳ chưa (DB hoặc bộ nhớ máy)
       let hasProfile = false;
@@ -77,7 +122,23 @@ export default function LoginScreen({ navigation }: Props) {
         }
       }
 
-      navigation.replace(hasProfile ? 'Main' : 'PregnancySetup');
+      const destination = hasProfile ? 'Main' : 'PregnancySetup';
+      if (credentialStorageFailed) {
+        Alert.alert(
+          'Không thể cập nhật thông tin đã lưu',
+          'Bạn đã đăng nhập thành công, nhưng thông tin ghi nhớ chưa được cập nhật.',
+          [
+            {
+              text: 'Tiếp tục',
+              onPress: () => navigation.replace(destination),
+            },
+          ],
+          { cancelable: false },
+        );
+        return;
+      }
+
+      navigation.replace(destination);
     } catch (err) {
       const message =
         err instanceof Error
