@@ -389,18 +389,98 @@ cannot connect to 127.0.0.1:5554
 Lỗi này thường cho biết ADB chưa kết nối được với Android Emulator.
 
 Cách xử lý:
-1. Nếu lệnh đã dừng và trở về dấu nhắc PowerShell, chạy lại không có tác dụng
-   nếu máy ảo vẫn chưa kết nối.
-2. Dừng phiên Expo cũ nếu nó còn chạy bằng Ctrl+C.
-3. Mở Android Studio > Device Manager.
-4. Tắt máy ảo bị treo nếu cần, rồi nhấn Play để khởi động lại.
-5. Chờ đến màn hình chính Android.
-6. Mở terminal mới và chạy lại:
-   cd D:\HOC-TAP\NCKH\precare\mobile_app
-   npm run android
-7. Nếu Expo chạy nhưng ứng dụng chưa mở, nhấn a trong terminal Expo.
+1. Dừng phiên Expo đang chạy bằng `Ctrl + C` nếu cần.
+2. Mở Android Studio > Device Manager.
+3. Khởi động lại máy ảo và chờ máy vào màn hình chính.
+4. Chạy `adb devices` để kiểm tra.
+5. Khi thiết bị hiện trạng thái `device`, chạy lại `npm run android`.
 
-Nếu vẫn lỗi, mở một terminal PowerShell khác và nhập:
+### Lỗi 5 – Cổng 8081 đang được sử dụng
+
+Nếu Expo hỏi có muốn dùng cổng 8082 không, nhập `y` rồi nhấn Enter.
+
+Không cần mở thêm một Expo Server khác chỉ để đổi cổng.
+
+### Lỗi 6 – Expo đã chạy nhưng ứng dụng chưa mở
+
+1. Kiểm tra máy ảo đã bật và ADB đã nhận thiết bị.
+2. Nhấp vào cửa sổ CMD **PreCare Expo**.
+3. Nhấn phím `a`.
+4. Chờ ứng dụng mở trên Android Emulator.
+
+### Lỗi 7 – Muốn xóa cache Expo để xử lý lỗi tải lại
+
+Chỉ thực hiện khi đã dừng Expo Server đang chạy:
+
+1. Nhấp vào cửa sổ **PreCare Expo** và nhấn `Ctrl + C`.
+2. Trong Terminal tại thư mục `mobile_app`, chạy:
+
+```cmd
+npx expo start -c --android
+```
+
+Lệnh này khởi động Expo với cache được làm mới và yêu cầu mở Android. Khi dùng cách này, Expo chạy ngay trong Terminal đang nhập lệnh; không chạy đồng thời thêm `npm run android`.
+
+Sau khi xử lý xong, dừng phiên này bằng `Ctrl + C`. Những lần chạy bình thường tiếp theo có thể quay lại dùng `npm run android`.
+
+### Lỗi 8 – Ứng dụng mở nhưng không có dữ liệu
+
+Kiểm tra:
+1. Backend đã chạy chưa.
+2. Backend có hoạt động tại cổng `8000` không.
+3. Địa chỉ API trong `src/services/` có đúng môi trường Android Emulator không.
+4. Log lỗi trong cửa sổ Expo và Backend.
+
+---
+
+## 10. Lưu ý khi phát triển
+
+- Trước khi chỉnh sửa mã nguồn, nên lưu thay đổi và kiểm tra Git nếu dự án đang sử dụng Git.
+- Không xóa `node_modules`, `package-lock.json` hoặc file cấu hình khi chưa biết nguyên nhân lỗi.
+- Nếu màn hình không chuyển được, kiểm tra `AppNavigator.tsx` và sự kiện `onPress`.
+- Nếu nút bấm không phản hồi, kiểm tra logic xử lý trong file màn hình tương ứng.
+- Nếu chức năng cần dữ liệu máy chủ không hoạt động, kiểm tra Backend và API.
+- Chạy được Expo chỉ xác nhận ứng dụng đã được khởi động; không tự động xác nhận tất cả chức năng nghiệp vụ đã hoàn thiện.
+
+---
+
+## 11. Tóm tắt lệnh cần nhớ
+
+**Cài thư viện lần đầu** (tại thư mục `mobile_app`):
+
+```cmd
+npm ci
+```
+
+Nếu không có `package-lock.json`, dùng:
+
+```cmd
+npm install
+```
+
+**Kiểm tra dự án:**
+
+```cmd
+npx expo-doctor
+npx expo install --check
+npx tsc --noEmit
+```
+
+**Chạy ứng dụng hằng ngày:**
+
+```cmd
+npm run android
+```
+
+**Làm mới cache khi cần** (sau khi đã dừng Expo đang chạy):
+
+```cmd
+npx expo start -c --android
+```
+
+**Kiểm tra Android Emulator:**
+
+```cmd
 adb devices
 
 - Nếu thấy dòng thiết bị có trạng thái device, ADB đã nhận thiết bị.
