@@ -1,14 +1,122 @@
-HƯỚNG DẪN SỬ DỤNG VÀ CHẠY ỨNG DỤNG MOBILE PRECARE
-Dành cho người mới bắt đầu
-============================================================
+# HƯỚNG DẪN CÀI ĐẶT VÀ CHẠY PRECARE MOBILE TRÊN ANDROID
+*Dành cho người mới bắt đầu – Windows 10/11, Visual Studio Code và Android Emulator*
 
-1. MỤC ĐÍCH TÀI LIỆU
------------------------------------------------------------------------------------------------------------
-Tài liệu này hướng dẫn cách mở dự án PreCare Mobile bằng Visual Studio Code,
-khởi động máy ảo Android, chạy ứng dụng và kiểm tra các màn hình đã có trong
-mã nguồn.
+---
 
-Thư mục dự án theo máy hiện tại:
+## 1. Mục đích và yêu cầu
+
+Tài liệu này hướng dẫn cách chuẩn bị máy tính, cài thư viện, mở máy ảo Android và chạy ứng dụng PreCare Mobile.
+
+**Các công nghệ của ứng dụng:**
+- React Native và TypeScript.
+- Expo để khởi động ứng dụng.
+- Android Studio và Android Emulator để chạy thử trên máy tính.
+
+**Cần chuẩn bị:**
+1. Mã nguồn dự án PreCare trên máy tính.
+2. Node.js phiên bản LTS.
+3. Visual Studio Code.
+4. Android Studio, Android SDK và Android Emulator.
+5. Kết nối Internet trong lần cài đặt thư viện.
+
+> Lưu ý: Chạy được giao diện Mobile không có nghĩa tất cả chức năng nghiệp vụ đã hoàn thiện. Các chức năng cần dữ liệu máy chủ còn phụ thuộc vào Backend và địa chỉ API.
+
+---
+
+## 2. Cài đặt môi trường lần đầu
+
+### Bước 1 – Cài Node.js
+
+1. Tải và cài đặt **Node.js phiên bản LTS** từ trang chính thức: https://nodejs.org/
+2. Trong quá trình cài đặt, giữ các lựa chọn mặc định.
+3. Sau khi cài xong, mở CMD mới và chạy:
+
+```cmd
+node -v
+npm -v
+```
+
+Nếu cả hai lệnh hiển thị số phiên bản thì Node.js và npm đã được cài đặt.
+
+### Bước 2 – Cài Android Studio và Android SDK
+
+1. Cài Android Studio từ trang chính thức: https://developer.android.com/studio
+2. Mở Android Studio.
+3. Vào **More Actions > SDK Manager** ở màn hình chào; nếu đang mở dự án, vào **Tools > SDK Manager**.
+4. Trong tab **SDK Platforms**, cài Android SDK Platform phù hợp với máy ảo bạn định sử dụng.
+5. Trong tab **SDK Tools**, bảo đảm đã chọn:
+   - Android SDK Build-Tools.
+   - Android SDK Platform-Tools.
+   - Android Emulator.
+6. Nhấn **Apply > OK** và chờ cài đặt hoàn tất.
+
+### Bước 3 – Tạo máy ảo Android
+
+1. Trong Android Studio, mở **More Actions > Virtual Device Manager**; ở một số phiên bản, mục này có tên **Device Manager**.
+2. Chọn **Create Device**.
+3. Chọn một thiết bị điện thoại, ví dụ Pixel hoặc Medium Phone, rồi nhấn **Next**.
+4. Chọn phiên bản Android (System Image). Nếu chưa có, nhấn Download để tải.
+5. Nhấn **Next > Finish**.
+6. Trong Device Manager, nhấn nút **Play** để bật máy ảo.
+7. Chờ máy ảo khởi động đến màn hình chính Android.
+
+Máy hiện tại đang sử dụng máy ảo có tên **Medium_Phone**. Trên máy tính mới, tên AVD có thể khác; có thể chọn một máy ảo Android khác đã tạo.
+
+### Bước 4 – Thiết lập ANDROID_HOME và PATH
+
+Bước này giúp Windows nhận diện được công cụ ADB để kết nối với máy ảo.
+
+1. Trong Android Studio, mở **SDK Manager** và xem mục **Android SDK Location** để biết chính xác thư mục SDK.
+2. Trên Windows, tìm **Edit the system environment variables**.
+3. Chọn **Environment Variables...**.
+4. Trong phần **User variables**, chọn **New...**:
+   - Variable name: `ANDROID_HOME`
+   - Variable value: đường dẫn Android SDK vừa xem ở Android Studio.
+
+Đường dẫn mặc định thường là:
+
+```text
+%LOCALAPPDATA%\Android\Sdk
+```
+
+5. Trong phần **User variables**, chọn biến `Path` > **Edit** > **New**, thêm:
+
+```text
+%ANDROID_HOME%\platform-tools
+```
+
+6. Nhấn **OK** để lưu tất cả cửa sổ.
+7. Đóng và mở lại CMD hoặc Terminal để Windows nhận biến môi trường mới.
+
+Kiểm tra bằng các lệnh:
+
+```cmd
+adb --version
+adb devices
+```
+
+Khi máy ảo đang bật, kết quả `adb devices` cần có một thiết bị với trạng thái `device`, ví dụ:
+
+```text
+List of devices attached
+emulator-5554    device
+```
+
+Nếu chưa thấy thiết bị, hãy kiểm tra máy ảo đã khởi động hoàn toàn chưa và xem phần Khắc phục lỗi ở cuối tài liệu.
+
+---
+
+## 3. Mở dự án và cài thư viện Mobile
+
+### Bước 5 – Mở đúng thư mục dự án
+
+1. Mở Visual Studio Code.
+2. Chọn **File > Open Folder...**.
+3. Chọn thư mục `mobile_app` của dự án PreCare.
+
+Trên máy hiện tại, đường dẫn là:
+
+```text
 D:\HOC-TAP\NCKH\precare\mobile_app
 
 Công nghệ nhìn thấy trong dự án:
