@@ -252,50 +252,43 @@ Ví dụ:
 ```text
 Port 8081 is being used by another process.
 Use port 8082 instead?
-thì có nghĩa cổng 8081 đang được một tiến trình khác sử dụng. Có thể nhập y
-rồi nhấn Enter để tiếp tục bằng cổng 8082.
+```
 
-BƯỚC 5 — MỞ ỨNG DỤNG TRÊN MÁY ẢO
-- Nếu terminal tự mở ứng dụng trên máy ảo, hãy chờ ứng dụng tải.
-- Nếu Expo đã chạy, terminal vẫn đang hoạt động nhưng ứng dụng chưa mở,
-  nhấn phím chữ thường a trong cửa sổ terminal Expo.
-- Không gõ chữ a vào file README hoặc vào màn hình điện thoại. Phải bấm vào
-  đúng cửa sổ Terminal đang chạy Expo trước rồi mới nhấn a.
-- Chờ thêm một lúc để ứng dụng tải trên máy ảo.
+Nhập:
 
-Khi Expo đang chạy, giữ nguyên terminal đó. Không đóng terminal và không nhấn
-Ctrl+C nếu vẫn muốn ứng dụng tiếp tục kết nối với máy chủ phát triển.
+```text
+y
+```
 
+Sau đó nhấn Enter và chờ Expo tiếp tục chạy trên cổng mới.
 
-4. CÁCH DÙNG CÁC CỬA SỔ TRÊN MÀN HÌNH
------------------------------------------------------------------------------------------------------------
-A. Visual Studio Code
-- Explorer bên trái: xem thư mục và file mã nguồn.
-- Các tab phía trên: mở file đang chỉnh sửa, ví dụ OnboardingScreen.tsx,
-  LoginScreen.tsx, RegisterScreen.tsx, HomeScreen.tsx, AppNavigator.tsx.
-- Terminal phía dưới: nhập lệnh chạy dự án và xem thông báo lỗi.
-- Không cần sửa README.md để chạy ứng dụng.
+**Quan trọng:** Sau khi `npm run android` đã khởi động Expo, không mở thêm Terminal khác để chạy `npx expo start -c` cùng lúc. Hai lệnh khởi động Expo riêng biệt có thể gây xung đột cổng hoặc khiến bạn không biết cửa sổ nào đang phục vụ ứng dụng.
 
-B. Android Emulator
-- Đây là điện thoại Android ảo trên máy tính.
-- Dùng chuột để chạm nút, nhập thông tin và chuyển màn hình như điện thoại thật.
-- Nếu bàn phím ảo không hiện khi chọn ô nhập, nhấp lại vào ô nhập hoặc kiểm tra
-  cài đặt bàn phím của máy ảo.
-- Sau khi sửa giao diện, có thể chờ Expo tự tải lại. Nếu cần tải lại thủ công,
-  dùng phím r trong terminal Expo khi terminal đang nhận lệnh.
+---
 
-C. Terminal Expo
-- Dòng thông báo và nhật ký chạy xuất hiện ở đây.
-- QR code và địa chỉ exp:// là thông tin kết nối của Expo.
-- Khi chạy Android Emulator trên cùng máy tính, ưu tiên phím a để yêu cầu Expo
-  mở ứng dụng Android; không cần quét QR bằng điện thoại thật.
+## 6. Quy trình chạy ứng dụng hằng ngày
 
+Sau khi đã cài đặt đầy đủ ở các bước trên, mỗi lần sử dụng chỉ cần:
 
-5. CÁC MÀN HÌNH/PHẦN ĐÃ CÓ TRONG MÃ NGUỒN
------------------------------------------------------------------------------------------------------------
-Dựa trên các file đang thấy trong thư mục src/screens và src/navigation:
+1. Mở Android Studio và bật máy ảo Android.
+2. Chờ máy ảo vào màn hình chính.
+3. Mở VS Code và dự án `mobile_app`.
+4. Chọn **Terminal > New Terminal**.
+5. Nếu Terminal chưa ở đúng thư mục, nhập:
 
-1. OnboardingScreen.tsx
+```cmd
+cd /d "D:\HOC-TAP\NCKH\precare\mobile_app"
+```
+
+6. Chạy:
+
+```cmd
+npm run android
+```
+
+7. Chờ cửa sổ **PreCare Expo** mở và ứng dụng tải trên máy ảo.
+8. Nếu ứng dụng chưa tự mở, nhấp vào cửa sổ Expo và nhấn `a`.
+
    - File màn hình giới thiệu ban đầu (Onboarding).
    - Có thể dùng để giới thiệu mục đích ứng dụng trước khi người dùng vào phần
      đăng nhập/đăng ký.
