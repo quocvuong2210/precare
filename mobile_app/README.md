@@ -118,31 +118,101 @@ Trên máy hiện tại, đường dẫn là:
 
 ```text
 D:\HOC-TAP\NCKH\precare\mobile_app
+```
 
-Công nghệ nhìn thấy trong dự án:
-- React Native + TypeScript
-- Expo để khởi động ứng dụng
-- Android Emulator để chạy thử trên máy tính
+Nếu dự án nằm ở ổ đĩa hoặc thư mục khác trên máy mới, hãy chọn đúng thư mục `mobile_app` tại vị trí đó.
 
-LƯU Ý: Đây là hướng dẫn chạy và kiểm tra giao diện. Việc một màn hình đã có
-file mã nguồn không đồng nghĩa mọi chức năng nghiệp vụ hoặc API đã hoàn thiện.
+Trong Explorer của VS Code, kiểm tra thấy các file/thư mục như:
 
+```text
+src
+app.json
+package.json
+index.ts
+tsconfig.json
+```
 
-2. NGƯỜI MỚI BẮT ĐẦU NÊN LÀM GÌ ĐẦU TIÊN?
------------------------------------------------------------------------------------------------------------
-Làm theo đúng thứ tự dưới đây, không mở terminal chạy lệnh ngay khi máy ảo
-chưa khởi động xong.
+### Bước 6 – Mở Terminal và cài thư viện
 
-BƯỚC 1 — MỞ DỰ ÁN
-1. Mở Visual Studio Code.
-2. Chọn File > Open Folder...
-3. Chọn thư mục:
-   D:\HOC-TAP\NCKH\precare\mobile_app
-4. Ở khung Explorer bên trái, kiểm tra thấy các mục như:
-   src, app.json, package.json, index.ts, tsconfig.json.
-5. Nếu thư mục node_modules đã có sẵn thì thường không cần cài lại thư viện.
+Trong VS Code, chọn **Terminal > New Terminal**.
 
-BƯỚC 2 — MỞ MÁY ẢO ANDROID
+Nếu Terminal chưa đứng ở thư mục `mobile_app`, nhập lệnh sau (đổi đường dẫn nếu dự án nằm ở vị trí khác):
+
+```cmd
+cd /d "D:\HOC-TAP\NCKH\precare\mobile_app"
+```
+
+Kiểm tra đang ở đúng thư mục:
+
+```cmd
+dir package.json
+```
+
+Cài thư viện:
+
+```cmd
+npm ci
+```
+
+`npm ci` sử dụng `package-lock.json` để cài đúng phiên bản thư viện đã khóa. Nếu thư mục dự án không có `package-lock.json`, dùng lệnh sau thay thế:
+
+```cmd
+npm install
+```
+
+Chỉ cần cài thư viện ở lần đầu hoặc khi các thư viện của dự án thay đổi. Không cần chạy lại mỗi ngày.
+
+### Bước 7 – Kiểm tra dự án
+
+Chạy lần lượt:
+
+```cmd
+npx expo-doctor
+npx expo install --check
+npx tsc --noEmit
+```
+
+Ý nghĩa:
+- `npx expo-doctor`: kiểm tra cấu hình và môi trường Expo.
+- `npx expo install --check`: kiểm tra phiên bản các gói liên quan Expo.
+- `npx tsc --noEmit`: kiểm tra lỗi TypeScript mà không tạo file đầu ra.
+
+Nếu lệnh nào báo lỗi, hãy đọc thông báo lỗi và xử lý trước khi tiếp tục. Không nên bỏ qua lỗi kiểm tra rồi kết luận dự án đã sẵn sàng.
+
+---
+
+## 4. Cấu hình để Expo chạy trong cửa sổ CMD riêng
+
+### Bước 8 – Kiểm tra `package.json`
+
+Mở file:
+
+```text
+mobile_app/package.json
+```
+
+Trong phần `scripts`, dòng Android của dự án hiện tại là:
+
+```json
+"android": "start \"PreCare Expo\" cmd.exe /k \"npx expo start --android\""
+```
+
+Giữ nguyên dòng này. Không cần thay bằng `expo start --android` nếu muốn Expo mở trong cửa sổ CMD riêng.
+
+**Dòng lệnh trên hoạt động như sau:**
+- Bạn gõ `npm run android` trong Terminal của VS Code.
+- Windows mở thêm một cửa sổ CMD có tên **PreCare Expo**.
+- Expo chạy trong cửa sổ CMD mới đó.
+- Cửa sổ Terminal trong VS Code có thể tiếp tục dùng để nhập lệnh khác.
+
+> Lưu ý: Cấu hình `start ... cmd.exe` này dành cho Windows. Không xóa hoặc sửa các dòng `ios`, `web` hay các dependencies khác nếu không có yêu cầu thay đổi.
+
+---
+
+## 5. Chạy ứng dụng PreCare Mobile lần đầu
+
+### Bước 9 – Bật Android Emulator
+
 1. Mở Android Studio.
 2. Tại màn hình chào, vào More Actions > Virtual Device Manager
    (một số phiên bản gọi là Device Manager).
