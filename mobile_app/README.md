@@ -327,37 +327,66 @@ Dựa trên các file được ghi nhận trong dự án:
 
 ```text
 http://10.0.2.2:8000/api/v1
+```
 
-Địa chỉ 10.0.2.2 cho phép Android Emulator truy cập máy tính đang chạy backend.
-Nếu backend chưa chạy, API chưa sẵn sàng hoặc sai cổng, những chức năng phụ thuộc
-backend có thể không hoạt động dù giao diện mobile vẫn mở được.
+`10.0.2.2` là địa chỉ đặc biệt để Android Emulator truy cập máy tính đang chạy Backend.
 
-Nếu cần kiểm tra chức năng có dữ liệu thật:
-1. Khởi động backend theo hướng dẫn riêng của dự án backend.
-2. Kiểm tra backend đang chạy đúng cổng.
-3. Kiểm tra địa chỉ API trong file dịch vụ của mobile.
-4. Thử chức năng trên ứng dụng và xem lỗi trong terminal/log nếu có.
+- Nếu chỉ kiểm tra giao diện, ứng dụng có thể mở mà không cần Backend.
+- Nếu dùng chức năng đăng nhập, tải hồ sơ hoặc lấy dữ liệu từ máy chủ, Backend phải được khởi động và hoạt động đúng cổng.
+- Nếu ứng dụng mở nhưng dữ liệu không tải được, kiểm tra trạng thái Backend, địa chỉ API và log lỗi.
+- Không tự ý đổi địa chỉ API khi chưa xác định Backend đang chạy ở đâu.
 
+Hãy sử dụng hướng dẫn khởi động Backend riêng của dự án PreCare.
 
-7. KHẮC PHỤC LỖI THƯỜNG GẶP
------------------------------------------------------------------------------------------------------------
-LỖI A — Cổng 8081 đang được sử dụng
-Thông báo có thể là:
-Port 8081 is being used by another process
-Use port 8082 instead?
+---
 
-Cách xử lý:
-- Nhập y rồi Enter để dùng cổng 8082.
-- Đây không nhất thiết là lỗi nghiêm trọng.
+## 9. Khắc phục lỗi thường gặp
 
-LỖI B — Expo báo không kết nối được cổng 5554
-Ví dụ:
+### Lỗi 1 – Windows không nhận lệnh `node` hoặc `npm`
+
+Kiểm tra lại Node.js đã cài chưa. Sau khi cài, đóng CMD/VS Code cũ và mở lại rồi chạy:
+
+```cmd
+node -v
+npm -v
+```
+
+### Lỗi 2 – Windows không nhận lệnh `adb`
+
+Kiểm tra biến `ANDROID_HOME` và biến `Path`. Đường dẫn `platform-tools` phải trỏ đến thư mục SDK thực tế.
+
+Đóng rồi mở lại Terminal và chạy:
+
+```cmd
+adb --version
+adb devices
+```
+
+### Lỗi 3 – Không tìm thấy máy ảo hoặc thiết bị ở trạng thái `offline`
+
+1. Mở Android Studio > Device Manager.
+2. Khởi động lại máy ảo và chờ đến màn hình chính.
+3. Mở CMD và chạy:
+
+```cmd
+adb kill-server
+adb start-server
+adb devices
+```
+
+4. Nếu vẫn chưa nhận, tắt máy ảo rồi bật lại từ Device Manager.
+5. Khi trạng thái thiết bị là `device`, chạy lại `npm run android`.
+
+### Lỗi 4 – Expo báo không kết nối được cổng 5554
+
+Thông báo có thể có dạng:
+
+```text
 could not connect to TCP port 5554
 cannot connect to 127.0.0.1:5554
+```
 
-Ý nghĩa:
-- Công cụ ADB không kết nối được với máy ảo Android.
-- Đây không phải lỗi được giải quyết chỉ bằng cách nhấn a.
+Lỗi này thường cho biết ADB chưa kết nối được với Android Emulator.
 
 Cách xử lý:
 1. Nếu lệnh đã dừng và trở về dấu nhắc PowerShell, chạy lại không có tác dụng
