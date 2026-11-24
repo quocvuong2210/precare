@@ -214,34 +214,43 @@ Giữ nguyên dòng này. Không cần thay bằng `expo start --android` nếu 
 ### Bước 9 – Bật Android Emulator
 
 1. Mở Android Studio.
-2. Tại màn hình chào, vào More Actions > Virtual Device Manager
-   (một số phiên bản gọi là Device Manager).
-3. Tìm máy ảo có tên Medium_Phone.
-4. Nhấn nút hình tam giác Play ở dòng máy ảo.
-5. Chờ máy ảo khởi động hoàn toàn đến màn hình chính Android.
-6. Không đóng cửa sổ máy ảo trong lúc chạy ứng dụng.
+2. Vào **Device Manager**.
+3. Nhấn **Play** ở máy ảo muốn sử dụng, ví dụ `Medium_Phone`.
+4. Chờ máy ảo vào màn hình chính Android.
+5. Có thể kiểm tra kết nối bằng lệnh:
 
-Nếu máy ảo đã mở sẵn và đang ở màn hình Android chính, có thể bỏ qua bước này.
+```cmd
+adb devices
+```
 
+Chỉ tiếp tục khi máy ảo đã khởi động và ADB nhận thiết bị ở trạng thái `device`.
 
-3. CHẠY ỨNG DỤNG BẰNG TERMINAL
------------------------------------------------------------------------------------------------------------
-BƯỚC 3 — MỞ TERMINAL ĐÚNG THƯ MỤC
-Trong VS Code, chọn Terminal > New Terminal.
-Nhìn đường dẫn ở đầu dòng lệnh. Nếu chưa đúng thư mục dự án, nhập:
+### Bước 10 – Chạy ứng dụng từ VS Code
 
-cd D:\HOC-TAP\NCKH\precare\mobile_app
+1. Quay lại VS Code.
+2. Mở Terminal tại thư mục `mobile_app`.
+3. Chạy đúng một lệnh:
 
-Nhấn Enter.
-
-BƯỚC 4 — KHỞI ĐỘNG EXPO
-Nhập lệnh:
-
+```cmd
 npm run android
+```
 
-Nhấn Enter và chờ Expo khởi động.
+4. Windows sẽ tự mở cửa sổ CMD riêng có tên **PreCare Expo**.
+5. Chờ Expo khởi động. Vì lệnh đã có `--android`, Expo sẽ yêu cầu mở ứng dụng trên Android Emulator.
+6. Nếu ứng dụng chưa tự mở, nhấp vào cửa sổ **PreCare Expo** rồi nhấn phím:
 
-Nếu terminal hỏi:
+```text
+a
+```
+
+7. Chờ ứng dụng tải trên máy ảo.
+
+### Nếu xuất hiện thông báo đổi cổng
+
+Ví dụ:
+
+```text
+Port 8081 is being used by another process.
 Use port 8082 instead?
 thì có nghĩa cổng 8081 đang được một tiến trình khác sử dụng. Có thể nhập y
 rồi nhấn Enter để tiếp tục bằng cổng 8082.
