@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // Địa chỉ Backend PreCare
 export const API_BASE_URL =
@@ -20,11 +21,22 @@ export let currentAccessToken: string = '';
 export let currentUserProfile: UserAccountInfo | null = null;
 let sessionRevision = 0;
 
+const ACCESS_TOKEN_KEY = 'precare_access_token';
+const REFRESH_TOKEN_KEY = 'precare_refresh_token';
+
+async function getStoredAccessToken(): Promise<string> {
+  return (await SecureStore.getItemAsync(ACCESS_TOKEN_KEY)) || '';
+}
+
+async function getStoredRefreshToken(): Promise<string> {
+  return (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)) || '';
+}
+
 // Khôi phục phiên đăng nhập từ bộ nhớ máy nếu có
 export async function restoreSession(): Promise<UserAccountInfo | null> {
   const revision = sessionRevision;
   try {
-    const savedToken = await AsyncStorage.getItem('precare_access_token');
+    const savedToken = await getStoredAccessToken();
     const savedUser = await AsyncStorage.getItem('precare_current_user');
     if (revision !== sessionRevision) return null;
     currentAccessToken = savedToken || '';
@@ -42,12 +54,15 @@ export async function restoreSession(): Promise<UserAccountInfo | null> {
 // Đăng xuất và xóa thông tin phiên cục bộ
 export async function logout(): Promise<void> {
   sessionRevision += 1;
-  const token = currentAccessToken || (await AsyncStorage.getItem('precare_access_token'));
-  const refreshToken = await AsyncStorage.getItem('precare_refresh_token');
-  await AsyncStorage.multiRemove([
-    'precare_access_token',
-    'precare_current_user',
-    'precare_refresh_token',
+  const token = currentAccessToken || (await getStoredAccessToken());
+  const refreshToken = await getStoredRefreshToken();
+  await Promise.all([
+    AsyncStorage.multiRemove([
+      'precare_current_user',
+    ]),
+    SecureStore.deleteItemAsync('precare_remembered_email'),
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
   ]);
   sessionRevision += 1;
   currentAccessToken = '';
@@ -190,14 +205,14 @@ export async function login(email: string, password: string) {
     birthday: userObj.birthday || '',
   };
 
-  // Lưu token và thông tin user hiện tại vào AsyncStorage
+  // Lưu token trong SecureStore và thông tin hồ sơ phiên trong AsyncStorage
   try {
-    await AsyncStorage.setItem('precare_access_token', token);
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
     await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
     if (data.refresh_token) {
-      await AsyncStorage.setItem('precare_refresh_token', data.refresh_token);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refresh_token);
     } else {
-      await AsyncStorage.removeItem('precare_refresh_token');
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
   } catch (e) {
     console.log('Lỗi lưu phiên đăng nhập:', e);
@@ -426,7 +441,7 @@ export async function savePregnancyProfileToDB(
   token?: string
 ): Promise<any> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
   if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
   const headers: Record<string, string> = {
@@ -497,7 +512,7 @@ export async function fetchPregnancyProfileFromDB(
   options: { throwOnError?: boolean } = {}
 ): Promise<any> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
   if (!authToken) {
     if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
     return null;
@@ -688,7 +703,7 @@ async function getIngestAuthHeaders(isJson = false): Promise<Record<string, stri
     await restoreSession();
   }
   const authToken =
-    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    currentAccessToken || (await getStoredAccessToken()) || '';
   const headers: Record<string, string> = {
     Accept: 'application/json',
   };
@@ -712,7 +727,7 @@ export async function uploadMultipartViaXHR<T = any>(
   token?: string
 ): Promise<T> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -790,7 +805,7 @@ export async function uploadParaclinicalFile<T = any>(
   token?: string
 ): Promise<T> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
 
   try {
     const res = await fetch(url, {
@@ -1163,7 +1178,7 @@ export async function saveVerifiedRecordToDatabase(
 }> {
   const userHeaders = await getIngestAuthHeaders(true);
   const userToken =
-    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    currentAccessToken || (await getStoredAccessToken()) || '';
 
   const validProfileId =
     payload.profileId && isUuid(payload.profileId)

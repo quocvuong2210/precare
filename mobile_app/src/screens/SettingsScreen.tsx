@@ -328,7 +328,10 @@ export default function SettingsScreen({
   const handleLogout = async () => {
     if (logoutInProgress.current) return;
     const root = rootNavigation();
-    if (!root) return;
+    if (!root) {
+      setLogoutError(true);
+      return;
+    }
     logoutInProgress.current = true;
     setLoggingOut(true);
     setLogoutError(false);
