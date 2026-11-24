@@ -11,9 +11,11 @@ const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/s
 
 function setup({ offline = false, failStorage = false, refresh = true } = {}) {
   const stored = new Map([
-    ['precare_access_token', 'access'], ['precare_current_user', JSON.stringify({ email: 'test@example.com' })],
+    ['precare_current_user', JSON.stringify({ email: 'test@example.com' })],
     ['precare_settings', 'keep-settings'], ['precare_records_test', 'keep-records'],
+    ['precare_remembered_email', 'test@example.com'],
   ]);
+  stored.set('precare_access_token', 'access');
   if (refresh) stored.set('precare_refresh_token', 'refresh');
   const requests = [];
   const storage = {
@@ -23,9 +25,20 @@ function setup({ offline = false, failStorage = false, refresh = true } = {}) {
       keys.forEach((key) => stored.delete(key));
     },
   };
+  const secureStore = {
+    getItemAsync: async (key) => stored.get(key) || null,
+    setItemAsync: async (key, value) => {
+      stored.set(key, value);
+    },
+    deleteItemAsync: async (key) => stored.delete(key),
+  };
   const context = {
     exports: {}, AbortController, setTimeout, clearTimeout, console,
-    require: (name) => name === 'react-native' ? { Platform: { OS: 'android' } } : storage,
+    require: (name) => {
+      if (name === 'react-native') return { Platform: { OS: 'android' } };
+      if (name === 'expo-secure-store') return secureStore;
+      return storage;
+    },
     fetch: async (url, options) => {
       requests.push({ url, options });
       if (offline) throw new Error('offline');
@@ -45,6 +58,7 @@ test('logout clears credentials, revokes refresh token and preserves records and
   assert.equal(stored.has('precare_access_token'), false);
   assert.equal(stored.has('precare_current_user'), false);
   assert.equal(stored.has('precare_refresh_token'), false);
+  assert.equal(stored.has('precare_remembered_email'), false);
   assert.equal(stored.get('precare_settings'), 'keep-settings');
   assert.equal(stored.get('precare_records_test'), 'keep-records');
   assert.equal(requests[0].options.headers.Authorization, 'Bearer access');
