@@ -402,6 +402,85 @@ export async function verifySessionWithBackend(
       }
     }
 
+    if (
+      !profileRes ||
+      profileRes.status === 400 ||
+      profileRes.status === 401 ||
+      profileRes.status === 403 ||
+      profileRes.status === 404
+    ) {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+      return {
+        status: 'unauthenticated',
+        reason: 'invalid_token',
+        rememberedEmail,
+        message: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
+      };
+    }
+
+    if (!profileRes.ok) {
+      currentAccessToken = '';
+      currentUserProfile = null;
+      return {
+        status: 'unauthenticated',
+        reason: 'network_error',
+        rememberedEmail,
+        message: 'Máy chủ đang gặp sự cố khi xác thực phiên đăng nhập. Vui lòng đăng nhập lại.',
+      };
+    }
+
+    const profileData = await safeParseJson(profileRes);
+    const userObj = profileData?.user || profileData?.data || profileData;
+    const role = userObj?.role || profileData?.role;
+
+    if (role !== 'pregnant_woman') {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+      return {
+        status: 'unauthenticated',
+        reason: 'wrong_role',
+        rememberedEmail,
+        message: 'Chỉ tài khoản thai phụ mới được phép đăng nhập vào ứng dụng.',
+      };
+    }
+
+    if (revision !== sessionRevision) {
+      return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
+    }
+
+    const resolvedUser: UserAccountInfo = {
+      id: userObj?.id || userObj?.user_id || '',
+      full_name: userObj?.full_name || userObj?.name || '',
+      email: (userObj?.email || rememberedEmail || '').trim().toLowerCase(),
+      phone_number: userObj?.phone_number || userObj?.phone || '',
+      birthday: userObj?.birthday || '',
+    };
+
+    currentAccessToken = activeToken;
+    sessionRevision += 1;
+    currentUserProfile = resolvedUser;
+
+    await AsyncStorage.setItem('precare_current_user', JSON.stringify(resolvedUser)).catch(() => {});
+
+    const destination = await resolvePostAuthDestination(activeToken, resolvedUser.email);
+
+    return {
+      status: 'authenticated',
+      user: resolvedUser,
+      accessToken: activeToken,
+      destination,
+    };
+  } catch {
+    currentAccessToken = '';
+    currentUserProfile = null;
+    return {
+      status: 'unauthenticated',
+      reason: 'network_error',
+      rememberedEmail,
+      message: 'Không thể kết nối máy chủ để xác thực phiên đăng nhập. Vui lòng đăng nhập lại.',
+    };
+  }
+}
+
 // Đăng nhập và kiểm tra role qua API profile
 export async function login(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
