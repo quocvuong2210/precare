@@ -18,12 +18,30 @@ function setup(
   profileStatus = 200
 ) {
   const calls = [];
+  const stored = new Map();
+  if (storedSession) {
+    stored.set('precare_access_token', 'stored-access');
+    stored.set('precare_current_user', JSON.stringify({ id: 'account-id' }));
+  }
+  const storage = {
+    getItem: async (key) => stored.get(key) || null,
+    setItem: async (key, value) => {
+      stored.set(key, value);
+    },
+    removeItem: async (key) => stored.delete(key),
+    multiRemove: async (keys) => keys.forEach((key) => stored.delete(key)),
+  };
+  const secureStore = {
+    getItemAsync: async (key) => stored.get(key) || null,
+    setItemAsync: async (key, value) => stored.set(key, value),
+    deleteItemAsync: async (key) => stored.delete(key),
+  };
   const context = {
     exports: {}, AbortController, setTimeout, clearTimeout, console,
-    require: (name) => name === 'react-native' ? { Platform: { OS: 'android' } } : {
-      getItem: async (key) => storedSession
-        ? ({ precare_access_token: 'stored-access', precare_current_user: JSON.stringify({ id: 'account-id' }) }[key] || null)
-        : null,
+    require: (name) => {
+      if (name === 'react-native') return { Platform: { OS: 'android' } };
+      if (name === 'expo-secure-store') return secureStore;
+      return storage;
     },
     fetch: async (url, options) => {
       calls.push({ url, options });
@@ -31,12 +49,14 @@ function setup(
         return {
           status: profileStatus,
           ok: profileStatus < 400,
+          text: async () => JSON.stringify(profileResponse),
           json: async () => profileResponse,
         };
       }
       return {
         status,
         ok: status < 400,
+        text: async () => JSON.stringify(response),
         json: async () => response,
       };
     },
@@ -92,14 +112,39 @@ test('success requires an actual pending request receipt', async () => {
 });
 
 test('plain text server errors produce a readable mobile error', async () => {
+  const stored = new Map();
+  const storage = {
+    getItem: async (key) => stored.get(key) || null,
+    setItem: async (key, value) => stored.set(key, value),
+    removeItem: async (key) => stored.delete(key),
+  };
+  const secureStore = {
+    getItemAsync: async (key) => stored.get(key) || null,
+    setItemAsync: async (key, value) => stored.set(key, value),
+    deleteItemAsync: async (key) => stored.delete(key),
+  };
   const context = {
     exports: {}, AbortController, setTimeout, clearTimeout, console,
-    require: (name) => name === 'react-native' ? { Platform: { OS: 'android' } } : {},
+    require: (name) => {
+      if (name === 'react-native') return { Platform: { OS: 'android' } };
+      if (name === 'expo-secure-store') return secureStore;
+      return storage;
+    },
     fetch: async (url) => {
       if (url.includes('/pregnancy-profiles/active')) {
-        return { status: 200, ok: true, json: async () => ({ success: true, data: { id: 'profile-id' } }) };
+        return {
+          status: 200,
+          ok: true,
+          text: async () => JSON.stringify({ success: true, data: { id: 'profile-id' } }),
+          json: async () => ({ success: true, data: { id: 'profile-id' } }),
+        };
       }
-      return { status: 500, ok: false, json: async () => { throw new SyntaxError('Unexpected character: I'); } };
+      return {
+        status: 500,
+        ok: false,
+        text: async () => 'Internal Server Error',
+        json: async () => { throw new SyntaxError('Unexpected character: I'); },
+      };
     },
   };
   vm.runInNewContext(code, context);

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // Địa chỉ Backend PreCare
 export const API_BASE_URL =
@@ -20,11 +21,121 @@ export let currentAccessToken: string = '';
 export let currentUserProfile: UserAccountInfo | null = null;
 let sessionRevision = 0;
 
+const ACCESS_TOKEN_KEY = 'precare_access_token';
+const REFRESH_TOKEN_KEY = 'precare_refresh_token';
+export const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
+export const REMEMBER_ME_KEY = 'precare_remember_me';
+
+export type PostAuthDestination = 'Main' | 'PregnancySetup';
+
+export type SessionVerificationResult =
+  | {
+      status: 'authenticated';
+      user: UserAccountInfo;
+      accessToken: string;
+      destination: PostAuthDestination;
+    }
+  | {
+      status: 'unauthenticated';
+      reason: 'no_remember' | 'no_token' | 'invalid_token' | 'wrong_role' | 'network_error';
+      rememberedEmail: string;
+      message?: string;
+    };
+
+async function getStoredAccessToken(): Promise<string> {
+  return (await SecureStore.getItemAsync(ACCESS_TOKEN_KEY)) || '';
+}
+
+async function getStoredRefreshToken(): Promise<string> {
+  return (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)) || '';
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 8000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function clearLocalSession(options: {
+  keepRememberedEmail?: boolean;
+  clearRememberMeFlag?: boolean;
+} = {}): Promise<void> {
+  const { keepRememberedEmail = true, clearRememberMeFlag = true } = options;
+  sessionRevision += 1;
+  const ops: Promise<unknown>[] = [
+    AsyncStorage.multiRemove([
+      'precare_current_user',
+      'precare_pregnancy_profile_id',
+    ]),
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+  ];
+  if (clearRememberMeFlag) {
+    ops.push(SecureStore.deleteItemAsync(REMEMBER_ME_KEY));
+  }
+  if (!keepRememberedEmail) {
+    ops.push(SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY));
+  }
+  await Promise.all(ops);
+  sessionRevision += 1;
+  currentAccessToken = '';
+  currentUserProfile = null;
+}
+
+export async function loadRememberedLoginState(): Promise<{
+  rememberedEmail: string;
+  rememberMeEnabled: boolean;
+  hasStoredToken: boolean;
+}> {
+  const [savedEmail, rememberFlag, accessToken, refreshToken] = await Promise.all([
+    SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY),
+    SecureStore.getItemAsync(REMEMBER_ME_KEY),
+    getStoredAccessToken(),
+    getStoredRefreshToken(),
+  ]);
+  const trimmedEmail = savedEmail ? savedEmail.trim() : '';
+  if (!trimmedEmail && savedEmail !== null) {
+    await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY).catch(() => {});
+  }
+  return {
+    rememberedEmail: trimmedEmail,
+    rememberMeEnabled: rememberFlag === 'true',
+    hasStoredToken: Boolean(accessToken || refreshToken),
+  };
+}
+
+// Chỉ lưu Email và trạng thái Remember Me, tuyệt đối không lưu Password
+export async function saveRememberMePreference(
+  rememberMe: boolean,
+  email: string
+): Promise<void> {
+  const trimmedEmail = email.trim();
+  if (rememberMe && trimmedEmail) {
+    await Promise.all([
+      SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, trimmedEmail),
+      SecureStore.setItemAsync(REMEMBER_ME_KEY, 'true'),
+    ]);
+    return;
+  }
+  await Promise.all([
+    SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY),
+    SecureStore.deleteItemAsync(REMEMBER_ME_KEY),
+  ]);
+}
+
 // Khôi phục phiên đăng nhập từ bộ nhớ máy nếu có
 export async function restoreSession(): Promise<UserAccountInfo | null> {
   const revision = sessionRevision;
   try {
-    const savedToken = await AsyncStorage.getItem('precare_access_token');
+    const savedToken = await getStoredAccessToken();
     const savedUser = await AsyncStorage.getItem('precare_current_user');
     if (revision !== sessionRevision) return null;
     currentAccessToken = savedToken || '';
@@ -39,19 +150,12 @@ export async function restoreSession(): Promise<UserAccountInfo | null> {
   return currentUserProfile;
 }
 
-// Đăng xuất và xóa thông tin phiên cục bộ
+// Đăng xuất và xóa thông tin phiên cục bộ (giữ email ghi nhớ để tiện đăng nhập lại)
 export async function logout(): Promise<void> {
   sessionRevision += 1;
-  const token = currentAccessToken || (await AsyncStorage.getItem('precare_access_token'));
-  const refreshToken = await AsyncStorage.getItem('precare_refresh_token');
-  await AsyncStorage.multiRemove([
-    'precare_access_token',
-    'precare_current_user',
-    'precare_refresh_token',
-  ]);
-  sessionRevision += 1;
-  currentAccessToken = '';
-  currentUserProfile = null;
+  const token = currentAccessToken || (await getStoredAccessToken());
+  const refreshToken = await getStoredRefreshToken();
+  await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
 
   if (!token || !refreshToken) return;
 
@@ -129,11 +233,260 @@ async function postAuth(path: string, body: object): Promise<any> {
   return data;
 }
 
+async function tryRefreshAccessToken(
+  refreshToken: string,
+  expectedRevision: number
+): Promise<string | null> {
+  if (!refreshToken) return null;
+  const res = await fetchWithTimeout(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!res.ok) {
+    if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
+      return null;
+    }
+    throw new Error(`HTTP_${res.status}`);
+  }
+
+  const json = await safeParseJson(res);
+  const nextAccessToken =
+    json?.data?.access_token || json?.access_token || json?.tokens?.access_token || '';
+  const nextRefreshToken =
+    json?.data?.refresh_token || json?.refresh_token || json?.tokens?.refresh_token || '';
+
+  if (!nextAccessToken || expectedRevision !== sessionRevision) {
+    return null;
+  }
+
+  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, nextAccessToken);
+  if (nextRefreshToken) {
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, nextRefreshToken);
+  }
+  return nextAccessToken;
+}
+
+export async function resolvePostAuthDestination(
+  token?: string,
+  email?: string
+): Promise<PostAuthDestination> {
+  let hasProfile = false;
+  try {
+    const pregnancyProfile = await fetchPregnancyProfileFromDB(token);
+    if (pregnancyProfile) {
+      hasProfile = true;
+    }
+  } catch (profileErr) {
+    console.log('Chưa lấy được hồ sơ thai kỳ từ backend:', profileErr);
+  }
+
+  if (!hasProfile && email) {
+    try {
+      const identifier = email.trim().toLowerCase();
+      const localRecord = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
+      if (localRecord) {
+        hasProfile = true;
+      }
+    } catch {
+      // Bỏ qua lỗi đọc bộ nhớ máy
+    }
+  }
+
+  return hasProfile ? 'Main' : 'PregnancySetup';
+}
+
+// Xác thực token đã lưu với Backend trước khi cho phép tự động vào Home
+export async function verifySessionWithBackend(
+  options: { requireRememberMe?: boolean } = {}
+): Promise<SessionVerificationResult> {
+  const { requireRememberMe = true } = options;
+  const revision = sessionRevision;
+
+  let savedRememberMe = '';
+  let rememberedEmail = '';
+  let savedAccessToken = '';
+  let savedRefreshToken = '';
+
+  try {
+    const [rememberFlag, emailVal, accessVal, refreshVal] = await Promise.all([
+      SecureStore.getItemAsync(REMEMBER_ME_KEY),
+      SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY),
+      getStoredAccessToken(),
+      getStoredRefreshToken(),
+    ]);
+    savedRememberMe = rememberFlag || '';
+    rememberedEmail = emailVal ? emailVal.trim() : '';
+    savedAccessToken = accessVal;
+    savedRefreshToken = refreshVal;
+  } catch {
+    currentAccessToken = '';
+    currentUserProfile = null;
+    return {
+      status: 'unauthenticated',
+      reason: 'no_token',
+      rememberedEmail: '',
+    };
+  }
+
+  if (revision !== sessionRevision) {
+    return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
+  }
+
+  if (requireRememberMe && savedRememberMe !== 'true') {
+    if (savedAccessToken || savedRefreshToken) {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true }).catch(() => {
+        currentAccessToken = '';
+        currentUserProfile = null;
+      });
+    } else {
+      currentAccessToken = '';
+      currentUserProfile = null;
+    }
+    return {
+      status: 'unauthenticated',
+      reason: 'no_remember',
+      rememberedEmail,
+    };
+  }
+
+  if (!savedAccessToken && !savedRefreshToken) {
+    await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true }).catch(() => {});
+    return {
+      status: 'unauthenticated',
+      reason: 'no_token',
+      rememberedEmail,
+    };
+  }
+
+  try {
+    let activeToken = savedAccessToken;
+    let profileRes: Response | null = null;
+
+    if (activeToken) {
+      profileRes = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+          Accept: 'application/json',
+        },
+      });
+    }
+
+    // Backend deps.py trả 403 (hoặc 401) khi access_token không hợp lệ/hết hạn
+    if (!profileRes || profileRes.status === 401 || profileRes.status === 403) {
+      if (savedRefreshToken) {
+        const refreshedToken = await tryRefreshAccessToken(savedRefreshToken, revision);
+        if (refreshedToken) {
+          activeToken = refreshedToken;
+          profileRes = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${activeToken}`,
+              Accept: 'application/json',
+            },
+          });
+        } else {
+          await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+          return {
+            status: 'unauthenticated',
+            reason: 'invalid_token',
+            rememberedEmail,
+            message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          };
+        }
+      }
+    }
+
+    if (
+      !profileRes ||
+      profileRes.status === 400 ||
+      profileRes.status === 401 ||
+      profileRes.status === 403 ||
+      profileRes.status === 404
+    ) {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+      return {
+        status: 'unauthenticated',
+        reason: 'invalid_token',
+        rememberedEmail,
+        message: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
+      };
+    }
+
+    if (!profileRes.ok) {
+      currentAccessToken = '';
+      currentUserProfile = null;
+      return {
+        status: 'unauthenticated',
+        reason: 'network_error',
+        rememberedEmail,
+        message: 'Máy chủ đang gặp sự cố khi xác thực phiên đăng nhập. Vui lòng đăng nhập lại.',
+      };
+    }
+
+    const profileData = await safeParseJson(profileRes);
+    const userObj = profileData?.user || profileData?.data || profileData;
+    const role = userObj?.role || profileData?.role;
+
+    if (role !== 'pregnant_woman') {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+      return {
+        status: 'unauthenticated',
+        reason: 'wrong_role',
+        rememberedEmail,
+        message: 'Chỉ tài khoản thai phụ mới được phép đăng nhập vào ứng dụng.',
+      };
+    }
+
+    if (revision !== sessionRevision) {
+      return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
+    }
+
+    const resolvedUser: UserAccountInfo = {
+      id: userObj?.id || userObj?.user_id || '',
+      full_name: userObj?.full_name || userObj?.name || '',
+      email: (userObj?.email || rememberedEmail || '').trim().toLowerCase(),
+      phone_number: userObj?.phone_number || userObj?.phone || '',
+      birthday: userObj?.birthday || '',
+    };
+
+    currentAccessToken = activeToken;
+    sessionRevision += 1;
+    currentUserProfile = resolvedUser;
+
+    await AsyncStorage.setItem('precare_current_user', JSON.stringify(resolvedUser)).catch(() => {});
+
+    const destination = await resolvePostAuthDestination(activeToken, resolvedUser.email);
+
+    return {
+      status: 'authenticated',
+      user: resolvedUser,
+      accessToken: activeToken,
+      destination,
+    };
+  } catch {
+    currentAccessToken = '';
+    currentUserProfile = null;
+    return {
+      status: 'unauthenticated',
+      reason: 'network_error',
+      rememberedEmail,
+      message: 'Không thể kết nối máy chủ để xác thực phiên đăng nhập. Vui lòng đăng nhập lại.',
+    };
+  }
+}
+
 // Đăng nhập và kiểm tra role qua API profile
 export async function login(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
   const formData = new URLSearchParams();
 
-  formData.append('username', email);
+  formData.append('username', normalizedEmail);
   formData.append('password', password);
 
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -145,7 +498,7 @@ export async function login(email: string, password: string) {
     body: formData.toString(),
   });
 
-  const data = await response.json();
+  const data = await safeParseJson(response);
 
   if (!response.ok) {
     throw new Error(
@@ -154,12 +507,21 @@ export async function login(email: string, password: string) {
         : JSON.stringify(data.detail || data),
     );
   }
-  // Lấy access_token từ bước login
-  const token = data.access_token;
+  // Lấy access_token (và refresh_token nếu backend trả về) từ bước login
+  const token =
+    data?.access_token ||
+    data?.data?.tokens?.access_token ||
+    data?.tokens?.access_token ||
+    '';
+  const refreshToken =
+    data?.refresh_token ||
+    data?.data?.tokens?.refresh_token ||
+    data?.tokens?.refresh_token ||
+    '';
   if (!token) {
     throw new Error('API không trả về access_token.');
   }
-  // Gọi tiếp API lấy thông tin user hiện tại (ví dụ: /auth/me hoặc /users/me tùy backend của nhóm bạn)
+  // Gọi tiếp API lấy thông tin user hiện tại
   const profileRes = await fetch(`${API_BASE_URL}/auth/me`, {
     method: 'GET',
     headers: {
@@ -172,7 +534,7 @@ export async function login(email: string, password: string) {
     throw new Error('Không lấy được thông tin tài khoản. Vui lòng thử lại.');
   }
 
-  const profileData = await profileRes.json();
+  const profileData = await safeParseJson(profileRes);
   const userObj = profileData.user || profileData.data || profileData;
   const role = userObj.role || profileData.role;
 
@@ -185,25 +547,34 @@ export async function login(email: string, password: string) {
   currentUserProfile = {
     id: userObj.id || userObj.user_id || '',
     full_name: userObj.full_name || userObj.name || '',
-    email: (userObj.email || email).trim().toLowerCase(),
+    email: (userObj.email || normalizedEmail).trim().toLowerCase(),
     phone_number: userObj.phone_number || userObj.phone || '',
     birthday: userObj.birthday || '',
   };
 
-  // Lưu token và thông tin user hiện tại vào AsyncStorage
+  // Lưu token trong SecureStore và thông tin hồ sơ phiên trong AsyncStorage (không lưu Password)
+  let tokenStorageFailed = false;
   try {
-    await AsyncStorage.setItem('precare_access_token', token);
-    await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
-    if (data.refresh_token) {
-      await AsyncStorage.setItem('precare_refresh_token', data.refresh_token);
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
+    if (refreshToken) {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
     } else {
-      await AsyncStorage.removeItem('precare_refresh_token');
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
+    await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
   } catch (e) {
+    tokenStorageFailed = true;
     console.log('Lỗi lưu phiên đăng nhập:', e);
   }
 
-  return { ...data, role, user: currentUserProfile };
+  return {
+    ...data,
+    access_token: token,
+    refresh_token: refreshToken || undefined,
+    role,
+    user: currentUserProfile,
+    tokenStorageFailed,
+  };
 }
 
 // 1. Gửi mã OTP (đăng ký)
@@ -426,7 +797,7 @@ export async function savePregnancyProfileToDB(
   token?: string
 ): Promise<any> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
   if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
 
   const headers: Record<string, string> = {
@@ -497,7 +868,7 @@ export async function fetchPregnancyProfileFromDB(
   options: { throwOnError?: boolean } = {}
 ): Promise<any> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
   if (!authToken) {
     if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
     return null;
@@ -688,7 +1059,7 @@ async function getIngestAuthHeaders(isJson = false): Promise<Record<string, stri
     await restoreSession();
   }
   const authToken =
-    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    currentAccessToken || (await getStoredAccessToken()) || '';
   const headers: Record<string, string> = {
     Accept: 'application/json',
   };
@@ -712,7 +1083,7 @@ export async function uploadMultipartViaXHR<T = any>(
   token?: string
 ): Promise<T> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -790,7 +1161,7 @@ export async function uploadParaclinicalFile<T = any>(
   token?: string
 ): Promise<T> {
   const authToken =
-    token || currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
 
   try {
     const res = await fetch(url, {
@@ -1163,7 +1534,7 @@ export async function saveVerifiedRecordToDatabase(
 }> {
   const userHeaders = await getIngestAuthHeaders(true);
   const userToken =
-    currentAccessToken || (await AsyncStorage.getItem('precare_access_token')) || '';
+    currentAccessToken || (await getStoredAccessToken()) || '';
 
   const validProfileId =
     payload.profileId && isUuid(payload.profileId)
