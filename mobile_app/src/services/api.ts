@@ -23,6 +23,24 @@ let sessionRevision = 0;
 
 const ACCESS_TOKEN_KEY = 'precare_access_token';
 const REFRESH_TOKEN_KEY = 'precare_refresh_token';
+export const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
+export const REMEMBER_ME_KEY = 'precare_remember_me';
+
+export type PostAuthDestination = 'Main' | 'PregnancySetup';
+
+export type SessionVerificationResult =
+  | {
+      status: 'authenticated';
+      user: UserAccountInfo;
+      accessToken: string;
+      destination: PostAuthDestination;
+    }
+  | {
+      status: 'unauthenticated';
+      reason: 'no_remember' | 'no_token' | 'invalid_token' | 'wrong_role' | 'network_error';
+      rememberedEmail: string;
+      message?: string;
+    };
 
 async function getStoredAccessToken(): Promise<string> {
   return (await SecureStore.getItemAsync(ACCESS_TOKEN_KEY)) || '';
@@ -30,6 +48,87 @@ async function getStoredAccessToken(): Promise<string> {
 
 async function getStoredRefreshToken(): Promise<string> {
   return (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)) || '';
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 8000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function clearLocalSession(options: {
+  keepRememberedEmail?: boolean;
+  clearRememberMeFlag?: boolean;
+} = {}): Promise<void> {
+  const { keepRememberedEmail = true, clearRememberMeFlag = true } = options;
+  sessionRevision += 1;
+  const ops: Promise<unknown>[] = [
+    AsyncStorage.multiRemove([
+      'precare_current_user',
+      'precare_pregnancy_profile_id',
+    ]),
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+  ];
+  if (clearRememberMeFlag) {
+    ops.push(SecureStore.deleteItemAsync(REMEMBER_ME_KEY));
+  }
+  if (!keepRememberedEmail) {
+    ops.push(SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY));
+  }
+  await Promise.all(ops);
+  sessionRevision += 1;
+  currentAccessToken = '';
+  currentUserProfile = null;
+}
+
+export async function loadRememberedLoginState(): Promise<{
+  rememberedEmail: string;
+  rememberMeEnabled: boolean;
+  hasStoredToken: boolean;
+}> {
+  const [savedEmail, rememberFlag, accessToken, refreshToken] = await Promise.all([
+    SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY),
+    SecureStore.getItemAsync(REMEMBER_ME_KEY),
+    getStoredAccessToken(),
+    getStoredRefreshToken(),
+  ]);
+  const trimmedEmail = savedEmail ? savedEmail.trim() : '';
+  if (!trimmedEmail && savedEmail !== null) {
+    await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY).catch(() => {});
+  }
+  return {
+    rememberedEmail: trimmedEmail,
+    rememberMeEnabled: rememberFlag === 'true',
+    hasStoredToken: Boolean(accessToken || refreshToken),
+  };
+}
+
+// Chỉ lưu Email và trạng thái Remember Me, tuyệt đối không lưu Password
+export async function saveRememberMePreference(
+  rememberMe: boolean,
+  email: string
+): Promise<void> {
+  const trimmedEmail = email.trim();
+  if (rememberMe && trimmedEmail) {
+    await Promise.all([
+      SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, trimmedEmail),
+      SecureStore.setItemAsync(REMEMBER_ME_KEY, 'true'),
+    ]);
+    return;
+  }
+  await Promise.all([
+    SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY),
+    SecureStore.deleteItemAsync(REMEMBER_ME_KEY),
+  ]);
 }
 
 // Khôi phục phiên đăng nhập từ bộ nhớ máy nếu có
@@ -51,22 +150,12 @@ export async function restoreSession(): Promise<UserAccountInfo | null> {
   return currentUserProfile;
 }
 
-// Đăng xuất và xóa thông tin phiên cục bộ
+// Đăng xuất và xóa thông tin phiên cục bộ (giữ email ghi nhớ để tiện đăng nhập lại)
 export async function logout(): Promise<void> {
   sessionRevision += 1;
   const token = currentAccessToken || (await getStoredAccessToken());
   const refreshToken = await getStoredRefreshToken();
-  await Promise.all([
-    AsyncStorage.multiRemove([
-      'precare_current_user',
-    ]),
-    SecureStore.deleteItemAsync('precare_remembered_email'),
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-  ]);
-  sessionRevision += 1;
-  currentAccessToken = '';
-  currentUserProfile = null;
+  await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
 
   if (!token || !refreshToken) return;
 
