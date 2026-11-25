@@ -128,3 +128,83 @@ test('verifySessionWithBackend rejects auto-login when Remember Me is off and cl
 
   const result = await api.verifySessionWithBackend({ requireRememberMe: true });
   assert.equal(result.status, 'unauthenticated');
+  assert.equal(result.reason, 'no_remember');
+  assert.equal(requests.length, 0);
+  assert.equal(secureStored.has('precare_access_token'), false);
+  assert.equal(secureStored.has('precare_refresh_token'), false);
+});
+
+test('verifySessionWithBackend verifies token with backend and routes to Main when profile exists', async () => {
+  const { api, requests } = setup({
+    initialSecure: [
+      ['precare_remember_me', 'true'],
+      ['precare_remembered_email', 'mother@example.com'],
+      ['precare_access_token', 'valid-access'],
+    ],
+    fetchImpl: async (url) => {
+      if (url.endsWith('/auth/me')) {
+        return jsonResponse(200, {
+          id: 'user-1',
+          email: 'mother@example.com',
+          full_name: 'Nguyễn Thị Hoa',
+          role: 'pregnant_woman',
+          phone_number: '0901234567',
+        });
+      }
+      if (url.endsWith('/pregnancy-profiles/active')) {
+        return jsonResponse(200, {
+          success: true,
+          data: { id: 'profile-uuid-1' },
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+  });
+
+  const result = await api.verifySessionWithBackend({ requireRememberMe: true });
+  assert.equal(result.status, 'authenticated');
+  assert.equal(result.destination, 'Main');
+  assert.equal(result.accessToken, 'valid-access');
+  assert.equal(requests[0].url.endsWith('/auth/me'), true);
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer valid-access');
+});
+
+test('verifySessionWithBackend refreshes expired token (403 from deps.py) and rotates tokens in SecureStore', async () => {
+  let meAttempts = 0;
+  const { api, secureStored } = setup({
+    initialSecure: [
+      ['precare_remember_me', 'true'],
+      ['precare_remembered_email', 'mother@example.com'],
+      ['precare_access_token', 'expired-access'],
+      ['precare_refresh_token', 'old-refresh'],
+    ],
+    fetchImpl: async (url, options) => {
+      if (url.endsWith('/auth/me')) {
+        meAttempts += 1;
+        if (meAttempts === 1) {
+          return jsonResponse(403, { detail: 'Could not validate credentials' });
+        }
+        assert.equal(options.headers.Authorization, 'Bearer rotated-access');
+        return jsonResponse(200, {
+          id: 'user-1',
+          email: 'mother@example.com',
+          full_name: 'Nguyễn Thị Hoa',
+          role: 'pregnant_woman',
+          phone_number: '0901234567',
+        });
+      }
+      if (url.endsWith('/auth/refresh')) {
+        assert.deepEqual(JSON.parse(options.body), { refresh_token: 'old-refresh' });
+        return jsonResponse(200, {
+          success: true,
+          data: {
+            access_token: 'rotated-access',
+            refresh_token: 'rotated-refresh',
+            token_type: 'Bearer',
+            expires_in: 1800,
+          },
+        });
+      }
+      if (url.endsWith('/pregnancy-profiles/active')) {
+        return jsonResponse(404, { detail: 'Not found' });
+      }
