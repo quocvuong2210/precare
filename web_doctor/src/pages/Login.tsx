@@ -23,34 +23,6 @@ export interface LoginProps {
   defaultRole?: 'doctor' | 'admin';
 }
 
-const DEMO_ACCOUNTS: Record<string, { role: 'doctor' | 'admin'; full_name: string; validPasswords: string[] }> = {
-  'bacsi.leminh@phusantw.org': {
-    role: 'doctor',
-    full_name: 'BS. Lê Minh',
-    validPasswords: ['password123', 'Bacsileminh2026@'],
-  },
-  'quantri.nam@phusantw.org': {
-    role: 'admin',
-    full_name: 'Nguyễn Hoàng Nam',
-    validPasswords: ['password123', 'Admin123@'],
-  },
-  'bacsi.nguyen@precare.vn': {
-    role: 'doctor',
-    full_name: 'BS. Nguyễn Văn',
-    validPasswords: ['password123'],
-  },
-  'nguyenminhhoang@precare.vn': {
-    role: 'doctor',
-    full_name: 'ThS. BS. Nguyễn Minh Hoàng',
-    validPasswords: ['password123'],
-  },
-  'admin@precare.vn': {
-    role: 'admin',
-    full_name: 'Quản trị viên Hệ thống',
-    validPasswords: ['password123'],
-  },
-};
-
 const envSiteKey = (import.meta as any).env?.VITE_RECAPTCHA_SITE_KEY;
 const SITE_KEY =
   envSiteKey && envSiteKey !== '6Lcd1u0tAAAAADpcltc_RK3NClzFw1CrpQW1cd_C'
@@ -223,68 +195,15 @@ export const Login: React.FC<LoginProps> = ({
           return;
         }
 
-        // Fallback kiểm tra thông tin tài khoản offline / demo khi backend không kết nối được
-        const cleanEmail = trimmedEmail.toLowerCase();
-
-        // Nếu backend có response (dù lỗi) → không dùng offline fallback
-        // Chỉ fallback khi thực sự không kết nối được backend (network error)
         if (apiErr.code === 'ECONNREFUSED' || apiErr.code === 'ERR_NETWORK' ||
             apiErr.message?.includes('Network Error') || apiErr.message?.includes('timeout')) {
-          // Backend offline: thông báo rõ thay vì fallback ngầm
           setLoginError('Không thể kết nối máy chủ. Vui lòng kiểm tra backend đang chạy tại localhost:8000.');
           setIsSubmitting(false);
           return;
         }
-
-        let registeredUsers: Array<{ email: string; password?: string; full_name?: string }> = [];
-        try {
-          const raw = localStorage.getItem('precare_registered_users');
-          if (raw) registeredUsers = JSON.parse(raw);
-        } catch {
-          // ignore
-        }
-
-        const known = DEMO_ACCOUNTS[cleanEmail];
-        const registered = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-
-        if (!known && !registered) {
-          setEmailError('Email không tồn tại trong hệ thống.');
-          setLoginError('Email không tồn tại trong hệ thống.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Kiểm tra mật khẩu
-        const isValidPassword =
-          (known && known.validPasswords.includes(password)) ||
-          (registered && (registered.password === password || password === 'password123'));
-
-        if (!isValidPassword) {
-          setPasswordError('Mật khẩu không chính xác.');
-          setLoginError('Mật khẩu không chính xác.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const resolvedRole = known ? known.role : (role || 'doctor');
-        const userObj = {
-          id: 'u-' + Date.now(),
-          email: cleanEmail,
-          full_name: known ? known.full_name : registered?.full_name || 'Bác sĩ PreCare',
-          role: resolvedRole,
-          is_active: true,
-        };
-
-        const mockToken = 'mock_jwt_' + resolvedRole + '_' + Date.now();
-        const mockRefreshToken = 'mock_refresh_' + resolvedRole + '_' + Date.now();
-        localStorage.setItem('precare_token', mockToken);
-        localStorage.setItem('precare_refresh_token', mockRefreshToken);
-        localStorage.setItem('precare_user', JSON.stringify(userObj));
-
-        authResponse = {
-          user: userObj,
-          tokens: { access_token: mockToken, token_type: 'Bearer' },
-        };
+        setLoginError('Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+        setIsSubmitting(false);
+        return;
       }
 
       setIsSubmitting(false);
