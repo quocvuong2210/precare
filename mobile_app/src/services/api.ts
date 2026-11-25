@@ -300,6 +300,108 @@ export async function resolvePostAuthDestination(
   return hasProfile ? 'Main' : 'PregnancySetup';
 }
 
+// Xác thực token đã lưu với Backend trước khi cho phép tự động vào Home
+export async function verifySessionWithBackend(
+  options: { requireRememberMe?: boolean } = {}
+): Promise<SessionVerificationResult> {
+  const { requireRememberMe = true } = options;
+  const revision = sessionRevision;
+
+  let savedRememberMe = '';
+  let rememberedEmail = '';
+  let savedAccessToken = '';
+  let savedRefreshToken = '';
+
+  try {
+    const [rememberFlag, emailVal, accessVal, refreshVal] = await Promise.all([
+      SecureStore.getItemAsync(REMEMBER_ME_KEY),
+      SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY),
+      getStoredAccessToken(),
+      getStoredRefreshToken(),
+    ]);
+    savedRememberMe = rememberFlag || '';
+    rememberedEmail = emailVal ? emailVal.trim() : '';
+    savedAccessToken = accessVal;
+    savedRefreshToken = refreshVal;
+  } catch {
+    currentAccessToken = '';
+    currentUserProfile = null;
+    return {
+      status: 'unauthenticated',
+      reason: 'no_token',
+      rememberedEmail: '',
+    };
+  }
+
+  if (revision !== sessionRevision) {
+    return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
+  }
+
+  if (requireRememberMe && savedRememberMe !== 'true') {
+    if (savedAccessToken || savedRefreshToken) {
+      await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true }).catch(() => {
+        currentAccessToken = '';
+        currentUserProfile = null;
+      });
+    } else {
+      currentAccessToken = '';
+      currentUserProfile = null;
+    }
+    return {
+      status: 'unauthenticated',
+      reason: 'no_remember',
+      rememberedEmail,
+    };
+  }
+
+  if (!savedAccessToken && !savedRefreshToken) {
+    await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true }).catch(() => {});
+    return {
+      status: 'unauthenticated',
+      reason: 'no_token',
+      rememberedEmail,
+    };
+  }
+
+  try {
+    let activeToken = savedAccessToken;
+    let profileRes: Response | null = null;
+
+    if (activeToken) {
+      profileRes = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+          Accept: 'application/json',
+        },
+      });
+    }
+
+    // Backend deps.py trả 403 (hoặc 401) khi access_token không hợp lệ/hết hạn
+    if (!profileRes || profileRes.status === 401 || profileRes.status === 403) {
+      if (savedRefreshToken) {
+        const refreshedToken = await tryRefreshAccessToken(savedRefreshToken, revision);
+        if (refreshedToken) {
+          activeToken = refreshedToken;
+          profileRes = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${activeToken}`,
+              Accept: 'application/json',
+            },
+          });
+        } else {
+          await clearLocalSession({ keepRememberedEmail: true, clearRememberMeFlag: true });
+          return {
+            status: 'unauthenticated',
+            reason: 'invalid_token',
+            rememberedEmail,
+            message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          };
+        }
+      }
+    }
+
 // Đăng nhập và kiểm tra role qua API profile
 export async function login(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
