@@ -208,3 +208,82 @@ test('verifySessionWithBackend refreshes expired token (403 from deps.py) and ro
       if (url.endsWith('/pregnancy-profiles/active')) {
         return jsonResponse(404, { detail: 'Not found' });
       }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+  });
+
+  const result = await api.verifySessionWithBackend({ requireRememberMe: true });
+  assert.equal(result.status, 'authenticated');
+  assert.equal(result.destination, 'PregnancySetup');
+  assert.equal(secureStored.get('precare_access_token'), 'rotated-access');
+  assert.equal(secureStored.get('precare_refresh_token'), 'rotated-refresh');
+});
+
+test('verifySessionWithBackend clears invalid tokens while keeping remembered email when backend rejects token', async () => {
+  const { api, secureStored } = setup({
+    initialSecure: [
+      ['precare_remember_me', 'true'],
+      ['precare_remembered_email', 'mother@example.com'],
+      ['precare_access_token', 'bad-access'],
+    ],
+    fetchImpl: async (url) => {
+      if (url.endsWith('/auth/me')) {
+        return jsonResponse(403, { detail: 'Could not validate credentials' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+  });
+
+  const result = await api.verifySessionWithBackend({ requireRememberMe: true });
+  assert.equal(result.status, 'unauthenticated');
+  assert.equal(result.reason, 'invalid_token');
+  assert.equal(result.rememberedEmail, 'mother@example.com');
+  assert.equal(secureStored.has('precare_access_token'), false);
+  assert.equal(secureStored.has('precare_remember_me'), false);
+  assert.equal(secureStored.get('precare_remembered_email'), 'mother@example.com');
+});
+
+test('verifySessionWithBackend never enters Home when backend is offline', async () => {
+  const { api, secureStored } = setup({
+    initialSecure: [
+      ['precare_remember_me', 'true'],
+      ['precare_remembered_email', 'mother@example.com'],
+      ['precare_access_token', 'cached-access'],
+    ],
+    fetchImpl: async () => {
+      throw new Error('Network request failed');
+    },
+  });
+
+  const result = await api.verifySessionWithBackend({ requireRememberMe: true });
+  assert.equal(result.status, 'unauthenticated');
+  assert.equal(result.reason, 'network_error');
+  assert.equal(result.rememberedEmail, 'mother@example.com');
+  assert.equal(api.currentAccessToken, '');
+  assert.equal(secureStored.get('precare_remembered_email'), 'mother@example.com');
+});
+
+test('after logout, email remains saved for LoginScreen while startup will not auto-enter Home', async () => {
+  const { api, secureStored } = setup({
+    initialSecure: [
+      ['precare_remember_me', 'true'],
+      ['precare_remembered_email', 'mother@example.com'],
+      ['precare_access_token', 'valid-access'],
+      ['precare_refresh_token', 'valid-refresh'],
+    ],
+    fetchImpl: async () => jsonResponse(200, { success: true }),
+  });
+
+  await api.logout();
+  const state = await api.loadRememberedLoginState();
+  assert.equal(state.rememberedEmail, 'mother@example.com');
+  assert.equal(state.rememberMeEnabled, false);
+  assert.equal(state.hasStoredToken, false);
+  assert.equal(secureStored.has('precare_access_token'), false);
+  assert.equal(secureStored.has('precare_refresh_token'), false);
+
+  const check = await api.verifySessionWithBackend({ requireRememberMe: true });
+  assert.equal(check.status, 'unauthenticated');
+  assert.equal(check.reason, 'no_remember');
+  assert.equal(check.rememberedEmail, 'mother@example.com');
+});
