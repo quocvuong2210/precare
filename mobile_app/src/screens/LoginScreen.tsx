@@ -15,64 +15,100 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
-import { fetchPregnancyProfileFromDB, login } from '../services/api';
+import {
+  loadRememberedLoginState,
+  login,
+  resolvePostAuthDestination,
+  saveRememberMePreference,
+  verifySessionWithBackend,
+} from '../services/api';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
-
-export default function LoginScreen({ navigation }: Props) {
+export default function LoginScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [autoAuthenticating, setAutoAuthenticating] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let isMounted = true;
+    const initialMessage = route.params?.sessionMessage;
+    const skipAutoLogin = route.params?.skipAutoLogin === true;
 
-    const loadRememberedCredentials = async () => {
+    if (initialMessage) {
+      setError(initialMessage);
+    }
+
+    const initializeLoginState = async () => {
       try {
-        const savedEmail = await SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY);
+        const state = await loadRememberedLoginState();
 
         if (!isMounted) {
           return;
         }
 
-        if (savedEmail) {
-          setEmail(savedEmail);
+        if (state.rememberedEmail) {
+          setEmail(state.rememberedEmail);
           setRememberMe(true);
         } else {
-          await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY);
+          setRememberMe(state.rememberMeEnabled);
+        }
+
+        if (!skipAutoLogin && state.rememberMeEnabled && state.hasStoredToken) {
+          setAutoAuthenticating(true);
+          const result = await verifySessionWithBackend({ requireRememberMe: true });
+          if (!isMounted) {
+            return;
+          }
+
+          if (result.status === 'authenticated') {
+            navigation.replace(result.destination);
+            return;
+          }
+
+          if (result.rememberedEmail) {
+            setEmail(result.rememberedEmail);
+          }
+          if (result.message) {
+            setError(result.message);
+          }
         }
       } catch {
         if (isMounted) {
           setError('Không thể tải thông tin đăng nhập đã lưu.');
         }
+      } finally {
+        if (isMounted) {
+          setAutoAuthenticating(false);
+        }
       }
     };
 
-    void loadRememberedCredentials();
+    void initializeLoginState();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [navigation, route.params?.sessionMessage, route.params?.skipAutoLogin]);
+
+  const isBusy = loading || autoAuthenticating;
 
   const handleLogin = async () => {
-    if (loading) {
+    if (isBusy) {
       return;
     }
 
-    if (!email.trim() || !password) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setError('Vui lòng nhập email và mật khẩu.');
       return;
     }
@@ -81,48 +117,24 @@ export default function LoginScreen({ navigation }: Props) {
     setError('');
 
     try {
-      const data = await login(email.trim(), password);
+      const data = await login(trimmedEmail, password);
 
       if (!data.access_token) {
         throw new Error('API không trả về access_token.');
       }
       console.log('Đăng nhập thành công!');
 
-      let credentialStorageFailed = false;
+      let credentialStorageFailed = Boolean(rememberMe && data.tokenStorageFailed);
       try {
-        if (rememberMe) {
-          await SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, email.trim());
-        } else {
-          await SecureStore.deleteItemAsync(REMEMBERED_EMAIL_KEY);
-        }
+        await saveRememberMePreference(rememberMe, trimmedEmail);
       } catch {
         credentialStorageFailed = true;
       }
 
-      // Kiểm tra xem thai phụ đã có hồ sơ thai kỳ chưa (DB hoặc bộ nhớ máy)
-      let hasProfile = false;
-      try {
-        const pregnancyProfile = await fetchPregnancyProfileFromDB(data.access_token);
-        if (pregnancyProfile) {
-          hasProfile = true;
-        }
-      } catch (profileErr) {
-        console.log('Chưa lấy được hồ sơ thai kỳ từ backend:', profileErr);
-      }
-
-      if (!hasProfile) {
-        try {
-          const identifier = (data.user?.email || email).trim().toLowerCase();
-          const localRecord = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
-          if (localRecord) {
-            hasProfile = true;
-          }
-        } catch {
-          // Bỏ qua lỗi đọc bộ nhớ máy
-        }
-      }
-
-      const destination = hasProfile ? 'Main' : 'PregnancySetup';
+      const destination = await resolvePostAuthDestination(
+        data.access_token,
+        data.user?.email || trimmedEmail,
+      );
       if (credentialStorageFailed) {
         Alert.alert(
           'Không thể cập nhật thông tin đã lưu',
@@ -196,7 +208,7 @@ export default function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               value={email}
               onChangeText={setEmail}
-              editable={!loading}
+              editable={!isBusy}
             />
           </View>
 
@@ -212,7 +224,7 @@ export default function LoginScreen({ navigation }: Props) {
               autoCorrect={false}
               value={password}
               onChangeText={setPassword}
-              editable={!loading}
+              editable={!isBusy}
               onSubmitEditing={handleLogin}
               returnKeyType="done"
             />
@@ -220,7 +232,7 @@ export default function LoginScreen({ navigation }: Props) {
             <Pressable
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeButton}
-              disabled={loading}
+              disabled={isBusy}
             >
               <Ionicons
                 name={showPassword ? 'eye' : 'eye-outline'}
@@ -238,7 +250,7 @@ export default function LoginScreen({ navigation }: Props) {
             <Pressable
               style={styles.rememberContainer}
               onPress={() => setRememberMe(!rememberMe)}
-              disabled={loading}
+              disabled={isBusy}
             >
               <View
                 style={[
@@ -260,7 +272,7 @@ export default function LoginScreen({ navigation }: Props) {
 
             <Pressable
               onPress={() => navigation.navigate('ForgotPassword')}
-              disabled={loading}
+              disabled={isBusy}
             >
               <Text style={styles.forgotPassword}>
                 Quên mật khẩu?
@@ -271,12 +283,18 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.spacer} />
 
           <PrimaryButton
-            title={loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            title={
+              autoAuthenticating
+                ? 'Đang xác thực phiên...'
+                : loading
+                  ? 'Đang đăng nhập...'
+                  : 'Đăng nhập'
+            }
             onPress={handleLogin}
-
+            disabled={isBusy}
           />
 
-          {loading && (
+          {isBusy && (
             <ActivityIndicator
               color={colors.primary}
               style={styles.loading}
@@ -290,7 +308,7 @@ export default function LoginScreen({ navigation }: Props) {
 
             <Pressable
               onPress={() => navigation.navigate('Register')}
-              disabled={loading}
+              disabled={isBusy}
             >
               <Text style={styles.registerLink}>
                 Đăng ký ngay
