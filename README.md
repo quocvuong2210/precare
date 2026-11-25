@@ -35,9 +35,17 @@ docker-compose down
 ### 2. Services Access Points
 - **Doctor Web Portal**: `http://localhost:3000`
 - **FastAPI Backend Swagger**: `http://localhost:8000/docs`
-
 - **Analysis Microservice OpenAPI**: `http://localhost:8001/docs`
 - **MinIO Storage Console**: `http://localhost:9001` (User: `precare_minio`, Pass: `precare_minio_secret`)
+
+### 3. Demo Accounts & Seed Data
+PreCare provides a comprehensive set of pre-seeded accounts (doctors, pregnant women, and admin) initialized automatically via `init-db/01-init.sql`.
+
+👉 **[Chi tiết danh sách tài khoản & kịch bản kiểm thử lâm sàng (docs/SEED_ACCOUNTS.md)](docs/SEED_ACCOUNTS.md)**
+- **Mật khẩu chung cho tất cả tài khoản:** `password123`
+- **Tài khoản Bác sĩ chính:** `bacsi.leminh@phusantw.org` / `password123`
+- **Tài khoản Thai phụ mẫu (thai kỳ chuẩn):** `haiyen.le@gmail.com` / `password123`
+- **Tài khoản Thai phụ mẫu (cảnh báo FGR):** `thaochi.nguyen@gmail.com` / `password123`
 
 ## Run the Mobile App on Android
 
