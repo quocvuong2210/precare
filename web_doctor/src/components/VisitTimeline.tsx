@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Ruler,
   Stethoscope,
+  Upload,
+  Eye,
   X,
 } from 'lucide-react';
 import {
@@ -18,6 +20,7 @@ import {
   createCheckup,
   fetchCheckupHistory,
 } from '../services/checkup.service';
+import { CheckupDetailModal } from './CheckupDetailModal';
 
 type BloodPressureStatus = 'normal' | 'elevated' | 'stage1_hypertension' | 'crisis';
 
@@ -57,8 +60,21 @@ const todayInputValue = () => {
   return localDate.toISOString().slice(0, 10);
 };
 
-export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregnancyProfileId }) => {
+export interface VisitTimelineProps {
+  pregnancyProfileId: string;
+  patientName?: string;
+  onOpenUpload?: () => void;
+  newlyAddedVisits?: CheckupTimelineRecord[];
+}
+
+export const VisitTimeline: React.FC<VisitTimelineProps> = ({
+  pregnancyProfileId,
+  patientName,
+  onOpenUpload,
+  newlyAddedVisits = [],
+}) => {
   const [visits, setVisits] = useState<CheckupTimelineRecord[]>([]);
+  const [selectedVisitForDetail, setSelectedVisitForDetail] = useState<CheckupTimelineRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -87,12 +103,22 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
     loadVisits();
   }, [pregnancyProfileId]);
 
-  // Sắp xếp ở giao diện để mốc tuổi thai/ngày khám mới nhất luôn nằm trên cùng.
+  // Gộp bản ghi vừa tải lên (nếu có) và sắp xếp mốc tuổi thai/ngày khám mới nhất lên đầu
+  const allVisits = useMemo(() => {
+    const combined = [...newlyAddedVisits, ...visits];
+    const seen = new Set<string>();
+    return combined.filter((v) => {
+      if (seen.has(v.id)) return false;
+      seen.add(v.id);
+      return true;
+    });
+  }, [visits, newlyAddedVisits]);
+
   const sortedVisits = useMemo(
-    () => [...visits].sort(
+    () => [...allVisits].sort(
       (a, b) => b.gestational_age.days - a.gestational_age.days || b.checkup_date.localeCompare(a.checkup_date)
     ),
-    [visits]
+    [allVisits]
   );
 
   const isDemoData = visits.some((visit) => visit.notes?.startsWith('[DỮ LIỆU DEMO TIMELINE]'));
@@ -147,14 +173,25 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
             <p className="mt-1 text-xs text-slate-500">Thông tin được tải trực tiếp từ hồ sơ thai kỳ.</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={loadVisits}
-          disabled={isLoading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Làm mới
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenUpload && (
+            <button
+              type="button"
+              onClick={onOpenUpload}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#275248] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-[#1f423a] transition-colors cursor-pointer"
+            >
+              <Upload className="h-3.5 w-3.5" /> Tải hồ sơ
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={loadVisits}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Làm mới
+          </button>
+        </div>
       </header>
 
       {isLoading ? (
@@ -180,9 +217,24 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800"><CalendarDays className="h-5 w-5" /></div>
           <p className="mt-3 text-sm font-semibold text-slate-800">Chưa có dữ liệu lần khám nào cho hồ sơ thai kỳ này</p>
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">Ghi nhận lần khám để bắt đầu theo dõi các mốc sức khỏe mẹ và bé.</p>
-          <button type="button" onClick={() => setIsCreateOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-900">
-            <Plus className="h-4 w-4" /> Ghi nhận lần khám đầu tiên
-          </button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            {onOpenUpload && (
+              <button
+                type="button"
+                onClick={onOpenUpload}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#275248] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#1f423a] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Upload className="h-4 w-4" /> Tải hồ sơ đầu tiên
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Ghi nhận lần khám
+            </button>
+          </div>
         </div>
       ) : (
         <div className="px-4 py-3 sm:px-6 sm:py-4">
@@ -242,7 +294,21 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
                       <p className="flex items-center gap-1.5 text-slate-500"><Ruler className="h-3.5 w-3.5 text-slate-400" /><strong className="font-semibold text-slate-700">Thai:</strong> Không có chỉ định siêu âm ở lần khám này.</p>
                     )}
 
-                    {note && <p className="flex items-start gap-1.5"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong className="font-semibold text-slate-700">Ghi chú:</strong> {note}</span></p>}
+                    {note && <p className="flex items-start gap-1.5"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong className="font-semibold text-slate-700">Ghi chú &amp; dặn dò:</strong> {note}</span></p>}
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Mã hồ sơ: {visit.id.slice(0, 14)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVisitForDetail(visit)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#275248] bg-teal-50 hover:bg-teal-100/80 border border-teal-200/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Xem chi tiết hồ sơ &amp; dặn dò</span>
+                    </button>
                   </div>
                 </div>
               </article>
@@ -283,6 +349,14 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
             </form>
           </div>
         </div>
+      )}
+
+      {selectedVisitForDetail && (
+        <CheckupDetailModal
+          visit={selectedVisitForDetail}
+          onClose={() => setSelectedVisitForDetail(null)}
+          patientName={patientName}
+        />
       )}
     </section>
   );

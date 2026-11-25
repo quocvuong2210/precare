@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { RequestDeletionModal } from '../components/RequestDeletionModal';
 import { VisitTimeline } from '../components/VisitTimeline';
 import { TrajectoryChart } from '../components/TrajectoryChart';
+import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupTimelineRecord, fetchCheckupHistory } from '../services/checkup.service';
 import {
   PregnancyRecordItem,
@@ -33,6 +34,7 @@ import {
 interface PatientDetailProps {
   patientId: string;
   onBack: () => void;
+  onNavigateToResults?: (patientId: string) => void;
 }
 
 type GrowthBiometricKey = 'efw' | 'ac' | 'bpd' | 'hc' | 'fl';
@@ -134,7 +136,11 @@ const GrowthCharts: React.FC<{ pregnancyProfileId: string }> = ({ pregnancyProfi
   );
 };
 
-export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack }) => {
+export const PatientDetail: React.FC<PatientDetailProps> = ({
+  patientId,
+  onBack,
+  onNavigateToResults,
+}) => {
   // 1. Quản lý bản ghi hồ sơ thai kỳ & Loading/Error states
   const [recordsVersion, setRecordsVersion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -144,9 +150,11 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
 
   const [currentRecord, setCurrentRecord] = useState<PregnancyRecordItem | undefined>(undefined);
   const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'results' | 'growth'>('overview');
+  const [isUploadWizardOpen, setIsUploadWizardOpen] = useState(false);
   useEffect(() => {
     setCurrentRecord(undefined);
     setActiveDetailTab('overview');
+    setIsUploadWizardOpen(false);
   }, [patientId]);
 
   // 2. State Ngày mốc khám target_date (mặc định hôm nay theo Endpoint 3 STORY-3.1)
@@ -369,6 +377,23 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
     ? `${currentRecord.crlMm.toFixed(2)} mm`
     : 'Chưa có dữ liệu';
 
+  if (isUploadWizardOpen && currentRecord) {
+    return (
+      <UploadVerificationWizard
+        pregnancyProfileId={currentRecord.id}
+        patientName={patientInfo.fullName}
+        gestationalAge={currentGaFormatted}
+        onClose={() => setIsUploadWizardOpen(false)}
+        onSaveSuccess={() => {
+          setIsUploadWizardOpen(false);
+          setActiveDetailTab('results');
+          setToastMessage('Đã đối chiếu và lưu hồ sơ điện tử thành công!');
+          setTimeout(() => setToastMessage(null), 3500);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -510,56 +535,47 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
             <ArrowLeftRight className="w-4 h-4 text-slate-600" />
             <span>Đổi trạng thái</span>
           </button>
-
-          <button
-              type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors shadow-2xs cursor-pointer"
-              title="Yêu cầu xóa hồ sơ theo chuẩn bảo mật y tế"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Yêu cầu xóa</span>
-          </button>
-
-          {/* Button Xuất PDF */}
-          <button
-            onClick={() =>
-              alert(
-                `Đã xuất báo cáo PDF hồ sơ thai kỳ của bệnh nhân ${patientInfo.fullName}!`
-              )
-            }
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-white bg-[#275248] hover:bg-[#1f423a] transition-colors shadow-2xs cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" /> Xuất PDF
-          </button>
         </div>
       </div>
 
       {currentRecord && (
-        <div role="tablist" aria-label="Các phần trong hồ sơ thai phụ" className="flex w-full overflow-x-auto bg-white">
-          {[
-            { id: 'overview' as const, label: 'Tổng quan' },
-            { id: 'results' as const, label: 'Kết quả xét nghiệm' },
-            { id: 'growth' as const, label: 'Biểu đồ tăng trưởng' },
-          ].map((tab) => {
-            const isSelected = activeDetailTab === tab.id;
-            return (
+        <div role="tablist" aria-label="Các phần trong hồ sơ thai phụ" className="flex items-center justify-between w-full overflow-x-auto bg-white border-b border-slate-200">
+          <div className="flex flex-1">
+            {[
+              { id: 'overview' as const, label: 'Tổng quan' },
+              { id: 'growth' as const, label: 'Biểu đồ tăng trưởng' },
+            ].map((tab) => {
+              const isSelected = activeDetailTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setActiveDetailTab(tab.id)}
+                  className={`min-w-[160px] border-b-2 px-6 py-3 text-sm transition-colors ${
+                    isSelected
+                      ? 'border-[#275248] font-bold text-[#275248]'
+                      : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {onNavigateToResults && (
+            <div className="pr-4 py-2">
               <button
-                key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={isSelected}
-                onClick={() => setActiveDetailTab(tab.id)}
-                className={`min-w-max flex-1 border px-5 py-3 text-sm transition-colors ${
-                  isSelected
-                    ? 'border-[#0D8A7C] font-semibold text-[#0D8A7C]'
-                    : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`}
+                onClick={() => onNavigateToResults(currentRecord.id)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-teal-800 bg-teal-50 hover:bg-teal-100/80 border border-teal-200 transition-colors cursor-pointer shadow-2xs"
               >
-                {tab.label}
+                <span>Tiếp nhận &amp; Tải hồ sơ cận lâm sàng &rarr;</span>
               </button>
-            );
-          })}
+            </div>
+          )}
         </div>
       )}
 
@@ -770,7 +786,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onBack 
 
       {/* 4. TIMELINE CÁC LẦN KHÁM */}
       {activeDetailTab === 'results' && currentRecord && (
-        <VisitTimeline pregnancyProfileId={currentRecord.id} />
+        <VisitTimeline
+          pregnancyProfileId={currentRecord.id}
+          onOpenUpload={() => setIsUploadWizardOpen(true)}
+        />
       )}
 
       {/* 5. KHỐI: DỮ LIỆU LÂM SÀNG ĐẦU VÀO (CHUẨN HÓA SCHEMA POSTGRESQL 16) */}

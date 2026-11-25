@@ -157,7 +157,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
                         onClick={() => onSelectPatient(item.id)}
                         className="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-[#345C59] hover:bg-[#2A4B48] transition-colors shadow-sm cursor-pointer"
                       >
-                        Xem bệnh án
+                        Xem hồ sơ
                       </button>
                     </td>
                   </tr>

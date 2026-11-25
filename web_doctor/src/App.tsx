@@ -3,6 +3,7 @@ import { authApi } from './services/auth.service';
 import { Dashboard } from './pages/Dashboard';
 import { PatientDetail } from './pages/PatientDetail';
 import { PregnancyProfile } from './pages/PregnancyProfile';
+import { TestResults } from './pages/TestResults';
 import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { ForgotPassword } from './pages/ForgotPassword';
@@ -21,10 +22,11 @@ import {
   LogOut,
   ArrowRight,
   Loader2,
+  ScanText,
 } from 'lucide-react';
 
 type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
-type TabType = 'overview' | 'records' | 'deletions' | 'reports' | 'settings';
+type TabType = 'overview' | 'records' | 'results' | 'deletions' | 'reports' | 'settings';
 
 interface ParsedRoute {
   view: AppView;
@@ -88,8 +90,13 @@ function parseLocation(pathname: string): ParsedRoute {
     return { view: 'app', tab: 'records', patientId: null };
   }
 
+  // Tab Kết quả xét nghiệm: /results
+  if (path === '/results' || path.startsWith('/results')) {
+    return { view: 'app', tab: 'results', patientId: null };
+  }
+
   if (path.startsWith('/deletions') || path.startsWith('/deletion-requests')) {
-  return { view: 'app', tab: 'deletions', patientId: null };
+    return { view: 'app', tab: 'deletions', patientId: null };
   }
 
   // Tab Báo cáo: /reports
@@ -117,17 +124,19 @@ export const App: React.FC = () => {
   // Đồng bộ chuyển tab và cập nhật URL trình duyệt (Two-way SPA Routing)
   const syncRoute = (tab: TabType, patientId: string | null = null) => {
     let targetPath = '/dashboard';
-    if (patientId) {
+    if (patientId && tab !== 'results') {
       targetPath = `/pregnancy-profiles/${patientId}`;
     } else if (tab === 'records') {
       targetPath = '/pregnancy-profiles';
+    } else if (tab === 'results') {
+      targetPath = '/results';
     } else if (tab === 'reports') {
       targetPath = '/reports';
     } else if (tab === 'settings') {
       targetPath = '/settings';
     } else if (tab === 'deletions') {
       targetPath = '/deletions';
-    }else {
+    } else {
       targetPath = '/dashboard';
     }
 
@@ -265,11 +274,12 @@ export const App: React.FC = () => {
 
   // VIEW 3: GIAO DIỆN BÁC SĨ (DASHBOARD)
   const navItems = [
-  { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-  { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
-  { id: 'deletions', label: 'Xét duyệt xóa hồ sơ', icon: ShieldAlert }, // <--- THÊM MỤC NÀY
-  { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
-  { id: 'settings', label: 'Cài đặt', icon: Settings },
+    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+    { id: 'records', label: 'Hồ sơ thai kỳ', icon: BookOpen },
+    { id: 'results', label: 'Tiếp nhận & Đối chiếu cận lâm sàng', icon: ScanText },
+    { id: 'deletions', label: 'Xét duyệt xóa hồ sơ', icon: ShieldAlert },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart2 },
+    { id: 'settings', label: 'Cài đặt', icon: Settings },
   ] as const;
 
   return (
@@ -300,13 +310,12 @@ export const App: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => syncRoute(item.id, null)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    isActive
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium text-left transition-all cursor-pointer ${isActive
                       ? 'bg-[#4D7D74] text-white shadow-sm font-semibold'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
                 </button>
               );
@@ -349,45 +358,53 @@ export const App: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
         {!selectedPatientId && (
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-5 sticky top-0 z-30 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-            {selectedPatientId
-              ? 'Hồ sơ chi tiết thai phụ'
-              : activeTab === 'records'
-              ? 'Quản lý Hồ sơ Thai kỳ'
-              : activeTab === 'deletions'
-              ? 'Thẩm định Yêu cầu Xóa Hồ sơ Y tế'
-              : activeTab === 'reports'
-              ? 'Báo cáo thống kê'
-              : activeTab === 'settings'
-              ? 'Cài đặt hệ thống'
-              : 'Tổng quan hoạt động'}
-          </h1>
+          <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-5 sticky top-0 z-30 flex items-center justify-between">
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+              {selectedPatientId && activeTab !== 'results'
+                ? 'Hồ sơ chi tiết thai phụ'
+                : activeTab === 'records'
+                  ? 'Quản lý Hồ sơ Thai kỳ'
+                  : activeTab === 'results'
+                    ? 'Kết quả xét nghiệm & Diễn biến khám'
+                    : activeTab === 'deletions'
+                      ? 'Thẩm định Yêu cầu Xóa Hồ sơ Y tế'
+                      : activeTab === 'reports'
+                        ? 'Báo cáo thống kê'
+                        : activeTab === 'settings'
+                          ? 'Cài đặt hệ thống'
+                          : 'Tổng quan hoạt động'}
+            </h1>
 
-          {/* Right Header Info */}
-          <div className="flex items-center gap-3">
-            <button
-              aria-label="Thông báo"
-              className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-2.5 right-2.5"></span>
-            </button>
+            {/* Right Header Info */}
+            <div className="flex items-center gap-3">
+              <button
+                aria-label="Thông báo"
+                className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer"
+              >
+                <Bell className="w-4 h-4" />
+                <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-2.5 right-2.5"></span>
+              </button>
 
-            <div className="text-right pl-2">
-              <div className="text-sm font-bold text-slate-800 leading-tight">Bệnh viện Phụ sản Trung ương</div>
-              <div className="text-xs text-slate-500">Phòng khám sản 402</div>
+              <div className="text-right pl-2">
+                <div className="text-sm font-bold text-slate-800 leading-tight">Bệnh viện Phụ sản Trung ương</div>
+                <div className="text-xs text-slate-500">Phòng khám sản 402</div>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
         )}
 
         {/* Page Content Body */}
         <main className="p-8 max-w-[1440px] w-full mx-auto">
-          {selectedPatientId ? (
+          {selectedPatientId && activeTab !== 'results' ? (
             <PatientDetail
               patientId={selectedPatientId}
               onBack={() => syncRoute('records', null)}
+              onNavigateToResults={(pid) => syncRoute('results', pid)}
+            />
+          ) : activeTab === 'results' ? (
+            <TestResults
+              initialPatientId={selectedPatientId}
+              onNavigateToProfile={(pid) => syncRoute('records', pid)}
             />
           ) : activeTab === 'records' ? (
             <PregnancyProfile onSelectPatient={(id) => syncRoute('records', id)} />
