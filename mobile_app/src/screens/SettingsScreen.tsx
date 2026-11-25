@@ -337,7 +337,7 @@ export default function SettingsScreen({
     setLogoutError(false);
     try {
       await logout();
-      root.reset({ index: 0, routes: [{ name: "Login" }] });
+      root.reset({ index: 0, routes: [{ name: "Login", params: { skipAutoLogin: true } }] });
     } catch {
       setLogoutError(true);
     } finally {

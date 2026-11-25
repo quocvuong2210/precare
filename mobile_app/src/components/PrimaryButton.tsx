@@ -6,17 +6,25 @@ type Props = {
   title: string;
   onPress: () => void;
   variant?: 'filled' | 'outline';
+  disabled?: boolean;
 };
 
-export default function PrimaryButton({ title, onPress, variant = 'filled' }: Props) {
+export default function PrimaryButton({
+  title,
+  onPress,
+  variant = 'filled',
+  disabled = false,
+}: Props) {
   const filled = variant === 'filled';
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.base,
         filled ? styles.filled : styles.outline,
-        pressed && { opacity: 0.85 },
+        pressed && !disabled && { opacity: 0.85 },
+        disabled && { opacity: 0.65 },
       ]}
     >
       <Text style={[styles.label, { color: filled ? colors.white : colors.primary }]}>{title}</Text>
