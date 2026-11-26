@@ -1208,61 +1208,61 @@ export async function ensureActivePregnancyProfileId(defaultWeek: number = 24): 
 
 export interface IngestFilePayload {
   uri: string;
-  );
-
-  const formData = new FormData();
-  formData.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.type || 'application/pdf',
-  } as any);
-  formData.append('pregnancy_profile_id', validProfileId);
-
-  if (options?.checkupId) {
-    formData.append('checkup_id', options.checkupId);
-  }
-  if (options?.documentType) {
-    formData.append('document_type', options.documentType);
-  }
-
-  const data: any = await uploadParaclinicalFile(
-    `${API_BASE_URL}/ingest/upload`,
-    formData
-  );
-
-  console.log(`Tải lên file đơn lẻ "${file.name}" thành công!`);
-  return data;
+  name: string;
+  type: string;
 }
 
-// 2. POST /api/v1/ingest/upload-batch — Tải lên hàng loạt nhiều phiếu khám (Batch Upload)
-export async function ingestUploadBatch(
-  files: IngestFilePayload[],
-  profileId?: string,
-  options?: { checkupId?: string | null; documentType?: string }
-): Promise<{ success: boolean; data: IngestBatchResponseData; message: string }> {
-  const validProfileId =
-    profileId && profileId !== 'profile_demo_01'
-      ? profileId
-      : await ensureActivePregnancyProfileId();
+export interface IngestUploadResponseData {
+  file_id: string;
+  task_id: string;
+  pregnancy_profile_id: string;
+  checkup_id?: string | null;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  document_type: string;
+  status: string;
+  tracking_url: string;
+  created_at: string;
+  [key: string]: any;
+}
 
-  console.log(
-    `[API 2/8] Đang tải lên hàng loạt ${files.length} file (pregnancy_profile_id=${validProfileId})...`
-  );
+export interface IngestBatchItem {
+  file_id: string;
+  task_id: string;
+  file_name: string;
+  file_size_bytes: number;
+  status: string;
+  [key: string]: any;
+}
 
-  const formData = new FormData();
-  files.forEach((f) => {
-    formData.append('files', {
-      uri: f.uri,
-      name: f.name,
-      type: f.type || 'application/pdf',
-    } as any);
-  });
-  formData.append('pregnancy_profile_id', validProfileId);
+export interface IngestBatchResponseData {
+  batch_id: string;
+  total_files: number;
+  successful_enqueued: number;
+  failed_enqueued: number;
+  tracking_url: string;
+  items: IngestBatchItem[];
+  [key: string]: any;
+}
 
-  if (options?.checkupId) {
-    formData.append('checkup_id', options.checkupId);
-  }
-  if (options?.documentType) {
+export interface IngestTaskStatusData {
+  task_id: string;
+  file_id: string;
+  state: string;
+  status?: string;
+  progress_percentage: number;
+  current_stage: string;
+  stage_message: string;
+  estimated_seconds_remaining: number;
+  verification_url?: string;
+  error_code?: string;
+  can_retry: boolean;
+  [key: string]: any;
+}
+
+export interface IngestBatchStatusData {
+  batch_id: string;
     formData.append('document_type', options.documentType);
   }
 
