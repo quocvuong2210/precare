@@ -382,105 +382,51 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
         }
       }
 
-      for (const k of ['q1_gestational_weeks', 'q1_gestational_days', 'crl_mm'] as const) {
-        if (next[k] !== '' && Number.isNaN(Number(next[k]))) {
-          setError('Tuần thai, ngày lẻ và CRL phải là số.');
-          return;
-        }
-      }
-
-      if (next.phone) {
-        const cleanedPhone = next.phone.replace(/[\s.-]/g, '');
-        if (!/^\+?\d{9,15}$/.test(cleanedPhone)) {
-          setError('Số điện thoại không hợp lệ.');
-          return;
-        }
-      }
-
-      const hasInput = next.lmp || next.q1_ultrasound_date || next.crl_mm || next.override_edd;
-      if (hasInput) {
-        try {
-          const body: PregnancyCalculateRequest = {
-            target_date: today,
-          };
-          if (next.lmp) body.lmp = next.lmp;
-          if (next.q1_ultrasound_date) body.q1_ultrasound_date = next.q1_ultrasound_date;
-          if (next.q1_gestational_weeks !== '') body.q1_gestational_weeks = Number(next.q1_gestational_weeks);
-          if (next.q1_gestational_days !== '') body.q1_gestational_days = Number(next.q1_gestational_days);
-          if (next.crl_mm !== '') body.crl_mm = Number(next.crl_mm);
-          if (next.override_edd) body.override_edd = next.override_edd;
-
-          const res = await calculatePregnancyProfile(body);
-          const responseData = res?.data || res;
-
-          const w = responseData.gestational_age?.weeks;
-          const days = responseData.gestational_age?.remaining_days ?? 0;
-          const edd = responseData.calculated_edd || responseData.override_edd;
-          const trimesterName = responseData.gestational_age?.trimester_name;
-
-          if (w !== undefined) {
-            nextGestationalAge = `${w} tuần ${days} ngày`;
-            nextTrimester =
-              trimesterName ||
-              (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-            setGestationalAge(nextGestationalAge);
-            setTrimester(nextTrimester);
-          }
-
-          if (edd) {
-            nextDueDate = String(edd).slice(0, 10).split('-').reverse().join('/');
-            setDueDate(nextDueDate);
-          }
-
-          await savePregnancyProfileToDB({
-            ...body,
-            edd: edd ? String(edd).slice(0, 10) : undefined,
-            calculation_method: body.lmp
-              ? 'lmp'
-              : body.q1_ultrasound_date && body.crl_mm !== undefined
-                ? 'crl'
-                : body.q1_ultrasound_date
-                  ? 'q1_ultrasound'
-                  : 'direct_edd',
-          });
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Lỗi tính toán tuổi thai từ máy chủ.');
-          return;
-        }
-      } else {
-        nextGestationalAge = '--';
-        nextTrimester = 'Chưa cập nhật';
-        nextDueDate = 'Chưa cập nhật';
-        setGestationalAge(nextGestationalAge);
-        setTrimester(nextTrimester);
-        setDueDate(nextDueDate);
-      }
+      setAccountEditorOpen(false);
+      Alert.alert(
+        isEn ? 'Success' : 'Thành công',
+        isEn ? 'Account information has been updated.' : 'Đã cập nhật thông tin tài khoản.',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : (isEn ? 'Unable to update account information.' : 'Không thể cập nhật thông tin tài khoản.'),
+      );
+    } finally {
+      setSaving(false);
     }
-
-    if (currentUserProfile) {
-      if (next.name) currentUserProfile.full_name = next.name;
-      if (next.email) currentUserProfile.email = next.email;
-      if (next.phone) currentUserProfile.phone_number = next.phone;
-      if (next.birthday) currentUserProfile.birthday = next.birthday;
-      await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
-    }
-
-    setProfile(next);
-    await persistAccountData(next, nextTrimester, nextGestationalAge, nextDueDate, contacts);
-    setEditor(null);
-
-    Alert.alert('Thành công', 'Đã lưu thông tin hồ sơ và đồng bộ vào cơ sở dữ liệu.');
   };
 
-  const modalTitle = editor === 'personal' ? 'Chỉnh sửa hồ sơ' : 'Thông tin y tế';
+  const notUpdatedText = isEn ? 'Not updated' : 'Chưa cập nhật';
+  const gestationalAgeText =
+    gaWeeks !== null
+      ? isEn
+        ? `${gaWeeks} weeks ${gaDays} days`
+        : `${gaWeeks} tuần ${gaDays} ngày`
+      : '--';
+  const q1AgeText =
+    pregnancy.q1_gestational_weeks !== ''
+      ? isEn
+        ? `${pregnancy.q1_gestational_weeks}w ${pregnancy.q1_gestational_days || '0'}d`
+        : `${pregnancy.q1_gestational_weeks} tuần ${pregnancy.q1_gestational_days || '0'} ngày`
+      : '';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={styles.header}><Text style={styles.headerTitle}>Hồ sơ mẹ bầu</Text></View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Maternal Profile' : 'Hồ sơ mẹ bầu'}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+      />
+
+      <ScrollView style={{ backgroundColor: theme.background }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.identity}>
-          <Image source={require('../../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
+          <Image
+            source={require('../../assets/pregnant.jpg')}
+            style={[styles.avatar, { borderColor: theme.surface }]}
+            accessibilityLabel={isEn ? 'Maternal avatar' : 'Ảnh đại diện mẹ bầu'}
+          />
           <View style={styles.identityText}>
             <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
             <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
