@@ -1263,61 +1263,61 @@ export default function UploadScreen({ navigation }: Props) {
     };
   }, []);
 
-        const lower = (fName || '').toLowerCase();
-        if (lower.endsWith('.pdf')) return 'application/pdf';
-        if (lower.endsWith('.png')) return 'image/png';
-        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-        return 'application/pdf';
-      };
-
-      const newBatchItems: UploadItem[] = result.assets.map((asset, idx) => ({
-        id: `${batchNow}_${idx}`,
-        name: asset.name,
-        time: nowLabel(),
-        status: 'processing',
-        uri: asset.uri,
-        mimeType: resolveMime(asset.name, asset.mimeType),
-      }));
-
-      updateItemsAndPersist((prev) => [...newBatchItems, ...prev]);
-      setBatchProgressText(
-        `Đang tải lên hàng loạt ${newBatchItems.length} phiếu khám...`
-      );
-
-      try {
-        const validPid = await ensureActivePregnancyProfileId(profileWeek);
-        setProfileId(validPid);
-
-        const batchRes: any = await ingestUploadBatch(
-          result.assets.map((a) => ({
-            uri: a.uri,
-            name: a.name,
-            type: resolveMime(a.name, a.mimeType),
-          })),
-          validPid
+  const updateItemsAndPersist = useCallback((updater: (prev: UploadItem[]) => UploadItem[]) => {
+    setItems((prev) => {
+      const next = updater(prev);
+      resolveAccountStorageKey().then((storageKey) => {
+        AsyncStorage.setItem(storageKey, JSON.stringify(next)).catch((e) =>
+          console.log('Lỗi lưu dữ liệu hồ sơ:', e)
         );
+      });
+      return next;
+    });
+  }, []);
 
-        const batchData: any = batchRes?.data || batchRes;
-        const batchId = String(batchData?.batch_id || `batch_${batchNow}`);
-        const enqueuedItems = Array.isArray(batchData?.items) ? batchData.items : [];
+  const persistConfirmedItemToPostgreSQL = useCallback(
+    async (confirmedItem: UploadItem) => {
+      if (!confirmedItem.analysis) return null;
+      const analysis = confirmedItem.analysis;
 
-        updateItemsAndPersist((prev) =>
-          prev.map((item) => {
-            const idx = newBatchItems.findIndex((b) => b.id === item.id);
-            if (idx === -1) return item;
-            const eq = enqueuedItems[idx];
-            return {
-              ...item,
-              batchId,
-              profileId: validPid,
-              fileId: eq?.file_id ? String(eq.file_id) : item.fileId,
-              taskId: eq?.task_id ? String(eq.task_id) : item.taskId,
-            };
-          })
-        );
+      return await saveVerifiedRecordToDatabase({
+        fileId: confirmedItem.fileId,
+        profileId: confirmedItem.profileId || profileId,
+        checkupId: confirmedItem.checkupId,
+        verificationUrl: confirmedItem.verificationUrl,
+        gestationalWeek: analysis.gestationalWeek || profileWeek || 24,
+        gestationalDays: analysis.gestationalDays ?? 0,
+        overallSeverity: analysis.overallSeverity,
+        percentile:
+          analysis.overallSeverity === 'danger'
+            ? 2.0
+            : analysis.overallSeverity === 'warning'
+            ? 8.5
+            : 50.0,
+        explanationDoctor: analysis.doctorConclusion,
+        explanationPatient: analysis.appConclusion || analysis.doctorConclusion,
+        disclaimerText: copyRef.current.disclaimerBody,
+        ruleVersion: analysis.rule_version || DEFAULT_RULE_VERSION,
+        modelVersion: analysis.model_version || DEFAULT_MODEL_VERSION,
+        metrics: analysis.metrics.map((m) => ({
+          key: m.key,
+          label: m.label,
+          value: m.value,
+          unit: m.unit,
+          percentile: m.percentile,
+          severity: m.severity,
+        })),
+      });
+    },
+    [profileId, profileWeek]
+  );
 
-        for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-          if (!isMountedRef.current) break;
+  /* =========================================================================
+     API 7: GET /api/v1/ingest/profiles/{profile_id}/files
+     ========================================================================= */
+  const loadAccountData = useCallback(async () => {
+    if (isPickingFileRef.current) return;
+    const activeLang = langRef.current;
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
           try {
