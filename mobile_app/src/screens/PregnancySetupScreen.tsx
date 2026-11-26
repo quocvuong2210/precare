@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import {
   calculatePregnancyProfile,
@@ -26,27 +28,61 @@ import {
   type PregnancyCalculationMethod,
 } from '../services/api';
 import { colors } from '../theme/colors';
+import {
+  formatDmyInput,
+  formatIsoToDmy,
+  getTodayISO,
+  parseStrictDmyToIso,
+} from '../utils/date';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PregnancySetup'>;
-type Preview = { weeks: number; days: number; edd: string; trimester?: string };
+type Preview = { weeks: number; days: number; edd: string; trimesterNum?: number; trimester?: string };
 
-const METHODS: { id: PregnancyCalculationMethod; title: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'lmp', title: 'Ngày kinh cuối', description: 'Mẹ nhớ ngày đầu của kỳ kinh cuối cùng.', icon: 'calendar-outline' },
-  { id: 'q1_ultrasound', title: 'Siêu âm quý 1', description: 'Mẹ có phiếu siêu âm ghi tuần thai.', icon: 'scan-outline' },
-  { id: 'crl', title: 'Chỉ số CRL', description: 'Mẹ có kết quả siêu âm ghi chiều dài đầu mông.', icon: 'resize-outline' },
-  { id: 'direct_edd', title: 'Ngày dự sinh', description: 'Bác sĩ đã xác định ngày dự sinh cho mẹ.', icon: 'flag-outline' },
+const METHODS: {
+  id: PregnancyCalculationMethod;
+  titleVi: string;
+  titleEn: string;
+  descVi: string;
+  descEn: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  {
+    id: 'lmp',
+    titleVi: 'Ngày kinh cuối',
+    titleEn: 'Last menstrual period',
+    descVi: 'Mẹ nhớ ngày đầu của kỳ kinh cuối cùng.',
+    descEn: 'Use the first day of your last menstrual period.',
+    icon: 'calendar-outline',
+  },
+  {
+    id: 'q1_ultrasound',
+    titleVi: 'Siêu âm quý 1',
+    titleEn: '1st trimester ultrasound',
+    descVi: 'Mẹ có phiếu siêu âm ghi tuần thai.',
+    descEn: 'Enter the gestational age shown on your Q1 scan report.',
+    icon: 'scan-outline',
+  },
+  {
+    id: 'crl',
+    titleVi: 'Chỉ số CRL',
+    titleEn: 'CRL measurement',
+    descVi: 'Mẹ có kết quả siêu âm ghi chiều dài đầu mông.',
+    descEn: 'Enter crown-rump length (CRL) from your Q1 scan.',
+    icon: 'resize-outline',
+  },
+  {
+    id: 'direct_edd',
+    titleVi: 'Ngày dự sinh',
+    titleEn: 'Estimated due date',
+    descVi: 'Bác sĩ đã xác định ngày dự sinh cho mẹ.',
+    descEn: 'Use the due date already assigned by your doctor.',
+    icon: 'flag-outline',
+  },
 ];
 
-function toIsoDate(value: string): string | null {
-  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
+export default function PregnancySetupScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
 
 function todayIso(): string {
   const now = new Date();

@@ -117,78 +117,28 @@ const styles = StyleSheet.create({
     elevation: 6,
     overflow: 'hidden',
   },
-
-
-  /* ================= ẢNH ================= */
-
-  photo: {
-    width: '100%',
-    height: '100%',
-
-    borderRadius: 18,
-  },
-
-
-  /* ================= TITLE ================= */
-
+  photo: { width: '100%', height: '100%', borderRadius: 18 },
   title: {
-    marginTop: 28,
-
-    fontSize: 20,
-
-    lineHeight: 25,
-
+    marginTop: 24,
+    fontSize: 21,
+    lineHeight: 28,
     fontWeight: '800',
-
-    color: colors.navy,
-
     textAlign: 'center',
-
     paddingHorizontal: 4,
   },
-
-
-  /* ================= DESCRIPTION ================= */
-
   desc: {
     marginTop: 12,
-
-    fontSize: 12.5,
-
-    lineHeight: 19,
-
-    color: colors.textMuted,
-
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
-
     paddingHorizontal: 2,
   },
-
-
-  /* ================= SPACER ================= */
-
-  spacer: {
-    flex: 1,
-  },
-
-
-  /* ================= KHOẢNG CÁCH BUTTON ================= */
-
-  buttonGap: {
-    height: 10,
-  },
-
-
+  spacer: { flex: 1, minHeight: 20 },
+  buttonGap: { height: 10 },
   version: {
     marginTop: 11,
-
-    fontSize: 10.5,
-
-    lineHeight: 16,
-
-    color: colors.textLight,
-
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
-
 });
