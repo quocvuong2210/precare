@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../../navigation/AppNavigator';
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { register } from '../../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDetails'>;
@@ -24,6 +26,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegisterDetails'>;
 const PRIMARY = '#0D9488';
 
 export default function RegisterDetailsScreen({ navigation, route }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const { email, role, verificationToken } = route.params;
 
   const [fullName, setFullName] = useState('');
@@ -41,22 +45,34 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
     const phone = phoneNumber.trim();
 
     if (!name || !phone || !password || !confirmPassword) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ các trường.');
+      Alert.alert(
+        isEn ? 'Missing information' : 'Thiếu thông tin',
+        isEn ? 'Please fill in all required fields.' : 'Vui lòng điền đầy đủ các trường.',
+      );
       return;
     }
 
     if (!/^[0-9+()\s-]{9,20}$/.test(phone)) {
-      Alert.alert('Số điện thoại không hợp lệ', 'Vui lòng kiểm tra số điện thoại.');
+      Alert.alert(
+        isEn ? 'Invalid phone number' : 'Số điện thoại không hợp lệ',
+        isEn ? 'Please check your phone number.' : 'Vui lòng kiểm tra số điện thoại.',
+      );
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Mật khẩu quá ngắn', 'Mật khẩu phải có ít nhất 8 ký tự.');
+      Alert.alert(
+        isEn ? 'Password too short' : 'Mật khẩu quá ngắn',
+        isEn ? 'Password must be at least 8 characters.' : 'Mật khẩu phải có ít nhất 8 ký tự.',
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Mật khẩu không khớp', 'Vui lòng nhập lại mật khẩu xác nhận.');
+      Alert.alert(
+        isEn ? 'Passwords do not match' : 'Mật khẩu không khớp',
+        isEn ? 'Please re-enter the confirmation password.' : 'Vui lòng nhập lại mật khẩu xác nhận.',
+      );
       return;
     }
 
@@ -75,13 +91,17 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
       );
 
       Alert.alert(
-        'Đăng ký thành công',
+        isEn ? 'Registration successful' : 'Đăng ký thành công',
         role === 'doctor'
-          ? 'Tài khoản bác sĩ đã được tạo và có thể cần được xét duyệt trước khi kích hoạt.'
-          : 'Tài khoản đã được tạo. Vui lòng đăng nhập để tiếp tục.',
+          ? (isEn
+              ? 'Doctor account created and may require review before activation.'
+              : 'Tài khoản bác sĩ đã được tạo và có thể cần được xét duyệt trước khi kích hoạt.')
+          : (isEn
+              ? 'Your account has been created. Please sign in to continue.'
+              : 'Tài khoản đã được tạo. Vui lòng đăng nhập để tiếp tục.'),
         [
           {
-            text: 'Đến đăng nhập',
+            text: isEn ? 'Go to sign in' : 'Đến đăng nhập',
             onPress: () =>
               navigation.reset({
                 index: 0,
@@ -95,18 +115,23 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Không thể đăng ký. Vui lòng thử lại.';
-      Alert.alert('Đăng ký thất bại', message);
+          : (isEn ? 'Unable to register. Please try again.' : 'Không thể đăng ký. Vui lòng thử lại.');
+      Alert.alert(isEn ? 'Registration failed' : 'Đăng ký thất bại', message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Complete registration' : 'Hoàn tất đăng ký'}
+        onBack={() => navigation.goBack()}
+        backDisabled={loading}
+      />
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: theme.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
@@ -115,16 +140,6 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.main}>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              disabled={loading}
-              style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Quay lại"
-            >
-              <Ionicons name="arrow-back" size={23} color="#0F172A" />
-            </Pressable>
-
             <View style={styles.brand}>
               <View style={styles.logo}>
                 <Ionicons name="heart-outline" size={31} color="#FFFFFF" />
@@ -132,37 +147,22 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
                   <Ionicons name="pulse" size={22} color="#FFFFFF" />
                 </View>
               </View>
-              <Text style={styles.appName}>PreCare</Text>
+              <Text style={[styles.appName, fontStyle(19, { min: 17.5, max: 22 }), { color: theme.tealText }]}>PreCare</Text>
             </View>
 
-            <Text style={styles.title}>Hoàn tất đăng ký</Text>
-            <Text style={styles.subtitle}>
-              Email đã được xác minh. Vui lòng bổ sung thông tin để tạo tài khoản.
+            <Text style={[styles.title, fontStyle(24, { lineHeight: 32, min: 22, max: 28 }), { color: theme.text }]}>
+              {isEn ? 'Complete registration' : 'Hoàn tất đăng ký'}
+            </Text>
+            <Text style={[styles.subtitle, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Your email has been verified. Complete your details to create an account.'
+                : 'Email đã được xác minh. Vui lòng bổ sung thông tin để tạo tài khoản.'}
             </Text>
 
-            <View style={styles.verifiedCard}>
+            <View style={[styles.verifiedCard, { backgroundColor: theme.tealSoft }]}>
               <Ionicons name="checkmark-circle" size={21} color={PRIMARY} />
               <View style={styles.verifiedContent}>
-                <Text style={styles.verifiedLabel}>Email đã xác minh</Text>
-                <Text style={styles.verifiedEmail}>{email}</Text>
-              </View>
-            </View>
-
-            <View style={styles.form}>
-              <Text style={styles.label}>Họ và tên <Text style={styles.required}>*</Text></Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="person-outline" size={19} color="#94A3B8" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập họ và tên"
-                  placeholderTextColor="#94A3B8"
-                  value={fullName}
-                  onChangeText={setFullName}
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  editable={!loading}
-                />
-              </View>
+                <Text style={[styles.verifiedLabel, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
 
               <Text style={styles.label}>Số điện thoại <Text style={styles.required}>*</Text></Text>
               <View style={styles.inputWrap}>
