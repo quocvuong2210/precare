@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   UploadFileItem,
   DocumentExtractionData,
+  createBlankManualExtractionData,
   createDefaultExtractionData,
 } from './mockOcrData';
 import { Step1Upload } from './Step1Upload';
@@ -21,6 +22,7 @@ export interface InitialReviewFileInfo {
   sizeFormatted: string;
   ocrConfidence?: number;
   doctorPerformer?: string;
+  isManualEntry?: boolean;
 }
 
 interface UploadVerificationWizardProps {
@@ -83,12 +85,19 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
   // Store extracted data per file ID or index
   const [extractionsMap, setExtractionsMap] = useState<Record<string, DocumentExtractionData>>(() => {
     if (!initialReviewFile) return {};
-    const prefilled = createDefaultExtractionData(
-      initialReviewFile.id,
-      initialReviewFile.name,
-      initialReviewFile.sizeFormatted,
-      patientName
-    );
+    const prefilled = initialReviewFile.isManualEntry
+      ? createBlankManualExtractionData(
+          initialReviewFile.id,
+          initialReviewFile.name,
+          initialReviewFile.sizeFormatted,
+          patientName
+        )
+      : createDefaultExtractionData(
+          initialReviewFile.id,
+          initialReviewFile.name,
+          initialReviewFile.sizeFormatted,
+          patientName
+        );
     return {
       [initialReviewFile.id]: {
         ...prefilled,
@@ -290,6 +299,48 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
   };
 
   // Xác nhận và lưu hồ sơ ở Bước 3
+  const handleFallbackToManualEntry = () => {
+    const manualMap: Record<string, DocumentExtractionData> = {};
+    const targetFiles = files.length > 0 ? files : [
+      {
+        id: `manual-${Date.now()}`,
+        name: 'Phieu_nhap_tay.pdf',
+        size: 0,
+        sizeFormatted: '—',
+        type: 'application/pdf',
+        progress: 100,
+        status: 'completed' as const,
+      },
+    ];
+
+    targetFiles.forEach((file) => {
+      const blank = createBlankManualExtractionData(
+        file.id,
+        file.name,
+        file.sizeFormatted,
+        currentPatientName
+      );
+      let localBlobUrl: string | undefined;
+      if (file.file) {
+        localBlobUrl = URL.createObjectURL(file.file);
+        blobUrlsRef.current.push(localBlobUrl);
+      }
+      manualMap[file.id] = {
+        ...blank,
+        presignedViewUrl: localBlobUrl,
+        fileType: file.type,
+      };
+    });
+
+    if (files.length === 0) {
+      setFiles(targetFiles);
+    }
+    setExtractionsMap(manualMap);
+    setActiveFileIndex(0);
+    setApiError(null);
+    setCurrentStep(2);
+  };
+
   const handleDeleteActiveFile = async () => {
     const targetFileId = activeExtraction.fileId || currentFile?.id || '';
     setApiError(null);
@@ -420,7 +471,7 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
     <div className="relative space-y-4">
       {/* API Error Banner */}
       {apiError && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start justify-between gap-3 text-xs text-rose-800 shadow-xs">
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-800 shadow-xs">
           <div className="flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>
@@ -428,13 +479,24 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
               <div className="mt-0.5">{apiError}</div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setApiError(null)}
-            className="text-rose-600 hover:text-rose-900 font-semibold cursor-pointer shrink-0"
-          >
-            Đóng
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {currentStep === 1 && files.length > 0 && (
+              <button
+                type="button"
+                onClick={handleFallbackToManualEntry}
+                className="px-3.5 py-1.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                Nhập tay thủ công
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setApiError(null)}
+              className="px-2.5 py-1.5 text-rose-600 hover:text-rose-900 font-semibold cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       )}
 

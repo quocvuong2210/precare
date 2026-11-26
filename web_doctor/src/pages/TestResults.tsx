@@ -23,12 +23,18 @@ import {
   Trash2,
   Loader2,
   X,
+  Edit3,
+  RefreshCw,
 } from 'lucide-react';
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupDetailModal } from '../components/CheckupDetailModal';
-import { CheckupTimelineRecord } from '../services/checkup.service';
+import { CheckupTimelineRecord, fetchCheckupHistory } from '../services/checkup.service';
 import { DocumentExtractionData, formatFileSize } from '../components/ocr-workflow/mockOcrData';
-import { ingestService, isValidUuid } from '../services/ingest.service';
+import {
+  ingestService,
+  isValidUuid,
+  mapFileDetailToExtractionData,
+} from '../services/ingest.service';
 import { apiClient } from '../services/auth.service';
 import { DataTable, DataTableColumn } from '../components/ui/DataTable';
 import { TableActionButton } from '../components/ui/TableActionButton';
@@ -36,6 +42,7 @@ import { TableActionButton } from '../components/ui/TableActionButton';
 export interface ParaclinicalWorklistItem {
   id: string;
   patientId: string;
+  checkupId?: string | null;
   patientName: string;
   patientPhone: string;
   gestationalAge: string;
@@ -46,7 +53,7 @@ export interface ParaclinicalWorklistItem {
   receivedAt: string;
   doctorPerformer: string;
   ocrConfidence: number;
-  status: 'pending_review' | 'verified';
+  status: 'pending_review' | 'verified' | 'failed';
   primaryDoctorId?: string | null;
   primaryDoctorName?: string | null;
   verifiedByName?: string | null;
@@ -174,6 +181,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
         return {
           id: item.id,
           patientId: item.pregnancy_profile_id,
+          checkupId: item.checkup_id,
           patientName: item.patient_name,
           patientPhone: item.patient_phone || '—',
           gestationalAge: item.gestational_age_formatted || 'Đang theo dõi',
@@ -193,8 +201,13 @@ export const TestResults: React.FC<TestResultsProps> = ({
           doctorPerformer: item.uploaded_by_name || 'Hệ thống tiếp nhận',
           verifiedByName: item.verified_by_name,
           verifiedAt: item.verified_at,
-          ocrConfidence: item.ocr_confidence ?? 98.0,
-          status: item.status === 'verified' ? 'verified' : 'pending_review',
+          ocrConfidence: item.ocr_confidence ?? (item.status === 'failed' ? 0 : 98.0),
+          status:
+            item.status === 'verified'
+              ? 'verified'
+              : item.status === 'failed'
+              ? 'failed'
+              : 'pending_review',
         };
       });
       setWorklist(mapped);
@@ -326,39 +339,106 @@ export const TestResults: React.FC<TestResultsProps> = ({
     setIsWizardOpen(true);
   };
 
-  // Action: Open details for a verified document
-  const handleViewVerifiedDetails = (item: ParaclinicalWorklistItem) => {
-    const mockVisit: CheckupTimelineRecord = {
-      id: `checkup-${item.id}`,
-      pregnancy_profile_id: item.patientId,
-      doctor: { id: 'doc-1', full_name: item.doctorPerformer },
-      checkup_date: item.receivedAt.slice(0, 10).split('/').reverse().join('-'),
-      gestational_age: {
-        days: 228,
-        weeks: parseInt(item.gestationalAge, 10) || 32,
-        remaining_days: 4,
-        formatted: item.gestationalAge,
-        trimester: 3,
-      },
-      vitals: {
-        weight_kg: 56.5,
-        blood_pressure_systolic: 118,
-        blood_pressure_diastolic: 76,
-        blood_pressure_status: 'normal',
-      },
-      notes: `1. Tình trạng thai: Một thai sống phát triển phù hợp tuần tuổi (${item.gestationalAge}), nước ối và bánh nhau bình thường.\n2. Lưu ý y mẹ: Huyết áp ổn định 118/76 mmHg. Theo dõi cử động thai.\n3. Hẹn tái khám: Sau 2 tuần theo lịch hẹn.`,
-      biometric_data: {
-        id: `bio-${item.id}`,
-        bpd: 58,
-        hc: 290,
-        ac: 196,
-        fl: 43,
-        efw: 1950,
-        status: 'verified',
-      },
-      created_at: new Date().toISOString(),
-    };
-    setSelectedVisitDetail(mockVisit);
+  const [selectedDocDetail, setSelectedDocDetail] = useState<DocumentExtractionData | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
+
+  // Action: Open details for a verified document (fetches real Checkup + FileDetail from Backend)
+  const handleViewVerifiedDetails = async (item: ParaclinicalWorklistItem) => {
+    setLoadingDetailId(item.id);
+    try {
+      const [fileResult, checkupsResult] = await Promise.allSettled([
+        ingestService.getFileDetail(item.id),
+        fetchCheckupHistory(item.patientId),
+      ]);
+
+      const fileDetail =
+        fileResult.status === 'fulfilled' ? fileResult.value : null;
+      const checkups =
+        checkupsResult.status === 'fulfilled' ? checkupsResult.value : [];
+
+      const docData = fileDetail
+        ? mapFileDetailToExtractionData(fileDetail, item.patientName)
+        : null;
+
+      const targetCheckupId = item.checkupId || fileDetail?.checkup_id;
+      const matchedCheckup = targetCheckupId
+        ? checkups.find((c) => c.id === targetCheckupId)
+        : undefined;
+
+      if (matchedCheckup) {
+        setSelectedDocDetail(docData);
+        setSelectedVisitDetail(matchedCheckup);
+        return;
+      }
+
+      // Fallback strictly from real fileDetail OCR payload (no hardcoded fake medical numbers)
+      const fields = fileDetail?.ocr_raw_payload?.extracted_fields || {};
+      const gaDays =
+        typeof fields.gestational_age_days === 'number'
+          ? fields.gestational_age_days
+          : 0;
+      const gaWeeks = gaDays > 0 ? Math.floor(gaDays / 7) : parseInt(item.gestationalAge, 10) || 0;
+      const gaRemDays = gaDays > 0 ? gaDays % 7 : 0;
+      const trimester = gaWeeks < 14 ? 1 : gaWeeks < 28 ? 2 : 3;
+
+      const conclusionParts = [
+        docData?.conclusions.fetalCondition,
+        docData?.conclusions.maternalNotes,
+        docData?.conclusions.followUpAdvice,
+      ].filter((p): p is string => Boolean(p && p.trim()));
+
+      const fallbackVisit: CheckupTimelineRecord = {
+        id: targetCheckupId || item.id,
+        pregnancy_profile_id: item.patientId,
+        doctor: {
+          id: '',
+          full_name:
+            item.verifiedByName ||
+            docData?.doctorPerformer ||
+            item.doctorPerformer ||
+            'Bác sĩ phụ trách',
+        },
+        checkup_date:
+          docData?.visitDate ||
+          (fileDetail?.created_at ? fileDetail.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
+        gestational_age: {
+          days: gaDays,
+          weeks: gaWeeks,
+          remaining_days: gaRemDays,
+          formatted: item.gestationalAge,
+          trimester,
+        },
+        vitals: {
+          weight_kg: docData?.vitals.weightKg ? docData.vitals.weightKg : null,
+          blood_pressure_systolic: docData?.vitals.bloodPressureSystolic
+            ? docData.vitals.bloodPressureSystolic
+            : null,
+          blood_pressure_diastolic: docData?.vitals.bloodPressureDiastolic
+            ? docData.vitals.bloodPressureDiastolic
+            : null,
+          blood_pressure_status: 'normal',
+        },
+        notes: conclusionParts.length > 0 ? conclusionParts.join('\n') : null,
+        biometric_data: {
+          id: `bio-${item.id}`,
+          bpd: typeof fields.bpd_mm === 'number' ? fields.bpd_mm : null,
+          hc: typeof fields.hc_mm === 'number' ? fields.hc_mm : null,
+          ac: typeof fields.ac_mm === 'number' ? fields.ac_mm : null,
+          fl: typeof fields.fl_mm === 'number' ? fields.fl_mm : null,
+          efw: typeof fields.efw_g === 'number' ? fields.efw_g : null,
+          status: 'verified',
+        },
+        created_at: fileDetail?.created_at || new Date().toISOString(),
+      };
+
+      setSelectedDocDetail(docData);
+      setSelectedVisitDetail(fallbackVisit);
+    } catch (err: any) {
+      setToastMessage(err?.message || 'Không thể tải chi tiết phiếu đã duyệt.');
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setLoadingDetailId(null);
+    }
   };
 
   // Callback when doctor finishes wizard in Step 3
@@ -403,6 +483,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
                 sizeFormatted: reviewingItem.fileSize,
                 ocrConfidence: reviewingItem.ocrConfidence,
                 doctorPerformer: reviewingItem.doctorPerformer,
+                isManualEntry: reviewingItem.status === 'failed',
               }
             : null
         }
@@ -701,7 +782,12 @@ export const TestResults: React.FC<TestResultsProps> = ({
               widthClass: 'w-[12%]',
               align: 'center',
               render: (item) =>
-                item.status === 'pending_review' ? (
+                item.status === 'failed' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                    <AlertTriangle className="w-3 h-3 text-rose-600" />
+                    OCR thất bại
+                  </span>
+                ) : item.status === 'pending_review' ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
                     <Clock className="w-3 h-3 text-amber-600" />
                     Chờ duyệt OCR
@@ -729,7 +815,46 @@ export const TestResults: React.FC<TestResultsProps> = ({
               widthClass: 'w-[19%]',
               align: 'right',
               render: (item) =>
-                item.status === 'pending_review' ? (
+                item.status === 'failed' ? (
+                  <div className="inline-flex items-center justify-end gap-1.5">
+                    <TableActionButton
+                      label="Nhập tay"
+                      icon={Edit3}
+                      variant="primary"
+                      onClick={() => handleReviewPending(item)}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          if (isValidUuid(item.id)) {
+                            await ingestService.retryFailedFile(item.id);
+                          }
+                          await loadWorklistQueue();
+                          setToastMessage('Đã gửi lại tác vụ trích xuất OCR.');
+                          setTimeout(() => setToastMessage(null), 3500);
+                        } catch (err: any) {
+                          setToastMessage(err?.message || 'Không thể thử lại OCR.');
+                          setTimeout(() => setToastMessage(null), 3500);
+                        }
+                      }}
+                      title="Thử lại trích xuất OCR"
+                      aria-label="Thử lại trích xuất OCR"
+                      className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-[#275248] transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteItem(item)}
+                      title="Xóa phiếu khỏi hàng đợi"
+                      aria-label="Xóa phiếu khỏi hàng đợi"
+                      className="p-2 rounded-xl border border-rose-200 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : item.status === 'pending_review' ? (
                   <div className="inline-flex items-center justify-end gap-1.5">
                     <TableActionButton
                       label="Duyệt & Đối chiếu"
@@ -749,9 +874,10 @@ export const TestResults: React.FC<TestResultsProps> = ({
                   </div>
                 ) : (
                   <TableActionButton
-                    label="Xem chi tiết & dặn dò"
-                    icon={Eye}
+                    label={loadingDetailId === item.id ? 'Đang tải...' : 'Xem chi tiết & dặn dò'}
+                    icon={loadingDetailId === item.id ? Loader2 : Eye}
                     variant="outline"
+                    disabled={loadingDetailId === item.id}
                     onClick={() => handleViewVerifiedDetails(item)}
                   />
                 ),
@@ -862,7 +988,11 @@ export const TestResults: React.FC<TestResultsProps> = ({
       {selectedVisitDetail && (
         <CheckupDetailModal
           visit={selectedVisitDetail}
-          onClose={() => setSelectedVisitDetail(null)}
+          documentData={selectedDocDetail}
+          onClose={() => {
+            setSelectedVisitDetail(null);
+            setSelectedDocDetail(null);
+          }}
           patientName={
             worklist.find((i) => i.patientId === selectedVisitDetail.pregnancy_profile_id)
               ?.patientName || 'Thai phụ'

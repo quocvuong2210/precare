@@ -157,13 +157,20 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#275248] border border-teal-200/80 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            Độ tin cậy OCR: {extractionData.ocrConfidence}%
-          </span>
+          {extractionData.isManualEntry ? (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200 flex items-center gap-1.5">
+              <Edit3 className="w-3.5 h-3.5 text-rose-600" />
+              Chế độ nhập tay (OCR thất bại)
+            </span>
+          ) : (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#275248] border border-teal-200/80 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              Độ tin cậy OCR: {extractionData.ocrConfidence}%
+            </span>
+          )}
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
             <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-            Chờ bác sĩ đối chiếu
+            {extractionData.isManualEntry ? 'Chờ bác sĩ nhập liệu' : 'Chờ bác sĩ đối chiếu'}
           </span>
         </div>
       </div>
@@ -171,10 +178,14 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
       {/* Main Title */}
       <div>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-          Đối chiếu dữ liệu trích xuất AI
+          {extractionData.isManualEntry
+            ? 'Nhập tay chỉ số khám thai (OCR thất bại)'
+            : 'Đối chiếu dữ liệu trích xuất AI'}
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          Kiểm tra trực tiếp kết quả bóc tách tự động so với tài liệu gốc trước khi đồng bộ vào bệnh án điện tử.
+          {extractionData.isManualEntry
+            ? 'Quan sát tài liệu gốc bên trái và nhập đầy đủ sinh hiệu, sinh trắc học thai nhi, xét nghiệm & kết luận trước khi lưu.'
+            : 'Kiểm tra trực tiếp kết quả bóc tách tự động so với tài liệu gốc trước khi đồng bộ vào bệnh án điện tử.'}
         </p>
       </div>
 

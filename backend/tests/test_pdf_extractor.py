@@ -295,3 +295,53 @@ def test_hybrid_pdfplumber_table_and_clinical_sections():
     assert "binh thuong" in (sections["conclusions"]["summary"] or "").lower()
 
 
+def test_ocr_slow_path_line_level_biometrics_and_diacritics_loss():
+    raw_ocr_text = (
+        "Tui thai hin ti 24 tun 2 ngày\n"
+        "FHR Nhip tim thai (Fetal Heart Rate) 148 bpm 120 - 160 bpm Binh thuong\n"
+        "BPD Đng kính lng đinh 58 mm 54 - 62 mm Binh thuong\n"
+        "HC* Chu vi vòng đầu thai 222 mm* ≈212-233 mm† Ước tính*\n"
+        "FL Chiu dài xng đi 43 mm 39 - 46 mm Binh thuong\n"
+        "AC Chu vi vòng bng thai 196 mm 182 - 208 mm Binh thuong\n"
+        "EFW Cân nng thai 720 g 600 - 780 g Phat trien tot\n"
+        "AFI Chi s nc i & Vi trí nhau 135 mm 80 - 180 mm Nhau mat truoc\n"
+    )
+    fields, confidence = pdf_extractor.parse_ultrasound_biometrics(raw_ocr_text)
+
+    assert fields["gestational_age_days"] == 24 * 7 + 2
+    assert fields["fhr_bpm"] == 148
+    assert fields["bpd_mm"] == 58.0
+    assert fields["hc_mm"] == 222.0
+    assert fields["fl_mm"] == 43.0
+    assert fields["ac_mm"] == 196.0
+    assert fields["efw_g"] == 720.0
+    assert fields["afi_cm"] == 13.5
+    assert "ac" in confidence and "fl" in confidence and "afi" in confidence
+
+
+def test_ocr_slow_path_vietnamese_only_diacritics_loss():
+    raw_ocr_text = (
+        "PHIÉU KÉT QUÀ Siêu Âm Thai Quý II\n"
+        "Ső thai: 01 Tim thai: 155 Lân/phút\n"
+        "-Đưng kính lung đinh: 32 mm\n"
+        "- Chu vi vòng đu: 125 mm\n"
+        "- Chu vi vòng bng: 103 mm\n"
+        "- Chiêu dài xương đùi: 17 mm\n"
+        "- Uc lưng cân nng: 136 gr\n"
+        "- AFI: 98.92 mm\n"
+        "01 THAI SÔNG ĐANG PHÁT TRIỂN TRONG TỬ CUNG KHOẢNG 15 TUẦN 2 NGÀY\n"
+    )
+    fields, _ = pdf_extractor.parse_ultrasound_biometrics(raw_ocr_text)
+
+    assert fields["fhr_bpm"] == 155
+    assert fields["bpd_mm"] == 32.0
+    assert fields["hc_mm"] == 125.0
+    assert fields["ac_mm"] == 103.0
+    assert fields["fl_mm"] == 17.0
+    assert fields["efw_g"] == 136.0
+    assert fields["afi_cm"] == 9.89
+    assert fields["gestational_age_days"] == 15 * 7 + 2
+
+
+
+

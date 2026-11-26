@@ -134,7 +134,7 @@ export type UploadItem = {
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 25;
+const MAX_POLL_ATTEMPTS = 90;
 
 type AppLang = 'vi' | 'en';
 

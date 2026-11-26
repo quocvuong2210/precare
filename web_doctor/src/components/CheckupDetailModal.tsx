@@ -15,18 +15,20 @@ import {
 } from 'lucide-react';
 import { CheckupTimelineRecord } from '../services/checkup.service';
 import { DocumentViewer } from './ocr-workflow/DocumentViewer';
-import { createDefaultExtractionData } from './ocr-workflow/mockOcrData';
+import { DocumentExtractionData } from './ocr-workflow/mockOcrData';
 
 interface CheckupDetailModalProps {
   visit: CheckupTimelineRecord;
   onClose: () => void;
   patientName?: string;
+  documentData?: DocumentExtractionData | null;
 }
 
 export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
   visit,
   onClose,
-  patientName = 'Nguyễn Thị Hương',
+  patientName = 'Thai phụ',
+  documentData = null,
 }) => {
   const [showOriginalDoc, setShowOriginalDoc] = useState(false);
 
@@ -35,7 +37,101 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
     visit.vitals.blood_pressure_systolic != null &&
     visit.vitals.blood_pressure_diastolic != null
       ? `${visit.vitals.blood_pressure_systolic}/${visit.vitals.blood_pressure_diastolic} mmHg`
-      : '118/76 mmHg';
+      : documentData?.vitals.bloodPressureSystolic && documentData?.vitals.bloodPressureDiastolic
+        ? `${documentData.vitals.bloodPressureSystolic}/${documentData.vitals.bloodPressureDiastolic} mmHg`
+        : 'Chưa ghi nhận';
+
+  const weightDisplay =
+    visit.vitals.weight_kg != null
+      ? `${visit.vitals.weight_kg} kg`
+      : documentData?.vitals.weightKg
+        ? `${documentData.vitals.weightKg} kg`
+        : 'Chưa ghi nhận';
+
+  const heartRateDisplay = documentData?.vitals.heartRateBpm
+    ? `${documentData.vitals.heartRateBpm} lần/phút`
+    : 'Chưa ghi nhận';
+  const tempDisplay = documentData?.vitals.temperatureC
+    ? `${documentData.vitals.temperatureC} °C`
+    : 'Chưa ghi nhận';
+  const bmiDisplay = documentData?.vitals.bmi
+    ? `${documentData.vitals.bmi} kg/m²`
+    : 'Chưa ghi nhận';
+
+  const findDocBiometric = (code: 'FHR' | 'BPD' | 'FL' | 'AC' | 'EFW' | 'AFI') =>
+    documentData?.biometrics.find((b) => b.code === code);
+
+  const fhrMetric = findDocBiometric('FHR');
+  const afiMetric = findDocBiometric('AFI');
+
+  const biometricRows = [
+    {
+      label: 'Tim thai (FHR)',
+      value: fhrMetric && fhrMetric.value > 0 ? `${fhrMetric.value} bpm` : null,
+      range: '120 - 160 bpm',
+      percentile: fhrMetric?.value ? fhrMetric.percentile || '—' : '—',
+    },
+    {
+      label: 'Đường kính lưỡng đỉnh (BPD)',
+      value:
+        biometric?.bpd != null
+          ? `${biometric.bpd} mm`
+          : findDocBiometric('BPD')?.value
+            ? `${findDocBiometric('BPD')?.value} mm`
+            : null,
+      range: 'Theo tuổi thai',
+      percentile: findDocBiometric('BPD')?.value ? findDocBiometric('BPD')?.percentile || '—' : '—',
+    },
+    {
+      label: 'Chu vi vòng đầu (HC)',
+      value: biometric?.hc != null ? `${biometric.hc} mm` : null,
+      range: 'Theo tuổi thai',
+      percentile: '—',
+    },
+    {
+      label: 'Chiều dài xương đùi (FL)',
+      value:
+        biometric?.fl != null
+          ? `${biometric.fl} mm`
+          : findDocBiometric('FL')?.value
+            ? `${findDocBiometric('FL')?.value} mm`
+            : null,
+      range: 'Theo tuổi thai',
+      percentile: findDocBiometric('FL')?.value ? findDocBiometric('FL')?.percentile || '—' : '—',
+    },
+    {
+      label: 'Chu vi vòng bụng (AC)',
+      value:
+        biometric?.ac != null
+          ? `${biometric.ac} mm`
+          : findDocBiometric('AC')?.value
+            ? `${findDocBiometric('AC')?.value} mm`
+            : null,
+      range: 'Theo tuổi thai',
+      percentile: findDocBiometric('AC')?.value ? findDocBiometric('AC')?.percentile || '—' : '—',
+    },
+    {
+      label: 'Cân nặng ước tính (EFW)',
+      value:
+        biometric?.efw != null
+          ? `${biometric.efw.toLocaleString('vi-VN')} g`
+          : findDocBiometric('EFW')?.value
+            ? `${findDocBiometric('EFW')?.value.toLocaleString('vi-VN')} g`
+            : null,
+      range: 'Theo tuổi thai',
+      percentile: findDocBiometric('EFW')?.value ? findDocBiometric('EFW')?.percentile || '—' : '—',
+    },
+    {
+      label: 'Chỉ số ối (AFI)',
+      value: afiMetric && afiMetric.value > 0 ? `${afiMetric.value} ${afiMetric.unit}` : null,
+      range: '5 - 24 cm',
+      percentile: afiMetric?.value ? afiMetric.percentile || '—' : '—',
+    },
+  ];
+
+  const recordedLabs = (documentData?.labs || []).filter(
+    (lab) => lab.value && lab.value.trim() !== '' && lab.value.trim() !== '--'
+  );
 
   // Format date helper
   const formattedDate = (() => {
@@ -57,14 +153,6 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
     .replace(/^\[DỮ LIỆU DEMO TIMELINE\]\s*/, '')
     .split('\n')
     .filter((l) => l.trim().length > 0);
-
-  // Fallback extraction data for viewing original document
-  const mockDocData = createDefaultExtractionData(
-    visit.id,
-    `Phieu_kham_thai_${visit.gestational_age.weeks}W.pdf`,
-    '2.4 MB',
-    patientName
-  );
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -96,14 +184,16 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowOriginalDoc(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5 text-slate-500" />
-              <span>Xem file gốc</span>
-            </button>
+            {documentData && (
+              <button
+                type="button"
+                onClick={() => setShowOriginalDoc(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                <span>Xem file gốc</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -122,17 +212,20 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
               <FileText className="w-4 h-4 text-[#275248]" />
               <div>
                 <span className="font-bold text-slate-800">
-                  Tài liệu đính kèm:{' '}
-                  {`Phieu_kham_thai_${visit.gestational_age.weeks}W.pdf`}
+                  {documentData ? `Tài liệu đính kèm: ${documentData.fileName}` : 'Hồ sơ lần khám điện tử'}
                 </span>
                 <span className="text-[11px] text-slate-500 ml-2">
-                  (Đã qua đối chiếu OCR &amp; Bác sĩ phê duyệt)
+                  {documentData
+                    ? '(Đã qua đối chiếu OCR & Bác sĩ phê duyệt)'
+                    : '(Dữ liệu lưu trữ trong bệnh án)'}
                 </span>
               </div>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Độ tin cậy OCR: 98.5%
+              {documentData?.ocrConfidence
+                ? `Độ tin cậy OCR: ${documentData.ocrConfidence}%`
+                : 'Đã xác nhận hồ sơ'}
             </span>
           </div>
 
@@ -156,9 +249,7 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                   Cân nặng
                 </div>
                 <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  {visit.vitals.weight_kg != null
-                    ? `${visit.vitals.weight_kg} kg`
-                    : '56.5 kg'}
+                  {weightDisplay}
                 </div>
               </div>
 
@@ -167,7 +258,7 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                   Mạch
                 </div>
                 <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  78 lần/phút
+                  {heartRateDisplay}
                 </div>
               </div>
 
@@ -176,7 +267,7 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                   Thân nhiệt
                 </div>
                 <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  36.6 °C
+                  {tempDisplay}
                 </div>
               </div>
 
@@ -185,7 +276,7 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                   Chỉ số BMI
                 </div>
                 <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  22.1 kg/m²
+                  {bmiDisplay}
                 </div>
               </div>
             </div>
@@ -196,10 +287,10 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
                 <Ruler className="w-4 h-4 text-emerald-700" />
-                <span>II. Chỉ số sinh trắc học thai nhi (Siêu âm 4D)</span>
+                <span>II. Chỉ số sinh trắc học thai nhi (Siêu âm)</span>
               </div>
               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Phát triển phù hợp tuổi thai
+                {biometric?.status === 'verified' ? 'Đã bác sĩ đối chiếu' : 'Dữ liệu ghi nhận'}
               </span>
             </div>
 
@@ -209,116 +300,35 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                   <tr className="bg-slate-50 text-slate-500 text-[11px] font-semibold border-b border-slate-200">
                     <th className="py-2.5 px-3">CHỈ SỐ</th>
                     <th className="py-2.5 px-3 text-center">GIÁ TRỊ ĐO ĐƯỢC</th>
-                    <th className="py-2.5 px-3 text-center">KHOẢNG THAM CHIẾU</th>
+                    <th className="py-2.5 px-3 text-center">THAM CHIẾU</th>
                     <th className="py-2.5 px-3 text-center">BÁCH PHÂN VỊ</th>
-                    <th className="py-2.5 px-3 text-right">ĐÁNH GIÁ</th>
+                    <th className="py-2.5 px-3 text-right">TRẠNG THÁI</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Tim thai (FHR)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      148 bpm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      120 - 160 bpm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      Chuẩn theo tuổi thai
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Đường kính lưỡng đỉnh (BPD)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      {biometric?.bpd ? `${biometric.bpd} mm` : '58 mm'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      54 - 62 mm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      52th percentile
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Chiều dài xương đùi (FL)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      {biometric?.fl ? `${biometric.fl} mm` : '43 mm'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      40 - 46 mm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      48th percentile
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Chu vi vòng bụng (AC)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      {biometric?.ac ? `${biometric.ac} mm` : '196 mm'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      185 - 210 mm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      50th percentile
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Cân nặng ước tính (EFW)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      {biometric?.efw
-                        ? `${biometric.efw.toLocaleString()} g`
-                        : '1,950 g'}
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      1,750 - 2,150 g
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      49th percentile
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-800">
-                      Chỉ số ối (AFI)
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-bold text-slate-900">
-                      135 mm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">
-                      100 - 180 mm
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">
-                      Bình thường
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold">
-                      Bình thường
-                    </td>
-                  </tr>
+                  {biometricRows.map((row) => (
+                    <tr key={row.label}>
+                      <td className="py-2.5 px-3 font-semibold text-slate-800">
+                        {row.label}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-900">
+                        {row.value ?? <span className="text-slate-400 font-normal">Chưa ghi nhận</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-slate-500">
+                        {row.range}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-slate-700">
+                        {row.percentile}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold">
+                        {row.value ? (
+                          <span className="text-emerald-700">Đã ghi nhận</span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -331,78 +341,41 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                 <Activity className="w-4 h-4 text-teal-700" />
                 <span>III. Kết quả xét nghiệm sinh hóa &amp; nước tiểu</span>
               </div>
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                1 chỉ số cần chú ý
-              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <div className="text-[10px] text-slate-400 font-semibold">
-                  Huyết sắc tố (HGB)
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  11.8 g/dL{' '}
-                  <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded ml-1">
-                    Ổn định
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-1">
-                  Khoảng chuẩn: 11.0 - 14.0 g/dL
-                </div>
+            {recordedLabs.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {recordedLabs.map((lab) => (
+                  <div
+                    key={lab.code}
+                    className={`p-3 rounded-xl border ${
+                      lab.isAbnormal
+                        ? 'border-amber-300 bg-amber-50/60'
+                        : 'border-slate-200 bg-slate-50/60'
+                    }`}
+                  >
+                    <div className="text-[10px] text-slate-500 font-semibold">
+                      {lab.label}
+                    </div>
+                    <div className="text-sm font-bold text-slate-900 mt-0.5">
+                      {lab.value} {lab.unit}
+                    </div>
+                    {lab.normalRange && (
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        Ngưỡng chuẩn: {lab.normalRange}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <div className="text-[10px] text-slate-400 font-semibold">
-                  Đường huyết đói (Glucose)
-                </div>
-                <div className="text-sm font-bold text-slate-900 mt-0.5">
-                  5.4 mmol/L{' '}
-                  <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded ml-1">
-                    Bình thường
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-1">
-                  Khoảng chuẩn: 4.1 - 5.6 mmol/L
-                </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500">
+                Chưa ghi nhận chỉ số xét nghiệm sinh hóa / nước tiểu trên phiếu này.
               </div>
-
-              <div className="p-3 rounded-xl border border-amber-300 bg-amber-50/60">
-                <div className="text-[10px] text-amber-900 font-semibold">
-                  Protein nước tiểu (Que nhúng)
-                </div>
-                <div className="text-sm font-bold text-amber-950 mt-0.5">
-                  0.15 g/L{' '}
-                  <span className="text-[10px] font-bold text-amber-900 bg-amber-200 px-1.5 py-0.5 rounded ml-1">
-                    Vết nhẹ - Theo dõi
-                  </span>
-                </div>
-                <div className="text-[10px] text-amber-800 mt-1">
-                  Ngưỡng chuẩn: &lt; 0.1 g/L
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* 4. Cảnh báo lâm sàng RACA-Net */}
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-xs space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span className="font-bold text-amber-900 uppercase">
-                  Lưu ý lâm sàng (Mức cam) - RACA-Net AI
-                </span>
-              </div>
-              <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
-                AI Sàng lọc sớm
-              </span>
-            </div>
-            <p className="text-slate-800 leading-relaxed font-medium">
-              Chu vi vòng bụng (AC) đạt 268 mm (Bách phân vị: P8), giảm tốc độ tăng trưởng rõ rệt so với mốc 28 tuần (P25). Đề xuất bác sĩ đánh giá bổ sung siêu âm Doppler động mạch rốn và động mạch não giữa để sàng lọc nguy cơ thai chậm tăng trưởng trong tử cung (FGR) thể bất đối xứng.
-            </p>
-          </div>
-
-          {/* 5. KẾT LUẬN & DẶN DÒ ĐIỀU TRỊ CỦA BÁC SĨ (CRITICAL SECTION) */}
+          {/* 4. KẾT LUẬN & DẶN DÒ ĐIỀU TRỊ CỦA BÁC SĨ */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
             <div className="flex items-center gap-2 text-slate-900 font-bold uppercase tracking-wider">
               <Stethoscope className="w-4 h-4 text-[#275248]" />
@@ -418,17 +391,9 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="space-y-1.5 text-slate-800 leading-relaxed pl-1">
-                <p>
-                  <strong>1. Tình trạng thai:</strong> Một thai sống trong tử cung {visit.gestational_age.weeks} tuần ngôi đầu, phát triển phù hợp tuần tuổi, nước ối và bánh nhau bình thường.
-                </p>
-                <p>
-                  <strong>2. Lưu ý y mẹ:</strong> Có vết protein niệu nhẹ (0.15 g/L). Huyết áp hiện tại ổn định ({bp}). Đã nghị đo HA tại nhà 2 lần/ngày sáng - tối.
-                </p>
-                <p>
-                  <strong>3. Hẹn tái khám:</strong> Sau 2 tuần (hoặc khám ngay nếu xuất hiện triệu chứng đau đầu, hoa mắt, phù chân).
-                </p>
-              </div>
+              <p className="text-slate-500 italic pl-1">
+                Chưa có kết luận hoặc lời dặn dò từ bác sĩ cho lần khám này.
+              </p>
             )}
           </div>
         </div>
@@ -439,13 +404,15 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             Mã định danh bản ghi: {visit.id}
           </span>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowOriginalDoc(true)}
-              className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
-            >
-              Xem tài liệu scan gốc
-            </button>
+            {documentData && (
+              <button
+                type="button"
+                onClick={() => setShowOriginalDoc(true)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
+              >
+                Xem tài liệu scan gốc
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -458,14 +425,14 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
       </div>
 
       {/* Modal View Original Document */}
-      {showOriginalDoc && (
+      {showOriginalDoc && documentData && (
         <div className="fixed inset-0 z-60 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl h-[88vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#275248]" />
                 <span className="text-xs font-bold text-slate-800">
-                  Tài liệu gốc lần khám {formattedDate}: {mockDocData.fileName}
+                  Tài liệu gốc lần khám {formattedDate}: {documentData.fileName}
                 </span>
               </div>
               <button
@@ -478,7 +445,7 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             </div>
             <div className="flex-1 p-2 bg-slate-100 overflow-hidden">
               <DocumentViewer
-                data={mockDocData}
+                data={documentData}
                 patientName={patientName}
               />
             </div>
