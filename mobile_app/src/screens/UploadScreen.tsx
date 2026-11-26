@@ -2583,61 +2583,61 @@ export default function UploadScreen({ navigation }: Props) {
               </Text>
             </View>
             <View style={{ width: 40 }} />
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    backgroundColor: '#1E293B',
-  },
-  modalPdfTitle: { fontSize: 13, fontWeight: '800', color: colors.white },
-  modalPdfHint: { fontSize: 11, color: '#CBD5E1', marginTop: 4, lineHeight: 15 },
-  modalScrollContent: { padding: 16, paddingBottom: 24 },
-  doctorBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    marginBottom: 10,
-  },
-  doctorBannerText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
-  fixedDisclaimerBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    backgroundColor: '#F1F5F9',
-    padding: 9,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    marginBottom: 12,
-  },
-  fixedDisclaimerText: {
-    flex: 1,
-    fontSize: 10.5,
-    lineHeight: 15,
-    color: '#334155',
-    fontWeight: '600',
-  },
-  weekEditorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#CCFBF1',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#14B8A6',
-    marginBottom: 12,
-  },
-  weekEditorLabel: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0F766E',
-    flex: 1,
-    marginRight: 8,
-  },
+          </View>
+
+          {verifyModalItem && verifyModalItem.analysis && (
+            <KeyboardAvoidingView
+              style={[styles.flex, { backgroundColor: theme.background }]}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+              <View style={[styles.splitTopPane, zoomSlipImage && styles.splitTopPaneExpanded]}>
+                <View style={styles.splitTopBar}>
+                  <View style={styles.slipPreviewTitleRow}>
+                    <Ionicons name="document-text-outline" size={15} color={colors.white} />
+                    <Text style={[styles.splitTopBarTitle, fontStyle(13, { min: 12 })]} numberOfLines={1}>
+                      {copy.originalPrefix}: {decodeFileName(verifyModalItem.name, lang)}
+                    </Text>
+                  </View>
+                  {isImageItem(verifyModalItem) && (
+                    <Pressable
+                      style={styles.zoomToggleBtn}
+                      onPress={() => setZoomSlipImage((z) => !z)}
+                    >
+                      <Ionicons
+                        name={zoomSlipImage ? 'contract-outline' : 'expand-outline'}
+                        size={14}
+                        color={colors.white}
+                      />
+                      <Text style={[styles.zoomToggleText, fontStyle(12, { min: 11, max: 14 })]}>
+                        {zoomSlipImage ? copy.zoomOut : copy.zoomIn}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {(verifyModalItem.presignedUrl || verifyModalItem.uri) &&
+                isImageItem(verifyModalItem) ? (
+                  <ScrollView
+                    maximumZoomScale={3}
+                    minimumZoomScale={1}
+                    contentContainerStyle={styles.slipImageScroll}
+                  >
+                    <Image
+                      source={{ uri: verifyModalItem.presignedUrl || verifyModalItem.uri }}
+                      style={[
+                        styles.modalSlipImage,
+                        zoomSlipImage && { height: 320 },
+                      ]}
+                      resizeMode="contain"
+                    />
+                  </ScrollView>
+                ) : (
+                  <View style={styles.modalPdfSummaryPane}>
+                    <Ionicons name="document-attach" size={28} color="#F87171" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modalPdfTitle, fontStyle(14, { min: 13 })]} numberOfLines={1}>
+                        {decodeFileName(verifyModalItem.name, lang)}
+                      </Text>
   weekStepper: {
     flexDirection: 'row',
     alignItems: 'center',
