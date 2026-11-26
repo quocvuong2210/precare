@@ -159,11 +159,13 @@ def create_checkup(
     payload: CreateCheckupRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RoleChecker(["doctor"]))
+    current_user: User = Depends(RoleChecker(["doctor", "pregnant_woman"]))
 ):
     """
     Ghi nhận một lần khám thai mới (Visit) kèm các chỉ số sinh hiệu và sinh trắc học siêu âm.
-    Chỉ dành cho Bác sĩ (Role: doctor). Tuổi thai gt được tính tự động từ EDD của thai kỳ.
+    - Bác sĩ (Role: doctor): Ghi nhận lượt khám chính thức (status = 'verified').
+    - Thai phụ (Role: pregnant_woman): Gửi kết quả nhập tay tự khai báo (status = 'pending_verification').
+    Tuổi thai gt được tính tự động từ EDD của thai kỳ theo chuẩn lâm sàng ACOG.
     """
     # 1. Kiểm tra hồ sơ thai kỳ hợp lệ và chưa bị xóa
     profile = db.query(PregnancyProfile).filter(
@@ -177,13 +179,47 @@ def create_checkup(
             detail="Không tìm thấy hồ sơ thai kỳ hoặc hồ sơ đã bị xóa."
         )
 
-    # 2. Tự động tính tuổi thai gt
+    # Nếu là thai phụ, bắt buộc hồ sơ phải thuộc về chính tài khoản đó
+    if current_user.role == "pregnant_woman" and profile.patient_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền thêm lần khám cho hồ sơ thai kỳ này."
+        )
+
+    # 2. Xác định bác sĩ phụ trách (doctor_id) & trạng thái sinh trắc học
+    if current_user.role == "doctor":
+        assigned_doctor_id = current_user.id
+        bio_status = "verified"
+        bio_verified_by = current_user.id
+        action_name = "CREATE_CHECKUP"
+        success_message = "Ghi nhận lần khám thành công"
+    else:
+        # Trường hợp Thai phụ nhập tay kết quả
+        assigned_doctor_id = profile.primary_doctor_id
+        if not assigned_doctor_id:
+            # Fallback về bác sĩ khả dụng đầu tiên trong cơ sở y tế
+            fallback_doc = db.query(User).filter(User.role == "doctor", User.is_active == True).first()
+            if not fallback_doc:
+                fallback_doc = db.query(User).filter(User.role == "doctor").first()
+            if fallback_doc:
+                assigned_doctor_id = fallback_doc.id
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Hệ thống chưa có bác sĩ để tiếp nhận phiếu khám này."
+                )
+        bio_status = "pending_verification"
+        bio_verified_by = None
+        action_name = "SUBMIT_MANUAL_CHECKUP"
+        success_message = "Đã gửi kết quả khám thành công. Dữ liệu đang chờ bác sĩ xác nhận."
+
+    # 3. Tự động tính tuổi thai gt
     ga_info = calculate_gestational_age_from_edd(profile.edd, payload.checkup_date)
 
-    # 3. Tạo bản ghi checkup
+    # 4. Tạo bản ghi checkup
     new_checkup = Checkup(
         pregnancy_profile_id=profile.id,
-        doctor_id=current_user.id,
+        doctor_id=assigned_doctor_id,
         checkup_date=payload.checkup_date,
         gestational_age_days=ga_info.days,
         weight_kg=Decimal(str(payload.weight_kg)) if payload.weight_kg is not None else None,
@@ -193,8 +229,7 @@ def create_checkup(
     )
     db.add(new_checkup)
     db.flush()  # Sinh ID cho checkup
-
-    # 4. Lưu chỉ số sinh trắc học (nếu có)
+    # 5. Lưu chỉ số sinh trắc học (nếu có)
     bio_response = None
     if payload.biometrics:
         b = payload.biometrics
@@ -207,8 +242,8 @@ def create_checkup(
             ac=Decimal(str(b.ac)) if b.ac is not None else None,
             fl=Decimal(str(b.fl)) if b.fl is not None else None,
             efw=Decimal(str(b.efw)) if b.efw is not None else None,
-            status="verified",
-            verified_by=current_user.id
+            status=bio_status,
+            verified_by=bio_verified_by
         )
         db.add(bio)
         db.flush()
@@ -226,11 +261,11 @@ def create_checkup(
     db.commit()
     db.refresh(new_checkup)
 
-    # 5. Ghi vết kiểm toán (Audit Trail)
+    # 6. Ghi vết kiểm toán (Audit Trail)
     log_audit_event(
         db=db,
         user_id=current_user.id,
-        action="CREATE_CHECKUP",
+        action=action_name,
         target_table="checkups",
         target_id=new_checkup.id,
         request=request
@@ -238,12 +273,20 @@ def create_checkup(
 
     bp_status = evaluate_blood_pressure(new_checkup.blood_pressure_systolic, new_checkup.blood_pressure_diastolic)
 
+    doctor_info = DoctorSummary(
+        id=new_checkup.doctor.id,
+        full_name=new_checkup.doctor.full_name
+    ) if new_checkup.doctor else DoctorSummary(
+        id=current_user.id,
+        full_name=current_user.full_name
+    )
+
     return CheckupResponse(
         success=True,
         data=CheckupDetailData(
             id=new_checkup.id,
             pregnancy_profile_id=new_checkup.pregnancy_profile_id,
-            doctor=DoctorSummary(id=current_user.id, full_name=current_user.full_name),
+            doctor=doctor_info,
             checkup_date=new_checkup.checkup_date,
             gestational_age=ga_info,
             vitals=MaternalVitalsResponse(
@@ -256,5 +299,5 @@ def create_checkup(
             biometric_data=bio_response,
             created_at=new_checkup.created_at
         ),
-        message="Ghi nhận lần khám thành công"
+        message=success_message
     )
