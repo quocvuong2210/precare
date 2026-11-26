@@ -2528,61 +2528,61 @@ export default function UploadScreen({ navigation }: Props) {
               </View>
             );
           })
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-  },
-  manualButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+        )}
 
-  modalScreen: { flex: 1, backgroundColor: '#F5F8FA' },
-  modalHeader: {
-    height: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  modalHeaderTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
-  modalHeaderSub: { fontSize: 10.5, color: '#64748B', marginTop: 2 },
-  splitTopPane: {
-    backgroundColor: '#0F172A',
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary,
-  },
-  splitTopPaneExpanded: { maxHeight: 360 },
-  splitTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#1E293B',
-  },
-  splitTopBarTitle: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: colors.white,
-    flex: 1,
-  },
-  zoomToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  zoomToggleText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  slipImageScroll: { alignItems: 'center', justifyContent: 'center', padding: 8 },
-  modalSlipImage: { width: '100%', height: 175, borderRadius: 8 },
-  modalPdfSummaryPane: {
-    flexDirection: 'row',
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('ManualResultEntry')}
+          style={({ pressed }) => [
+            styles.manualButton,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Ionicons name="create-outline" size={18} color={theme.tealText} />
+          <Text style={[styles.manualButtonText, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]}>
+            {copy.manualEntryBtn}
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      {/* MODAL MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU */}
+      <Modal
+        visible={verifyModalItem !== null}
+        animationType="slide"
+        onRequestClose={() => {
+          setVerifyModalItem(null);
+          setIsModalEditing(false);
+        }}
+      >
+        <SafeAreaView
+          style={[styles.modalScreen, { backgroundColor: theme.background }]}
+          edges={['top', 'bottom']}
+        >
+          <View
+            style={[
+              styles.modalHeader,
+              { backgroundColor: theme.surface, borderBottomColor: theme.border },
+            ]}
+          >
+            <Pressable
+              style={[styles.headerButton, { backgroundColor: theme.surfaceAlt }]}
+              onPress={() => {
+                setVerifyModalItem(null);
+                setIsModalEditing(false);
+              }}
+            >
+              <Ionicons name="close" size={20} color={theme.text} />
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+              <Text style={[styles.modalHeaderTitle, fontStyle(16, { max: 19 }), { color: theme.text }]}>
+                {copy.modalHeaderTitle}
+              </Text>
+              <Text style={[styles.modalHeaderSub, fontStyle(12, { lineHeight: 17, min: 11 }), { color: theme.textSecondary }]}>
+                {isModalEditing ? copy.modalHeaderSubEdit : copy.modalHeaderSubView}
+              </Text>
+            </View>
+            <View style={{ width: 40 }} />
     alignItems: 'center',
     gap: 12,
     padding: 14,
