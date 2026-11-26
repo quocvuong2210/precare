@@ -2748,28 +2748,90 @@ export default function UploadScreen({ navigation }: Props) {
                         ]}
                         value={draftWeek}
                         onChangeText={setDraftWeek}
-  toggleEditModalBtnActive: {
-    backgroundColor: '#0F766E',
-    borderColor: '#0F766E',
-  },
-  toggleEditModalBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.primaryDark,
-  },
-  confirmModalBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    paddingVertical: 13,
-    borderRadius: 10,
-  },
-  confirmModalBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.white,
-  },
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                      <Pressable
+                        style={[
+                          styles.weekStepBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.border },
+                        ]}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
+                        }
+                      >
+                        <Ionicons name="add" size={16} color={theme.text} />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+
+                <Text style={[styles.modalSectionLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                  {copy.modalSectionLabel(verifyModalItem.analysis.metrics.length)}
+                </Text>
+
+                {verifyModalItem.analysis.metrics.map((m) => {
+                  const currentVal = draftMetrics[m.key] ?? m.value;
+                  const liveEval = evaluateMetricByWeek(
+                    m.key,
+                    currentVal,
+                    activeModalWeek,
+                    lang
+                  );
+                  const mTheme = severityTheme[liveEval.severity];
+
+                  return (
+                    <View
+                      key={m.key}
+                      style={[
+                        styles.verifyMetricCard,
+                        {
+                          backgroundColor: mTheme.cardBg,
+                          borderColor: isModalEditing ? colors.primary : mTheme.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.metricTopRow}>
+                        <Text style={[styles.verifyMetricLabel, fontStyle(14, { lineHeight: 20, min: 13 }), { color: theme.text }]}>
+                          {localizeMetricLabel(m.key, m.label, lang)}
+                        </Text>
+                        <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
+                          <Text style={[styles.severityPillText, fontStyle(11.5, { min: 10.5, max: 13 }), { color: mTheme.badgeColor }]}>
+                            {mTheme.badgeLabel}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {isModalEditing ? (
+                        <View style={styles.verifyInputRow}>
+                          <TextInput
+                            style={[
+                              styles.verifyInput,
+                              fontStyle(16, { min: 15 }),
+                              { backgroundColor: theme.surface, color: mTheme.valueColor },
+                            ]}
+                            value={currentVal}
+                            onChangeText={(text) =>
+                              setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
+                            }
+                            placeholder={copy.enterValuePlaceholder}
+                            placeholderTextColor={theme.muted}
+                          />
+                          {!!m.unit && (
+                            <Text style={[styles.verifyUnitText, fontStyle(13.5, { min: 12.5 }), { color: theme.textSecondary }]}>
+                              {m.unit}
+                            </Text>
+                          )}
+                        </View>
+                      ) : (
+                        <View
+                          style={[
+                            styles.readOnlyValueBox,
+                            { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                          ]}
+                        >
+                          <Text style={[styles.readOnlyValueText, fontStyle(16, { min: 15 }), { color: mTheme.valueColor }]}>
+                            {currentVal} {m.unit}
+                          </Text>
+                        </View>
 });
