@@ -823,61 +823,61 @@ export async function updateLocalUserAccount(
   await AsyncStorage.setItem('precare_current_user', JSON.stringify(nextUser));
 
   const overrideKey = getAccountOverrideKey(baseUser || nextUser);
-  }
-  if (payload.q1_gestational_days !== undefined) {
-    requestBody.q1_gestational_days = payload.q1_gestational_days;
-  }
-  if (payload.crl_mm !== undefined) requestBody.crl_mm = payload.crl_mm;
-  if (payload.override_edd) {
-    requestBody.override_edd = payload.override_edd;
-  } else if (!payload.lmp && !payload.q1_ultrasound_date && payload.edd) {
-    requestBody.override_edd = payload.edd;
-  }
-
-  let res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!res.ok && (res.status === 400 || res.status === 409)) {
-    const existingProfile = await fetchPregnancyProfileFromDB(authToken);
-    const existingId =
-      existingProfile?.id || (await AsyncStorage.getItem('precare_pregnancy_profile_id'));
-    if (existingId) {
-      const { calculation_method: _method, ...updateBody } = requestBody;
-      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ ...updateBody, recalculate_edd: true }),
-      });
-    }
+  if (overrideKey) {
+    await AsyncStorage.setItem(
+      overrideKey,
+      JSON.stringify({
+        full_name: nextUser.full_name,
+        phone_number: nextUser.phone_number,
+        email: nextUser.email,
+      })
+    );
   }
 
-  const savedData = await handleResponse(res);
-  const savedId = extractProfileUuid(savedData);
-  if (savedId) {
-    await AsyncStorage.setItem('precare_pregnancy_profile_id', savedId);
+  const rememberedEmail = await SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY).catch(() => null);
+  if (rememberedEmail && nextUser.email) {
+    await SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, nextUser.email).catch(() => {});
   }
-  return savedData;
+
+  return nextUser;
 }
 
-// Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
-export async function fetchPregnancyProfileFromDB(
-  token?: string,
-  options: { throwOnError?: boolean } = {}
-): Promise<any> {
-  const authToken =
-    token || currentAccessToken || (await getStoredAccessToken()) || '';
-  if (!authToken) {
-    if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
-    return null;
+export async function requestPregnancyDeletion(
+  reason: string,
+  allowResearch: boolean
+): Promise<string> {
+  if (reason.trim().length < 10) {
+    throw new Error('Lý do cần có ít nhất 10 ký tự.');
+  }
+  if (!currentAccessToken) await restoreSession();
+  if (!currentAccessToken) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
   }
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    Authorization: `Bearer ${authToken}`,
-  };
+  const profile = await fetchPregnancyProfileFromDB(currentAccessToken);
+  const profileId = profile?.id ? String(profile.id).trim() : '';
+  if (!profileId) {
+    throw new Error('Không tìm thấy hồ sơ thai kỳ hiện tại để gửi yêu cầu xóa.');
+  }
+
+  const result = await medicalRequest('/deletion-requests', {
+    pregnancy_profile_id: profileId,
+    checkup_id: null,
+    target_type: 'full_profile',
+    reason: reason.trim(),
+    allow_anonymized_research: allowResearch,
+  });
+
+  if (!result?.success || result?.data?.status !== 'pending' || !result?.data?.request_id) {
+    throw new Error(
+      'Chưa xác nhận được yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi gửi lại.'
+    );
+  }
+  return result.data.request_id;
+}
+
+export interface PregnancyCalculateRequest {
+  target_date?: string;
 
   try {
     const res = await fetch(`${API_BASE_URL}/pregnancy-profiles/active`, {
