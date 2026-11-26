@@ -318,118 +318,67 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
 
       async function runFocusLoad() {
         const loadedUser = await loadFromDatabase();
-        const hasPregnancyInput =
-          loadedProfile.lmp ||
-          loadedProfile.q1_ultrasound_date ||
-          loadedProfile.crl_mm ||
-          loadedProfile.override_edd;
-
-        if (hasPregnancyInput) {
-          try {
-            const body: PregnancyCalculateRequest = { target_date: today };
-            if (loadedProfile.lmp) body.lmp = loadedProfile.lmp;
-            if (loadedProfile.q1_ultrasound_date) body.q1_ultrasound_date = loadedProfile.q1_ultrasound_date;
-            if (loadedProfile.q1_gestational_weeks !== '') {
-              body.q1_gestational_weeks = Number(loadedProfile.q1_gestational_weeks);
-            }
-            if (loadedProfile.q1_gestational_days !== '') {
-              body.q1_gestational_days = Number(loadedProfile.q1_gestational_days);
-            }
-            if (loadedProfile.crl_mm !== '') {
-              body.crl_mm = Number(loadedProfile.crl_mm);
-            }
-            if (loadedProfile.override_edd) {
-              body.override_edd = loadedProfile.override_edd;
-            }
-
-            const res = await calculatePregnancyProfile(body);
-            const responseData = res?.data || res;
-            const w = responseData.gestational_age?.weeks;
-            const days = responseData.gestational_age?.remaining_days ?? 0;
-            const edd = responseData.calculated_edd || responseData.override_edd;
-            const trimesterName = responseData.gestational_age?.trimester_name;
-
-            if (w !== undefined) {
-              loadedAge = `${w} tuần ${days} ngày`;
-              loadedTrimester =
-                trimesterName ||
-                (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-            }
-            if (edd) {
-              loadedDue = String(edd).slice(0, 10).split('-').reverse().join('/');
-            }
-          } catch {
-            // Giữ nguyên kết quả
-          }
-        }
-
         if (!isActive) return;
 
-        setProfile(loadedProfile);
-        setDraft(loadedProfile);
-        setTrimester(loadedTrimester);
-        setGestationalAge(loadedAge);
-        setDueDate(loadedDue);
-        setContacts(loadedContacts);
-
-        const section = route.params?.section;
-        if (section === 'personal') {
+        if (route.params?.section === 'personal') {
+          setAccountDraft(emptyAccountFields(loadedUser));
           setError('');
-          setEditor('personal');
-          navigation.setParams({ section: undefined });
-        } else if (section === 'contacts') {
-          setContactsVisible(true);
+          setAccountEditorOpen(true);
           navigation.setParams({ section: undefined });
         }
       }
 
-      loadCurrentAccountData();
+      void runFocusLoad();
 
       return () => {
         isActive = false;
       };
-    }, [navigation, route.params?.section]),
+    }, [loadFromDatabase, navigation, route.params?.section]),
   );
 
-  const openEditor = (section: Editor) => {
-    setDraft({
-      ...profile,
-      target_date: getTodayISO(),
-    });
+  const openAccountEditor = () => {
+    setAccountDraft(emptyAccountFields(account));
     setError('');
-    setEditor(section);
+    setAccountEditorOpen(true);
   };
 
-  const handleContactsChange = (nextContacts: EmergencyContact[]) => {
-    setContacts(nextContacts);
-    persistAccountData(profile, trimester, gestationalAge, dueDate, nextContacts);
-    Alert.alert('Thành công', 'Đã cập nhật danh sách liên hệ khẩn cấp.');
-  };
+  const saveAccount = async () => {
+    if (saving) return;
 
-  const save = async () => {
-    const today = getTodayISO();
-    const next = Object.fromEntries(
-      Object.entries(draft).map(([key, value]) => [
-        key,
-        String(value || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim(),
-      ]),
-    ) as Profile;
+    const fullName = accountDraft.full_name.trim();
+    const phone = accountDraft.phone_number.trim();
+    const email = accountDraft.email.trim().toLowerCase();
 
-    next.target_date = today;
+    if (!fullName) {
+      setError(isEn ? 'Please enter your full name.' : 'Vui lòng nhập họ và tên.');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+      setError(isEn ? 'Invalid email address. Please check again.' : 'Email không hợp lệ. Vui lòng kiểm tra lại.');
+      return;
+    }
+    if (phone && !PHONE_PATTERN.test(phone)) {
+      setError(isEn ? 'Invalid phone number (9–20 characters).' : 'Số điện thoại không hợp lệ (từ 9 đến 20 ký tự số).');
+      return;
+    }
 
-    let nextTrimester = trimester;
-    let nextGestationalAge = gestationalAge;
-    let nextDueDate = dueDate;
+    const oldStorageKey = getStorageKey(account?.email, account?.id);
+    setSaving(true);
+    setError('');
+    try {
+      const updatedUser = await updateLocalUserAccount({
+        full_name: fullName,
+        phone_number: phone || null,
+        email,
+      });
+      setAccount(updatedUser);
 
-    if (editor === 'personal') {
-      const isoDate = /^\d{4}-\d{2}-\d{2}$/;
-      for (const k of ['lmp', 'q1_ultrasound_date', 'override_edd'] as const) {
-        if (next[k]) {
-          next[k] = normalizeIsoDate(next[k]);
-          if (!isoDate.test(next[k])) {
-            setError('Ngày thai kỳ phải theo định dạng YYYY-MM-DD (VD: 2026-05-01).');
-            return;
-          }
+      const newStorageKey = getStorageKey(updatedUser.email, updatedUser.id);
+      if (oldStorageKey !== newStorageKey) {
+        const cached = await AsyncStorage.getItem(oldStorageKey).catch(() => null);
+        if (cached) {
+          await AsyncStorage.setItem(newStorageKey, cached).catch(() => {});
+          await AsyncStorage.removeItem(oldStorageKey).catch(() => {});
         }
       }
 
