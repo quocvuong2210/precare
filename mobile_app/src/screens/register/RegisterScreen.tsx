@@ -14,7 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../navigation/AppNavigator";
-
+import ScreenHeader from "../../components/ScreenHeader";
+import { useAppSettings } from "../../context/AppSettingsContext";
 import { sendOtp } from "../../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
@@ -22,6 +23,8 @@ type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 const PRIMARY = "#0D9488";
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === "en";
   const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -30,28 +33,25 @@ export default function RegisterScreen({ navigation }: Props) {
     const role = "pregnant_woman";
 
     if (!email) {
-      Alert.alert("Thông báo", "Vui lòng nhập email.");
-      return;
-    }
-
-    // 1. Kiểm tra email
-    if (!email) {
-      Alert.alert("Thông báo", "Vui lòng nhập email.");
+      Alert.alert(
+        isEn ? "Notice" : "Thông báo",
+        isEn ? "Please enter your email." : "Vui lòng nhập email.",
+      );
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng địa chỉ email.");
+      Alert.alert(
+        isEn ? "Invalid email" : "Email không hợp lệ",
+        isEn ? "Please enter a valid email address." : "Vui lòng nhập đúng địa chỉ email.",
+      );
       return;
     }
 
-    // 2. Ngăn gọi API nhiều lần
     if (loading) return;
 
     try {
       setLoading(true);
-
-      // 3. Chỉ gọi API gửi OTP MỘT LẦN
       const result = await sendOtp(email, role);
 
       console.log("Gửi OTP thành công:", result.message);

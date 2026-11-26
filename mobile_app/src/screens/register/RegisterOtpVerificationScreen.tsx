@@ -493,6 +493,98 @@ const styles = StyleSheet.create({
   },
   description: {
     marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    color: "#64748B",
+  },
+  email: {
+    marginTop: 4,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+  changeEmailButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    alignSelf: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  changeEmailText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: PRIMARY,
+  },
+  label: {
+    marginTop: 24,
+    marginBottom: 10,
+    fontSize: 14.5,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  otpContainer: {
+    position: "relative",
+    height: 54,
+  },
+  otpRow: {
+    flexDirection: "row",
+    gap: 8,
+    height: "100%",
+  },
+  otpBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#DFE8F3",
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  otpBoxFilled: {
+    borderColor: "#91D3CA",
+    backgroundColor: "#F0FDFA",
+  },
+  otpBoxActive: {
+    borderWidth: 2,
+    borderColor: PRIMARY,
+  },
+  otpDigit: {
+    fontSize: 23,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  otpInput: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+
+    opacity: 0,
+    color: "transparent",
+    backgroundColor: "transparent",
+  },
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#B45309",
+    lineHeight: 20,
+  },
+  messageError: {
+    color: "#DC2626",
+  },
+  messageSuccess: {
+    color: "#0D9488",
+  },
+  verifyButton: {
+    minHeight: 48,
+    paddingVertical: 12,
+    marginTop: 24,
+    borderRadius: 8,
     backgroundColor: PRIMARY,
     flexDirection: "row",
     alignItems: "center",
@@ -503,7 +595,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#91CEC8",
   },
   verifyText: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: "600",
     color: "#FFFFFF",
   },
@@ -519,11 +611,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   resendHint: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#64748B",
   },
+  resendButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
   resendLink: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
     color: PRIMARY,
   },
@@ -541,8 +638,8 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: "#64748B",
   },
   footer: {
@@ -555,8 +652,8 @@ const styles = StyleSheet.create({
   },
   footerText: {
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     color: "#94A3B8",
   },
 });
