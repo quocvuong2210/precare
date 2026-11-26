@@ -328,61 +328,61 @@ const UPLOAD_COPY = {
     fileTooLargeBody: 'Vui lòng chọn file tối đa 10MB.',
     uploadServerFail: 'Không thể tải tài liệu lên máy chủ.',
     uploadErrorTitle: 'Lỗi tải lên',
-    return {
-      severity: 'normal',
-      clinicalNote: `Mức Xanh (10th–90th): Đạt chuẩn Tuần ${clampedWeek} · Tháng thứ ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Thai phát triển tương xứng tuổi thai.`,
-      refRange: bounds.refRange,
-    };
-  }
-
-  if (key === 'hgb') {
-    const minHgb = trimester === 2 ? 10.5 : 11.0;
-    const refText = `${minHgb.toFixed(1)} – 14.5 g/dL (Tam cá nguyệt ${trimester})`;
-    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
-    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-
-    if (!isNaN(num)) {
-      if (num < 9.5) {
-        return {
-          severity: 'danger',
-          clinicalNote: `Mức Đỏ: Huyết sắc tố ở tháng thứ ${month} thấp (${num} < 9.5 g/dL). Mẹ nên đến gặp bác sĩ để được tư vấn chăm sóc phù hợp nhé.`,
-          refRange: refText,
-        };
-      }
-      if (num < minHgb) {
-        return {
-          severity: 'warning',
-          clinicalNote: `Mức Vàng: Huyết sắc tố hơi thấp nhẹ so với chuẩn Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Mẹ hãy tham khảo ý kiến bác sĩ nhé.`,
-          refRange: refText,
-        };
-      }
-      return {
-        severity: 'normal',
-        clinicalNote: `Đủ huyết sắc tố chuẩn Tam cá nguyệt ${trimester} (≥ ${minHgb} g/dL).`,
-        refRange: refText,
-      };
-    }
-  }
-
-  if (key === 'pro') {
-    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
-    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-    if (!isNaN(num)) {
-      if (num >= 0.3) {
-        return {
-          severity: 'danger',
-          clinicalNote: `Mức Đỏ: Đạm niệu cao (${num} g/L ≥ 0.3) ở tuần ${clampedWeek} — Mẹ nên đi khám sớm để bác sĩ kiểm tra kết hợp cùng huyết áp nhé.`,
-        };
-      }
-      if (num >= 0.15) {
-        return {
-          severity: 'warning',
-          clinicalNote: `Mức Vàng: Có vết Protein niệu (${num} g/L) ở tuần ${clampedWeek} — Mẹ nhớ uống đủ nước và theo dõi huyết áp nhé.`,
-        };
-      }
-      return {
-        severity: 'normal',
-        clinicalNote: 'Âm tính (< 0.15 g/L) — Chỉ số nước tiểu bình thường.',
+    batchUploading: (count: number) =>
+      `Đang tải lên hàng loạt ${count} phiếu khám...`,
+    batchProcessing: (completed: number, total: number, pct: number) =>
+      `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`,
+    batchDoneTitle: 'Tải hàng loạt hoàn tất',
+    batchDoneBody: (count: number) =>
+      `Đã phân tích xong ${count} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`,
+    batchErrorTitle: 'Lỗi tải hàng loạt',
+    batchErrorBody: 'Không thể tải hàng loạt lên máy chủ.',
+    retryFailMsg: 'Thử lại trích xuất thất bại.',
+    deleteTitle: 'Xoá tài liệu',
+    deleteConfirm: (name: string) =>
+      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${name}" khỏi hệ thống và Database không?`,
+    cancelBtn: 'Huỷ',
+    deleteForeverBtn: 'Xoá vĩnh viễn',
+    cannotDeleteTitle: 'Không thể xoá tài liệu',
+    cannotDeleteBody:
+      'Máy chủ không cho phép xoá tài liệu này hoặc gặp lỗi kết nối. Vui lòng thử lại.',
+    successTitle: 'Thành công',
+    deleteSuccessBody: 'Đã xoá tài liệu khỏi hệ thống và cơ sở dữ liệu.',
+    savedDbTitle: 'Đã đối chiếu & Lưu vào Database',
+    savedDbBody:
+      'Các chỉ số phiếu khám đã được xác nhận và đồng bộ trực tiếp vào cơ sở dữ liệu PostgreSQL!',
+    savedDbEndpointsLabel: 'Chi tiết kết nối Database:',
+    saveProfileErrorTitle: 'Lưu hồ sơ',
+    saveProfileFallback: 'Đã cập nhật hồ sơ. Vui lòng kiểm tra kết nối máy chủ.',
+    permissionDeniedTitle: 'Chưa cấp quyền',
+    cameraPermissionBody: 'Hãy cho phép ứng dụng dùng camera trong Cài đặt.',
+    chooserTitle: 'Tải lên phiếu khám cận lâm sàng',
+    chooserSub: 'Chọn phương thức tải lên:',
+    chooserTakePhoto: 'Chụp ảnh phiếu khám (Đơn lẻ)',
+    chooserPickImage: 'Chọn 1 ảnh từ thư viện',
+    chooserPickPdf: 'Chọn 1 file PDF / Ảnh',
+    chooserBatch: 'Tải lên hàng loạt (Batch Upload)',
+  },
+  en: {
+    defaultFileName: 'Medical report document',
+    todayPrefix: 'Today',
+    screenTitle: 'Upload & Verify Checkup Reports',
+    dropTitle: 'Take photo or upload medical report (PDF/Image)',
+    dropSub:
+      'Supports single or batch upload • Synced directly to the database',
+    uploadSingle: 'Single upload',
+    uploadBatch: 'Batch upload',
+    savedSectionTitle: (count: number) => `Saved Documents & Results (${count})`,
+    syncingText: 'Syncing document list from database...',
+    emptyText:
+      'No reports uploaded yet. Take a photo, upload a PDF, or tap "Enter results manually".',
+    taskPrefix: 'Task',
+    analyzingQueue: 'Analyzing in Celery Queue...',
+    extractFailedDefault: 'Celery extraction was interrupted.',
+    retryExtractBtn: 'Retry extraction',
+    removeFileBtn: 'Delete file',
+    slipImageHeader: 'Original report photo',
+    slipDocHeader: 'Original report document',
       };
     }
     if (lower.includes('++') || lower.includes('+++')) {
