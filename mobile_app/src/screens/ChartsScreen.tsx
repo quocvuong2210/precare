@@ -165,55 +165,108 @@ export default function ChartsScreen({ navigation }: BottomTabScreenProps<MainTa
   const metricTitle = isEn ? metric.titleEn : metric.titleVi;
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={s.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Về trang chủ" style={s.headerButton} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="arrow-back" size={20} color={colors.textMuted} />
-        </Pressable>
-        <Text style={s.headerTitle}>Biểu đồ tăng trưởng</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Thông tin biểu đồ" style={s.headerButton} onPress={() => setShowInfo(true)}>
-          <Ionicons name="ellipsis-vertical" size={21} color={colors.textMuted} />
-        </Pressable>
-      </View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-        <View style={s.selector}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Chọn chỉ số tăng trưởng" accessibilityState={{ expanded }} style={s.selectorButton} onPress={() => setExpanded(!expanded)}>
-            <Text style={s.selectorText}>{metric.label}</Text>
-            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={colors.textMuted} />
+    <SafeAreaView style={[s.container, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Growth Charts' : 'Biểu đồ tăng trưởng'}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+        backLabel={isEn ? 'Go back' : 'Quay lại'}
+        rightIcon="ellipsis-vertical"
+        onRightPress={() => setShowInfo(true)}
+        rightAccessibilityLabel={isEn ? 'Chart info' : 'Thông tin biểu đồ'}
+      />
+      <ScrollView style={{ backgroundColor: theme.background }} showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
+        <View style={{ backgroundColor: theme.surface }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isEn ? 'Select growth metric' : 'Chọn chỉ số tăng trưởng'}
+            accessibilityState={{ expanded }}
+            style={[s.selectorButton, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+            onPress={() => setExpanded(!expanded)}
+          >
+            <Text style={[s.selectorText, fontStyle(15, { min: 14 }), { color: theme.text }]}>{metricLabel}</Text>
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={theme.muted} />
           </Pressable>
-          {expanded && metrics.filter((item) => item.id !== metric.id).map((item) => (
-            <Pressable key={item.id} accessibilityRole="button" style={s.option} onPress={() => { setMetric(item); setExpanded(false); }}>
-              <Text style={s.selectorText}>{item.label}</Text>
-            </Pressable>
-          ))}
+          {expanded &&
+            METRIC_ITEMS.filter((item) => item.id !== metric.id).map((item) => (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                style={s.option}
+                onPress={() => {
+                  setMetric(item);
+                  setExpanded(false);
+                }}
+              >
+                <Text style={[s.selectorText, fontStyle(15, { min: 14 }), { color: theme.text }]}>
+                  {isEn ? item.labelEn : item.labelVi}
+                </Text>
+              </Pressable>
+            ))}
         </View>
 
         <View style={s.body}>
-          <View style={s.card}>
+          <View style={[s.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={s.cardHeader}>
               <View style={s.flex}>
-                <Text style={s.cardTitle}>{metric.title}</Text>
-                <Text style={s.subtitle}>So sánh với khoảng tham chiếu minh họa</Text>
+                <Text style={[s.cardTitle, fontStyle(16, { lineHeight: 22, min: 14.5 }), { color: theme.text }]}>
+                  {metricTitle}
+                </Text>
               </View>
-              <Text accessibilityLiveRegion="polite" style={s.valueBadge}>~{value}{metric.unit}</Text>
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[
+                  s.valueBadge,
+                  fontStyle(14, { min: 13, max: 16.5 }),
+                  { color: theme.tealText, backgroundColor: theme.tealSoft },
+                ]}
+              >
+                ~{value}{metric.unit}
+              </Text>
             </View>
             <GrowthChart metric={metric} selected={selected} onSelect={setSelected} />
             <View style={s.legend}>
-              <View style={s.legendItem}><View style={s.legendBox} /><Text style={s.legendText}>Khoảng minh họa</Text></View>
-              <View style={s.legendItem}><View style={s.legendLine} /><Text style={s.legendText}>Chỉ số của bé</Text></View>
+              <View style={s.legendItem}>
+                <View style={[s.legendBox, { backgroundColor: theme.tealSoft }]} />
+                <Text style={[s.legendText, fontStyle(12.5, { min: 11.5 }), { color: theme.muted }]}>
+                  {isEn ? 'Reference band' : 'Khoảng minh họa'}
+                </Text>
+              </View>
+              <View style={s.legendItem}>
+                <View style={s.legendLine} />
+                <Text style={[s.legendText, fontStyle(12.5, { min: 11.5 }), { color: theme.muted }]}>
+                  {isEn ? 'Baby metrics' : 'Chỉ số của bé'}
+                </Text>
+              </View>
             </View>
           </View>
 
-          <View style={[s.card, s.explanation]}>
-            <Text style={s.cardTitle}>Chuyên gia PreCare giải thích:</Text>
-            <Text style={s.explanationText}>
-              Ở tuần {weeks[selected]}, {metric.label.toLowerCase()} trong ví dụ là {value} {metric.unit}. Chạm vào các mốc trên biểu đồ để xem sự thay đổi theo từng tuần, hoặc chọn chỉ số khác ở phía trên.
+          <View style={[s.card, s.explanation, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[s.cardTitle, fontStyle(16, { lineHeight: 22, min: 14.5 }), { color: theme.text }]}>
+              {isEn ? 'PreCare Clinical Notes:' : 'Chuyên gia PreCare giải thích:'}
             </Text>
-            <Text style={s.explanationText}>Đây là dữ liệu minh họa giao diện. Cần có kết quả khám và khoảng tham chiếu đã được xác thực để đánh giá tăng trưởng của bé.</Text>
+            <Text style={[s.explanationText, fontStyle(15, { lineHeight: 23, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? `At week ${weeks[selected]}, the illustrative ${metricLabel.toLowerCase()} is ${value} ${metric.unit}. Tap points on the chart to inspect weekly changes or choose another metric above.`
+                : `Ở tuần ${weeks[selected]}, ${metricLabel.toLowerCase()} trong ví dụ là ${value} ${metric.unit}. Chạm vào các mốc trên biểu đồ để xem sự thay đổi theo từng tuần, hoặc chọn chỉ số khác ở phía trên.`}
+            </Text>
+            <Text style={[s.explanationText, fontStyle(15, { lineHeight: 23, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'This chart displays illustrative interface data. Confirmed checkup records and validated percentile ranges are required for clinical growth assessment.'
+                : 'Đây là dữ liệu minh họa giao diện. Cần có kết quả khám và khoảng tham chiếu đã được xác thực để đánh giá tăng trưởng của bé.'}
+            </Text>
           </View>
-          <Text style={s.footnote}>* Khuyến cáo: Các chỉ số và thông số chỉ mang tính chất tham khảo dựa trên kết quả siêu âm định kỳ, không thay thế cho tư vấn trực tiếp của bác sĩ sản khoa phụ trách.</Text>
-          <View style={s.demoNote}><Ionicons name="information-circle-outline" size={15} color={colors.textMuted} /><Text style={s.demoText}>Dữ liệu minh họa · Chưa kết nối hồ sơ khám</Text></View>
+          <Text style={[s.footnote, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.muted }]}>
+            {isEn
+              ? '* Disclaimer: Reference curves and figures are informational only and do not replace direct consultation with your obstetrician.'
+              : '* Khuyến cáo: Các chỉ số và thông số chỉ mang tính chất tham khảo dựa trên kết quả siêu âm định kỳ, không thay thế cho tư vấn trực tiếp của bác sĩ sản khoa phụ trách.'}
+          </Text>
+          <View style={s.demoNote}>
+            <Ionicons name="information-circle-outline" size={15} color={theme.muted} />
+            <Text style={[s.demoText, fontStyle(12.5, { min: 11.5 }), { color: theme.muted }]}>
+              {isEn ? 'Illustrative data · Not linked to checkup records' : 'Dữ liệu minh họa · Chưa kết nối hồ sơ khám'}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
