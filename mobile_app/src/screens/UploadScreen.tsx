@@ -1373,61 +1373,61 @@ export default function UploadScreen({ navigation }: Props) {
           const mappedStatus: Status =
             rawStatus === 'failed' || rawStatus === 'failure' || rawStatus === 'error'
               ? 'failed'
+              : rawStatus === 'processing' || rawStatus === 'queued' || rawStatus === 'started'
+              ? 'processing'
+              : rawStatus === 'confirmed' || rawStatus === 'done' || rawStatus === 'completed'
+              ? 'done'
+              : 'pending';
 
-    updateItemsAndPersist((prev) =>
-      prev.map((it) =>
-        it.id === item.id ? { ...it, status: 'processing', errorMessage: undefined } : it
-      )
-    );
+          const parsedAnalysis =
+            parseBackendIngestResult(rf, fName, safeWeek, activeLang) ||
+            existing?.analysis ||
+            buildDefaultExtractedAnalysis(fName, safeWeek, activeLang);
 
-    try {
-      const retryRes: any = await retryIngestFile(fId);
-      const retryData: any = retryRes?.data;
-      const newTaskId =
-        typeof retryData === 'string' && retryData.length > 0
-          ? retryData
-          : retryData?.task_id || item.taskId;
+          syncedItems.push({
+            id: fId, // Đồng bộ ID dùng chính UUID của PostgreSQL
+            fileId: fId,
+            profileId: realProfileId,
+            checkupId: rf.checkup_id || existing?.checkupId || null,
+            name: fName,
+            time: rf.created_at
+              ? new Date(rf.created_at).toLocaleDateString(
+                  activeLang === 'en' ? 'en-GB' : 'vi-VN'
+                )
+              : existing?.time || nowLabel(activeLang),
+            status: existing?.status === 'done' ? 'done' : mappedStatus,
+            uri: existing?.uri,
+            presignedUrl: existing?.presignedUrl,
+            mimeType: rf.file_type || existing?.mimeType,
+            analysis: parsedAnalysis,
+          });
+        }
 
-      if (newTaskId) {
-        await pollCeleryTaskStatus(item.id, String(newTaskId), fId, item.name);
-        return;
+        // Giữ lại các item local đang trong trạng thái tải lên thật (processing)
+        for (const localIt of localList) {
+          const lId = localIt.fileId || localIt.id;
+          if (localIt.status === 'processing' && !remoteIdSet.has(lId)) {
+            syncedItems.unshift(localIt);
+          }
+        }
+
+        setItems(syncedItems);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(syncedItems));
       }
-
-      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek);
-      updateItemsAndPersist((prev) =>
-        prev.map((it) =>
-          it.id === item.id
-            ? {
-                ...it,
-                status: 'pending',
-                errorMessage: undefined,
-                analysis,
-              }
-            : it
-        )
-      );
     } catch (e: any) {
-      updateItemsAndPersist((prev) =>
-        prev.map((it) =>
-          it.id === item.id
-            ? {
-                ...it,
-                status: 'failed',
-                errorMessage: e?.message || 'Thử lại trích xuất thất bại.',
-              }
-            : it
-        )
-      );
+      console.log('Đồng bộ hồ sơ từ DB:', e?.message || e);
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingStorage(false);
+      }
     }
-  };
+  }, [lang]);
 
-  /* =========================================================================
-     API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
-     ========================================================================= */
-  const deleteItem = (item: UploadItem) => {
-    const displayName = decodeFileName(item.name);
-    Alert.alert(
-      'Xoá tài liệu',
+  useFocusEffect(
+    useCallback(() => {
+      loadAccountData();
+    }, [loadAccountData])
+  );
       `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${displayName}" khỏi hệ thống và Database không?`,
       [
         { text: 'Huỷ', style: 'cancel' },
