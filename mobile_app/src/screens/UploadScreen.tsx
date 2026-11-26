@@ -2418,61 +2418,61 @@ export default function UploadScreen({ navigation }: Props) {
                           color={theme.danger}
                           style={{ marginHorizontal: 16 }}
                         />
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  compactVerifyBox: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  slipPreviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  slipPreviewTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  slipPreviewTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.navy,
-  },
-  compareSplitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  compareSplitBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  slipThumbnail: {
-    width: '100%',
-    height: 140,
-    borderRadius: 8,
-    backgroundColor: '#E2E8F0',
-  },
-  slipOverlayHint: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    left: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    paddingVertical: 5,
+                      ) : (
+                        <Pressable
+                          style={[
+                            styles.removeFailedBtn,
+                            {
+                              backgroundColor: theme.surface,
+                              borderColor: theme.dangerBorder,
+                            },
+                          ]}
+                          onPress={() => deleteItem(item)}
+                        >
+                          <Text style={[styles.removeFailedBtnText, fontStyle(13, { min: 12 }), { color: theme.danger }]}>
+                            {copy.removeFileBtn}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* CHỈ HIỂN THỊ KHUNG MỞ MÀN HÌNH ĐỐI CHIẾU, KHÔNG HIỂN THỊ CÁC CHỈ SỐ Ở NGOÀI */}
+                {item.analysis && (
+                  <View
+                    style={[
+                      styles.compactVerifyBox,
+                      {
+                        backgroundColor: theme.surfaceAlt,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.slipPreviewHeader}>
+                      <View style={styles.slipPreviewTitleRow}>
+                        <Ionicons name="eye-outline" size={15} color={theme.tealText} />
+                        <Text style={[styles.slipPreviewTitle, fontStyle(13.5, { min: 12.5 }), { color: theme.text }]}>
+                          {hasImagePreview ? copy.slipImageHeader : copy.slipDocHeader}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={styles.compareSplitBtn}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="git-compare-outline" size={14} color={colors.white} />
+                        <Text style={[styles.compareSplitBtnText, fontStyle(12.5, { min: 11.5, max: 14.5 })]}>
+                          {copy.compareBtn}
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {hasImagePreview ? (
+                      <Pressable onPress={() => openVerificationModal(item)}>
+                        <Image
+                          source={{ uri: previewSourceUri }}
+                          style={[styles.slipThumbnail, { backgroundColor: theme.border }]}
+                          resizeMode="cover"
     paddingHorizontal: 8,
     borderRadius: 6,
     flexDirection: 'row',
