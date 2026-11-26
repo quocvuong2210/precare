@@ -218,61 +218,61 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
             </Text>
 
             <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
-                textContentType="oneTimeCode"
-                autoComplete={
-                  Platform.OS === "android" ? "sms-otp" : "one-time-code"
-                }
-                autoCorrect={false}
-                autoCapitalize="none"
-                editable={!verifying && !resending && !verificationToken}
-                maxLength={OTP_LENGTH}
-                caretHidden
-                selectionColor="transparent"
-                accessibilityLabel="Nhập mã xác nhận 6 chữ số"
-              />
-            </View>
+              {copy.description}
+            </Text>
 
-            {!!message && (
-              <Text
-                style={[
-                  styles.message,
-                  messageType === "success" && styles.messageSuccess,
-                  messageType === "error" && styles.messageError,
-                ]}
-                accessibilityLiveRegion="polite"
-              >
-                {message}
-              </Text>
-            )}
+            <Text style={[styles.email, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.text }]}>{email}</Text>
 
             <Pressable
-              disabled={
-                !isComplete || verifying || resending || !!verificationToken
-              }
-              onPress={handleVerify}
+              style={styles.changeEmailButton}
+              onPress={() => navigation.goBack()}
               accessibilityRole="button"
-              accessibilityState={{
-                disabled:
-                  !isComplete || verifying || resending || !!verificationToken,
-              }}
-              style={({ pressed }) => [
-                styles.verifyButton,
-                (!isComplete || verifying || resending) &&
-                  styles.buttonDisabled,
-                pressed && styles.pressed,
-              ]}
             >
-              <Text style={styles.verifyText}>
-                {verifying
-                  ? "Đang xác minh..."
-                  : verificationToken
-                    ? "Đã xác nhận"
-                    : "Xác nhận"}
+              <Text style={[styles.changeEmailText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                {copy.changeEmail}
               </Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </Pressable>
 
-            <View style={styles.resendRow}>
+            <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.otpLabel}
+            </Text>
+
+            {/* A single input supports typing, pasting and autofill. */}
+            <View style={styles.otpContainer}>
+              <View
+                style={styles.otpRow}
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                {Array.from({ length: OTP_LENGTH }, (_, index) => {
+                  const active =
+                    focused && index === Math.min(otp.length, OTP_LENGTH - 1);
+
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.otpBox,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.border,
+                        },
+                        !!otp[index] && [
+                          styles.otpBoxFilled,
+                          {
+                            backgroundColor: theme.tealSoft,
+                            borderColor: theme.tealBorder,
+                          },
+                        ],
+                        active && [
+                          styles.otpBoxActive,
+                          { borderColor: theme.tealText },
+                        ],
+                      ]}
+                    >
+                      <Text style={[styles.otpDigit, fontStyle(23, { min: 20, max: 26 }), { color: theme.text }]}>
+                        {otp[index] || ""}
               <Text style={styles.resendHint}>Chưa nhận được mã?</Text>
 
               <Pressable
