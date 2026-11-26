@@ -64,81 +64,92 @@ type CachedAccountSummary = {
   dueDate: string;
 };
 
-function getTodayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function normalizeIsoDate(raw: string): string {
-  const s = String(raw || '')
-    .replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '')
-    .replace(/[–—−/]/g, '-');
-
-  const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (dmy) {
-    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-  }
-
-  const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (ymd) {
-    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
-  }
-
-  return s;
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^[0-9+()\s-]{9,20}$/;
 
 function getStorageKey(email?: string, id?: string): string {
   const identifier = (email || id || 'guest').trim().toLowerCase();
   return `precare_account_record_${identifier}`;
 }
 
-const fields: Record<'personal' | 'medical', Field[]> = {
-  personal: [
-    { key: 'name', label: 'Họ và tên' },
-    { key: 'birthday', label: 'Ngày sinh', placeholder: 'DD/MM/YYYY' },
-    { key: 'phone', label: 'Số điện thoại' },
-    { key: 'email', label: 'Email' },
-    { key: 'target_date', label: 'Ngày tính toán (Target Date)', placeholder: 'Tự động lấy ngày hiện tại' },
-    { key: 'lmp', label: 'Ngày kinh cuối (LMP)', placeholder: 'YYYY-MM-DD (VD: 2026-01-20)' },
-    { key: 'q1_ultrasound_date', label: 'Ngày siêu âm Quý 1', placeholder: 'YYYY-MM-DD' },
-    { key: 'q1_gestational_weeks', label: 'Tuần thai siêu âm Q1', placeholder: 'VD: 6' },
-    { key: 'q1_gestational_days', label: 'Ngày lẻ thai siêu âm Q1', placeholder: 'VD: 0' },
-    { key: 'crl_mm', label: 'Chiều dài đầu mông CRL (mm)', placeholder: 'VD: 10' },
-    { key: 'override_edd', label: 'Ngày dự sinh ấn định (Override EDD)', placeholder: 'YYYY-MM-DD' },
-  ],
-  medical: [
-    { key: 'blood', label: 'Nhóm máu', placeholder: 'Ví dụ: O+' },
-    { key: 'allergies', label: 'Dị ứng' },
-    { key: 'conditions', label: 'Bệnh nền' },
-    { key: 'obstetricHistory', label: 'Tiền sử sản khoa' },
-  ],
-};
-
-function createEmptyProfile(account?: { full_name?: string; email?: string; phone_number?: string; birthday?: string } | null): Profile {
+function emptyPregnancyFields(): PregnancyFields {
   return {
-    name: account?.full_name || '',
-    birthday: account?.birthday || '',
-    phone: account?.phone_number || '',
-    email: account?.email || '',
-    blood: '',
-    allergies: '',
-    conditions: '',
-    obstetricHistory: '',
-    target_date: getTodayISO(),
     lmp: '',
     q1_ultrasound_date: '',
     q1_gestational_weeks: '',
     q1_gestational_days: '',
     crl_mm: '',
-    override_edd: '',
+    edd: '',
   };
 }
 
-function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+function emptyAccountFields(user?: UserAccountInfo | null): AccountFields {
+  return {
+    full_name: user?.full_name || '',
+    phone_number: user?.phone_number || '',
+    email: user?.email || '',
+  };
+}
+
+function mapDbRecordToFields(dbRecord: any): PregnancyFields {
+  return {
+    lmp: formatIsoToDmy(dbRecord?.lmp),
+    q1_ultrasound_date: formatIsoToDmy(dbRecord?.q1_ultrasound_date),
+    q1_gestational_weeks:
+      dbRecord?.q1_gestational_weeks !== undefined && dbRecord?.q1_gestational_weeks !== null
+        ? String(dbRecord.q1_gestational_weeks)
+        : '',
+    q1_gestational_days:
+      dbRecord?.q1_gestational_days !== undefined && dbRecord?.q1_gestational_days !== null
+        ? String(dbRecord.q1_gestational_days)
+        : '',
+    crl_mm:
+      dbRecord?.crl_mm !== undefined && dbRecord?.crl_mm !== null
+        ? String(dbRecord.crl_mm)
+        : '',
+    edd: formatIsoToDmy(dbRecord?.edd),
+  };
+}
+
+function formatTrimester(trimesterNum: number | null, rawName: string, isEn: boolean): string {
+  if (!trimesterNum && !rawName) return isEn ? 'Not updated' : 'Chưa cập nhật';
+  if (isEn) {
+    if (trimesterNum === 1) return '1st Trimester (First 3 months)';
+    if (trimesterNum === 2) return '2nd Trimester (Second 3 months)';
+    if (trimesterNum === 3) return '3rd Trimester (Last 3 months)';
+    return 'Not updated';
+  }
+  return rawName || (trimesterNum ? `Tam cá nguyệt ${trimesterNum}` : 'Chưa cập nhật');
+}
+
+function formatStatus(status: string, isEn: boolean): string {
+  if (!status) return isEn ? 'No profile yet' : 'Chưa tạo hồ sơ';
+  if (status === 'active') return isEn ? 'Active' : 'Đang theo dõi';
+  if (status === 'completed') return isEn ? 'Completed' : 'Đã hoàn thành';
+  if (status === 'terminated') return isEn ? 'Terminated' : 'Đã kết thúc';
+  return status;
+}
+
+function InfoRow({
+  label,
+  value,
+  emptyText,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  emptyText: string;
+  last?: boolean;
+}) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <View style={[styles.infoRow, !last && styles.rowBorder]}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, !value && styles.missing]}>{value || 'Chưa cập nhật'}</Text>
+    <View style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}>
+      <Text style={[styles.label, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.muted }]}>
+        {label}
+      </Text>
+      <Text style={[styles.value, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: value ? theme.text : theme.muted }]}>
+        {value || emptyText}
+      </Text>
     </View>
   );
 }
