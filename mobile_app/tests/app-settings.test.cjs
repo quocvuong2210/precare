@@ -328,3 +328,78 @@ test('AppSettingsProvider exposes fontScale, scaleText and fontStyle reacting to
   await new Promise((r) => setTimeout(r, 10));
   const smallCtx = harness.renderProvider();
   assert.equal(smallCtx.fontScale, 0.94);
+  assert.equal(smallCtx.scaleText(11, { min: 10.5 }), 10.5);
+  assert.deepEqual(toPlain(smallCtx.fontStyle(15)), { fontSize: 14 });
+
+  const persisted = JSON.parse(harness.asyncStore.get('@precare/app-settings'));
+  assert.equal(persisted.textSize, 'small');
+});
+
+test('All screen components wire text scaling from useAppSettings', () => {
+  const screenFiles = collectTsxFiles(SCREENS_DIR);
+  assert.ok(screenFiles.length > 0, 'Expected screen TSX files');
+
+  for (const filePath of screenFiles) {
+    const source = fs.readFileSync(filePath, 'utf8');
+    const usesTextScaling =
+      source.includes('fontStyle') || source.includes('scaleText') || source.includes('fontScale');
+    assert.ok(
+      usesTextScaling,
+      `Expected ${path.relative(SCREENS_DIR, filePath)} to wire text scaling (fontStyle / scaleText / fontScale)`
+    );
+  }
+});
+
+test('All screen components except HomeScreen use shared ScreenHeader and tab screens support history back arrow', () => {
+  const screenFiles = collectTsxFiles(SCREENS_DIR);
+  assert.ok(screenFiles.length > 0, 'Expected screen TSX files');
+
+  for (const filePath of screenFiles) {
+    const relPath = path.relative(SCREENS_DIR, filePath).replace(/\\/g, '/');
+    const source = fs.readFileSync(filePath, 'utf8');
+    if (relPath === 'HomeScreen.tsx') {
+      assert.equal(
+        source.includes('<ScreenHeader'),
+        false,
+        'Expected HomeScreen.tsx not to render <ScreenHeader>'
+      );
+      continue;
+    }
+    assert.ok(
+      source.includes('<ScreenHeader'),
+      `Expected ${relPath} to render shared <ScreenHeader>`
+    );
+  }
+
+  const fourTabScreens = [
+    'profile/RecordsScreen.tsx',
+    'UploadScreen.tsx',
+    'ChartsScreen.tsx',
+    'SettingsScreen.tsx',
+  ];
+  for (const relPath of fourTabScreens) {
+    const source = fs.readFileSync(path.join(SCREENS_DIR, relPath), 'utf8');
+    assert.ok(
+      source.includes('onBack=') && source.includes('goBack()'),
+      `Expected ${relPath} to pass onBack with goBack() to ScreenHeader`
+    );
+  }
+
+  const mainTabsSource = fs.readFileSync(
+    path.join(__dirname, '../src/navigation/MainTabs.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    mainTabsSource.includes('backBehavior="history"'),
+    'Expected MainTabs to enable backBehavior="history" so back arrows return to the previous tab (e.g. Settings)'
+  );
+
+  const appNavigatorSource = fs.readFileSync(
+    path.join(__dirname, '../src/navigation/AppNavigator.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    appNavigatorSource.includes('headerShown: false'),
+    'Expected AppNavigator to disable native stack headers in favor of ScreenHeader'
+  );
+});
