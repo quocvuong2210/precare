@@ -383,61 +383,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                     accessibilityLabel={isEn ? 'Gestational age, days' : 'Tuổi thai, số ngày'}
                     value={age.days}
                     onChangeText={(days) => setManualAge((prev) => ({ ...prev, days }))}
-
-              const pillTextStyle =
-                status === 'danger'
-                  ? styles.pillTextDanger
-                  : status === 'warning'
-                  ? styles.pillTextWarning
-                  : styles.pillTextNormal;
-
-              return (
-                <View key={meta.key} style={[styles.metricFrame, frameStyle]}>
-                  <View style={styles.metricHeaderRow}>
-                    <Text style={styles.fieldLabel}>{meta.label}</Text>
-                    <View style={[styles.statusPill, pillStyle]}>
-                      <Text style={[styles.statusPillText, pillTextStyle]}>{badgeText}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.rangeHintText}>
-                    Chuẩn Tuần {bounds.clampedWeek} (Tháng {stageInfo.month}): {bounds.minNormal} – {bounds.maxNormal} {meta.unit} · Báo đỏ khi {'<'} {bounds.dangerLow} hoặc {'>'} {bounds.dangerHigh} {meta.unit}
+                    editable={!autoAge}
+                    placeholder="0"
+                    placeholderTextColor={theme.muted}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    selectTextOnFocus
+                    style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
+                  />
+                  <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+                    {isEn ? 'days' : 'ngày'}
                   </Text>
+                </View>
+              </View>
+            </View>
+            {!ageValid && (
+              <Text style={[styles.dangerErrorText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.danger }]}>
+                {autoAge
+                  ? (isEn
+                      ? 'Date is outside 12–41 weeks. Turn off Auto to enter weeks manually.'
+                      : 'Ngày khám không khớp tuổi thai 12–41 tuần. Hãy tắt “Tự tính” để nhập số tuần trực tiếp.')
+                  : (isEn
+                      ? 'Enter weeks between 12 and 41 (days 0–6).'
+                      : 'Vui lòng nhập tuần thai từ 12–41 (ô ngày từ 0–6, nếu để trống sẽ tính là 0 ngày).')}
+              </Text>
+            )}
 
-                  <View
-                    style={[
-                      styles.inputBox,
-                      status === 'danger' && styles.inputBoxDanger,
-                      status === 'warning' && styles.inputBoxWarning,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel={meta.label}
-                      value={values[meta.key]}
-                      onChangeText={(val) => setValues((prev) => ({ ...prev, [meta.key]: val }))}
-                      keyboardType="decimal-pad"
-                      maxLength={8}
-                      selectTextOnFocus
-                      placeholder="Nhập chỉ số..."
-                      placeholderTextColor="#94A3B8"
-                      style={[
-                        styles.inputText,
-                        status === 'danger' && styles.dangerInputText,
-                        status === 'warning' && styles.warningInputText,
-                      ]}
-                    />
-                    <Text style={styles.unit}>{meta.unit}</Text>
-                    {status !== 'normal' && (
-                      <Ionicons
-                        name={status === 'danger' ? 'alert-circle' : 'warning'}
-                        size={18}
-                        color={status === 'danger' ? '#DC2626' : WARNING_COLOR}
-                        style={styles.inputWarningIcon}
-                      />
-                    )}
-                  </View>
+            <View style={[styles.stageBanner, { backgroundColor: theme.tealSoft }]}>
+              <Ionicons name="analytics-outline" size={16} color={theme.tealText} />
+              <Text style={[styles.stageBannerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.tealText }]}>
+                {isEn ? `Comparing against reference: ${stageLabelDisplay}` : `Đang so sánh theo chuẩn: ${stageLabelDisplay}`}
+              </Text>
+            </View>
+          </View>
 
-                  <Text
+          <View style={styles.sectionHeading}>
+            <Text style={[styles.sectionTitle, fontStyle(15.5, { min: 14.5 }), { color: theme.text }]}>
+              {isEn ? `Ultrasound Metrics (Week ${stageInfo.clampedWeek})` : `Chỉ số siêu âm (Chuẩn Tuần ${stageInfo.clampedWeek})`}
+            </Text>
+            {(dangerCount > 0 || warningCount > 0) && (
+              <View style={[styles.warningBadge, { backgroundColor: dangerCount > 0 ? theme.dangerBackground : theme.badgeWarnBg }]}>
+                <Text style={[styles.warningBadgeText, fontStyle(12, { min: 11, max: 14 }), { color: dangerCount > 0 ? theme.danger : theme.badgeWarnText }]}>
+                  {dangerCount > 0
+                    ? (isEn ? `${dangerCount} RED alert(s)` : `${dangerCount} chỉ số báo ĐỎ`)
+                    : (isEn ? `${warningCount} YELLOW alert(s)` : `${warningCount} chỉ số báo VÀNG`)}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.metricsList}>
+            {evaluatedMetrics.map(({ meta, bounds, status, badgeText, message }) => {
+              const frameBg =
+                status === 'danger'
+                  ? theme.dangerBackground
+                  : status === 'warning'
                     style={[
                       styles.evalNoteText,
                       status === 'warning' && styles.warningErrorText,
