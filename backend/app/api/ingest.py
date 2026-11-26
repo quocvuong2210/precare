@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.audit import log_audit_event
 from app.models.user import User
 from app.models.pregnancy_profile import PregnancyProfile
+from app.models.ocr_correction_log import OcrCorrectionLog
 from app.models.uploaded_file import UploadedFile
 from app.services.storage_service import storage_service
 from app.workers.celery_app import celery_app
@@ -745,6 +746,18 @@ def verify_uploaded_file(
     db_file.verified_at = datetime.utcnow()
     if payload and payload.checkup_id:
         db_file.checkup_id = payload.checkup_id
+
+    correction_logged = False
+    if payload and payload.corrected_payload is not None:
+        correction_log = OcrCorrectionLog(
+            uploaded_file_id=db_file.id,
+            user_id=current_user.id,
+            original_payload=db_file.ocr_raw_payload or {},
+            corrected_payload=payload.corrected_payload,
+        )
+        db.add(correction_log)
+        correction_logged = True
+
     db.commit()
 
     log_audit_event(
@@ -759,5 +772,5 @@ def verify_uploaded_file(
     return {
         "success": True,
         "message": "Đã xác nhận phê duyệt tài liệu cận lâm sàng.",
-        "data": {"file_id": str(db_file.id), "status": db_file.status},
+        "data": {"file_id": str(db_file.id), "status": db_file.status, "correction_logged": correction_logged},
     }
