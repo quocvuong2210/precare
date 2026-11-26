@@ -108,29 +108,51 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
     Number(effectiveDays) <= 6;
 
   const activeWeek = ageValid ? Number(age.weeks) : 24;
+  const stageInfo = getPregnancyStageInfo(activeWeek, preferences.language);
+  const stageLabelDisplay = isEn
+    ? `Week ${stageInfo.clampedWeek} (Month ${stageInfo.month})`
+    : stageInfo.stageLabel;
+
+  const evaluatedMetrics = METRICS_META.map((meta) => {
+    const rawVal = values[meta.key].trim();
+    const bounds = getFetalMetricBoundsByWeek(
+      meta.key,
+      activeWeek,
+      meta.unit,
+      preferences.language
+    );
+    const num = Number(rawVal.replace(',', '.'));
+    const isValidNumber =
       Boolean(rawVal) && /^\d+(?:[.,]\d+)?$/.test(rawVal) && Number.isFinite(num) && num > 0;
 
     if (!isValidNumber) {
       return {
-        meta,
+        meta: { ...meta, label: isEn ? meta.labelEn : meta.labelVi },
         bounds,
         isValidNumber: false,
         status: 'danger' as SeverityLevel,
-        badgeText: !rawVal ? 'Chưa nhập' : 'Sai định dạng',
-        message: 'Vui lòng nhập một số lớn hơn 0.',
+        badgeText: !rawVal
+          ? (isEn ? 'Required' : 'Chưa nhập')
+          : (isEn ? 'Invalid format' : 'Sai định dạng'),
+        message: isEn ? 'Please enter a number greater than 0.' : 'Vui lòng nhập một số lớn hơn 0.',
       };
     }
 
-    const evalRes = evaluateMetricByWeek(meta.key, rawVal, activeWeek);
+    const evalRes = evaluateMetricByWeek(
+      meta.key,
+      rawVal,
+      activeWeek,
+      preferences.language
+    );
     const badgeText =
       evalRes.severity === 'danger'
-        ? 'Nguy hiểm (Đỏ)'
+        ? (isEn ? 'High Risk (Red)' : 'Nguy hiểm (Đỏ)')
         : evalRes.severity === 'warning'
-        ? 'Cần theo dõi (Vàng)'
-        : 'Đạt chuẩn tuần ' + bounds.clampedWeek;
+        ? (isEn ? 'Monitor (Yellow)' : 'Cần theo dõi (Vàng)')
+        : (isEn ? `Normal Week ${bounds.clampedWeek}` : `Đạt chuẩn tuần ${bounds.clampedWeek}`);
 
     return {
-      meta,
+      meta: { ...meta, label: isEn ? meta.labelEn : meta.labelVi },
       bounds,
       isValidNumber: true,
       status: evalRes.severity,
@@ -196,21 +218,30 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
 
       const summaryState = summarizeAnalysisState(
         builtMetrics,
-        `Phiếu khám ngày ${examDate}`,
-        activeWeek
+        isEn ? `Checkup report on ${examDate}` : `Phiếu khám ngày ${examDate}`,
+        activeWeek,
+        preferences.language
       );
 
       const newManualRecord = {
         id: String(Date.now()),
-        name: `Phiếu siêu âm thủ công (${examDate})`,
-        time: `Ngày khám: ${examDate} · ${stageInfo.stageLabel}`,
+        name: isEn
+          ? `Manual Ultrasound Report (${examDate})`
+          : `Phiếu siêu âm thủ công (${examDate})`,
+        time: isEn
+          ? `Exam date: ${examDate} · ${stageInfo.stageLabel}`
+          : `Ngày khám: ${examDate} · ${stageInfo.stageLabel}`,
         status: 'done',
         analysis: {
-          recordType: `Kết quả siêu âm (${age.weeks.trim()} tuần ${effectiveDays} ngày · Tháng thứ ${stageInfo.month})`,
+          recordType: isEn
+            ? `Ultrasound Results (${age.weeks.trim()}w ${effectiveDays}d · Month ${stageInfo.month})`
+            : `Kết quả siêu âm (${age.weeks.trim()} tuần ${effectiveDays} ngày · Tháng thứ ${stageInfo.month})`,
           gestationalWeek: activeWeek,
           gestationalDays: Number(effectiveDays) || 0,
           gestationalAge: stageInfo.stageLabel,
-          summary: `Đã đối chiếu chuẩn sinh trắc học theo ${stageInfo.stageLabel}.`,
+          summary: isEn
+            ? `Matched against biometry standards for ${stageInfo.stageLabel}.`
+            : `Đã đối chiếu chuẩn sinh trắc học theo ${stageInfo.stageLabel}.`,
           doctorConclusion: summaryState.doctorConclusion,
           overallSeverity: summaryState.overallSeverity,
           savedToProfile: true,
@@ -224,55 +255,24 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
       Keyboard.dismiss();
       navigation.navigate('UploadHome');
     } catch {
-      Alert.alert('Lỗi', 'Không thể lưu kết quả vào bộ nhớ máy.');
+      Alert.alert(
+        isEn ? 'Error' : 'Lỗi',
+        isEn ? 'Unable to save result to device memory.' : 'Không thể lưu kết quả vào bộ nhớ máy.',
+      );
     }
   };
 
+  const weekdays = isEn ? WEEKDAYS_EN : WEEKDAYS_VI;
+
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          onPress={() => navigation.goBack()}
-          hitSlop={8}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <Ionicons name="arrow-back" size={20} color="#475569" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Nhập kết quả thủ công</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Manual Result Entry' : 'Nhập kết quả thủ công'}
+        onBack={() => navigation.goBack()}
+      />
 
       <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-        >
-          <Text style={styles.title}>Kết quả khám thai theo tuần</Text>
-          <Text style={styles.subtitle}>
-            Mỗi tuần và tháng thai kỳ có ngưỡng chuẩn khác nhau. Khi bạn đổi ngày khám hoặc số tuần, bảng chuẩn dưới đây sẽ tự động cập nhật theo.
-          </Text>
-
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>Ngày khám</Text>
-            <View style={[styles.inputBox, !parsedDate && styles.inputBoxDanger, { marginTop: 4 }]}>
-              <TextInput
-                accessibilityLabel="Ngày khám, định dạng ngày tháng năm"
-                value={examDate}
-                onChangeText={setExamDate}
-                placeholder="DD/MM/YYYY"
-                placeholderTextColor={colors.textLight}
-                keyboardType="numbers-and-punctuation"
-                maxLength={10}
-                style={styles.inputText}
-              />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Chọn ngày khám"
