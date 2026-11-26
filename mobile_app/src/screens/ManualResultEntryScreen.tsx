@@ -658,61 +658,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
               })}
             </View>
           </View>
-    marginBottom: 4,
-  },
-  fieldLabel: { fontSize: 12.5, fontWeight: '800', color: colors.navy, flex: 1 },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  pillNormal: { backgroundColor: '#DCFCE7' },
-  pillWarning: { backgroundColor: '#FEF08A' },
-  pillDanger: { backgroundColor: '#FEE2E2' },
-  statusPillText: { fontSize: 10, fontWeight: '800' },
-  pillTextNormal: { color: '#15803D' },
-  pillTextWarning: { color: '#854D0E' },
-  pillTextDanger: { color: '#991B1B' },
-  rangeHintText: { fontSize: 11, color: '#0F766E', fontWeight: '700', marginBottom: 8, lineHeight: 15 },
-  inputBox: {
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const WARNING_COLOR = '#B45309';
+const BORDER_COLOR = '#DCE5F0';
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  screen: { flex: 1, backgroundColor: '#F7F9FC' },
+  header: {
+    height: 54,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 42,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER_COLOR,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F9FC',
+  },
+  headerSpacer: { width: 40 },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16.5, fontWeight: '700', color: colors.navy },
+  pressed: { opacity: 0.75 },
+  scrollContent: { padding: 18, paddingBottom: 24 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.navy },
+  subtitle: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textMuted,
+    marginTop: 5,
+    marginBottom: 14,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: BORDER_COLOR,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: colors.white,
+    padding: 14,
   },
-  inputBoxWarning: { backgroundColor: '#FFFFFF', borderColor: '#F59E0B', borderWidth: 1.5 },
-  inputBoxDanger: { backgroundColor: '#FFFFFF', borderColor: '#DC2626', borderWidth: 1.5 },
-  inputText: {
-    flex: 1,
-    minWidth: 0,
-    paddingVertical: 9,
-    paddingHorizontal: 0,
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.navy,
-  },
-  warningInputText: { color: WARNING_COLOR, fontWeight: '800' },
-  dangerInputText: { color: '#DC2626', fontWeight: '800' },
-  unit: { fontSize: 11.5, fontWeight: '700', color: colors.textMuted, marginLeft: 5 },
-  inputWarningIcon: { marginLeft: 7 },
-  evalNoteText: { fontSize: 11, lineHeight: 15, color: '#15803D', marginTop: 6, fontWeight: '600' },
-  warningErrorText: { color: WARNING_COLOR, fontWeight: '700' },
-  dangerErrorText: { fontSize: 11, lineHeight: 15, color: '#DC2626', marginTop: 6, fontWeight: '700' },
-  ageLabelRow: {
+  stageBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 7,
-  },
-  ageLabel: { flex: 1, fontSize: 11.5, fontWeight: '700', color: '#344663' },
-  autoAgeControl: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  autoAgeText: { fontSize: 11, fontWeight: '600', color: colors.primaryDark },
-  ageSwitch: { transform: [{ scale: 0.75 }], marginVertical: -6, marginRight: -6 },
+    gap: 6,
+    backgroundColor: '#CCFBF1',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   fieldRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   halfField: { flex: 1, minWidth: 0 },
   ageInput: { minHeight: 38 },
