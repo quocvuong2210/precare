@@ -1318,61 +1318,61 @@ export default function UploadScreen({ navigation }: Props) {
   const loadAccountData = useCallback(async () => {
     if (isPickingFileRef.current) return;
     const activeLang = langRef.current;
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-
-          try {
-            const statusRes: any = await getIngestBatchStatus(batchId);
-            const stData: any = statusRes?.data || statusRes;
-            const completed = Number(stData?.completed_files ?? 0);
-            const total = Number(stData?.total_files ?? newBatchItems.length);
-            const pct = Number(stData?.overall_progress_percentage ?? 0);
-
-            if (isMountedRef.current) {
-              setBatchProgressText(
-                `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`
-              );
-            }
-
-            if (stData?.is_all_finished || (total > 0 && completed >= total)) {
-              break;
-            }
-          } catch {
-            break;
-          }
-        }
-
-        const newIds = new Set(newBatchItems.map((i) => i.id));
-        updateItemsAndPersist((prev) =>
-          prev.map((item) =>
-            newIds.has(item.id)
-              ? {
-                  ...item,
-                  status: 'pending',
-                  analysis: buildDefaultExtractedAnalysis(item.name, profileWeek),
-                }
-              : item
-          )
-        );
-
-        setBatchProgressText(null);
-        Alert.alert(
-          'Tải hàng loạt hoàn tất',
-          `Đã phân tích xong ${newBatchItems.length} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`
-        );
-      } catch (err: any) {
-        setBatchProgressText(null);
-        Alert.alert('Lỗi tải hàng loạt', err?.message || 'Không thể tải hàng loạt lên máy chủ.');
+    try {
+      await restoreSession();
+      const storageKey = await resolveAccountStorageKey();
+      const savedData = await AsyncStorage.getItem(storageKey);
+      const localList: UploadItem[] = savedData ? JSON.parse(savedData) : [];
+      if (isMountedRef.current) {
+        setItems(localList);
       }
-    } finally {
-      isPickingFileRef.current = false;
-    }
-  };
 
-  /* =========================================================================
-     API 8: POST /api/v1/ingest/files/{file_id}/retry
-     ========================================================================= */
-  const retryFailedFile = async (item: UploadItem) => {
-    const fId = item.fileId || item.id;
+      const realProfileId = await ensureActivePregnancyProfileId(24);
+      const dbProfile = await fetchPregnancyProfileFromDB();
+      const dbWeek = Number(
+        dbProfile?.gestational_weeks || dbProfile?.q1_gestational_weeks || 24
+      );
+      const safeWeek = dbWeek >= 12 && dbWeek <= 41 ? dbWeek : 24;
+
+      if (isMountedRef.current) {
+        setProfileId(realProfileId);
+        setProfileWeek(safeWeek);
+      }
+
+      const filesRes: any = await getProfileIngestFiles(realProfileId, {
+        page: 1,
+        page_size: 50,
+      });
+      const remoteItems: any[] = Array.isArray(filesRes?.data?.items)
+        ? filesRes.data.items
+        : Array.isArray(filesRes?.items)
+        ? filesRes.items
+        : [];
+
+      if (isMountedRef.current) {
+        const remoteIdSet = new Set<string>();
+        const syncedItems: UploadItem[] = [];
+
+        for (const rf of remoteItems) {
+          const fId = String(rf.id || rf.file_id || '');
+          if (!fId) continue;
+          remoteIdSet.add(fId);
+
+          const rawFileName = rf.file_name || `Phieu_kham_${fId.slice(0, 6)}.pdf`;
+          const fName = decodeFileName(rawFileName, activeLang);
+
+          // Tìm dữ liệu tương ứng trong localList nếu có cache URI/analysis
+          const existing = localList.find(
+            (it) =>
+              it.fileId === fId ||
+              it.id === fId ||
+              decodeFileName(it.name, activeLang) === fName
+          );
+
+          const rawStatus = String(rf.status || '').toLowerCase();
+          const mappedStatus: Status =
+            rawStatus === 'failed' || rawStatus === 'failure' || rawStatus === 'error'
+              ? 'failed'
 
     updateItemsAndPersist((prev) =>
       prev.map((it) =>
