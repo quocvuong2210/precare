@@ -108,16 +108,6 @@ const translations = {
     textSizeNote: "Choose a comfortable text size for the entire app.",
     passwordNote:
       "Verify your email with a one-time code to reset your password.",
-    cancel: "Cancel",
-    continue: "Continue",
-    understood: "Got it",
-    small: "Small",
-    standard: "Default",
-    large: "Large",
-    sample: "Care for you, care for your baby",
-    textSizeNote: "Preview text size on the Settings screen.",
-    passwordNote:
-      "Verify your email with a one-time code to reset your password.",
     logoutNote: "Would you like to log out of PreCare?",
     loggingOut: "Logging out…",
     logoutError:
@@ -130,15 +120,12 @@ const translations = {
       "The official terms of use are not available in this version. They will appear here when provided.",
     privacyNote:
       "The official privacy policy is not available in this version. You can view and edit your personal information in your profile.",
-    helpProfile: "Where can I edit my information?",
+    helpProfile: "Where can I view pregnancy metrics or edit my account?",
     helpProfileAnswer:
-      "Go to Profile → Edit profile to update your personal information.",
+      "Go to Profile to view your saved pregnancy metrics and tap Edit account to update your account details.",
     helpUpload: "How do I add a medical document?",
     helpUploadAnswer:
       "Go to Upload to choose an image, take a photo, or add a PDF.",
-    helpContacts: "How do I manage emergency contacts?",
-    helpContactsAnswer:
-      "Select Emergency contacts to add, edit, or call a saved contact.",
     storageError: "Unable to save settings on this device. Please try again.",
   },
 };
@@ -154,11 +141,15 @@ type Dialog =
   | "logout"
   | "password";
 type IconName = keyof typeof Ionicons.glyphMap;
+type FontStyleFn = (
+  baseSize: number,
+  options?: { min?: number; max?: number; lineHeight?: number },
+) => { fontSize: number; lineHeight?: number };
 type RowProps = {
   icon: IconName;
   label: string;
   theme: Theme;
-  fontScale: number;
+  fontStyle: FontStyleFn;
   value?: string;
   last?: boolean;
   danger?: boolean;
@@ -176,7 +167,7 @@ function SettingsRow({
   icon,
   label,
   theme,
-  fontScale,
+  fontStyle,
   value,
   last,
   danger,
@@ -215,9 +206,9 @@ function SettingsRow({
         <Text
           style={[
             styles.rowLabel,
+            fontStyle(15, { lineHeight: 22, min: 14 }),
             {
               color: dangerLabel ? theme.danger : theme.text,
-              fontSize: 14 * fontScale,
             },
           ]}
         >
@@ -242,7 +233,8 @@ function SettingsRow({
               <Text
                 style={[
                   styles.rowValue,
-                  { color: theme.muted, fontSize: 13 * fontScale },
+                  fontStyle(14, { min: 13 }),
+                  { color: theme.muted },
                 ]}
               >
                 {value}
@@ -274,15 +266,23 @@ function SettingsRow({
 function SettingsSection({
   title,
   theme,
+  fontStyle,
   children,
 }: {
   title: string;
   theme: Theme;
+  fontStyle: FontStyleFn;
   children: React.ReactNode;
 }) {
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.muted }]}>
+      <Text
+        style={[
+          styles.sectionTitle,
+          fontStyle(12, { lineHeight: 17, min: 11, max: 14 }),
+          { color: theme.muted },
+        ]}
+      >
         {title.toLocaleUpperCase()}
       </Text>
       <View
@@ -300,7 +300,7 @@ function SettingsSection({
 export default function SettingsScreen({
   navigation,
 }: BottomTabScreenProps<MainTabParamList, "Settings">) {
-  const { preferences, updatePreference, isLoaded, storageError } =
+  const { preferences, fontStyle, updatePreference, isLoaded, storageError } =
     useAppSettings();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -310,13 +310,7 @@ export default function SettingsScreen({
   const focused = useIsFocused();
   const theme = settingsThemes[preferences.darkMode ? "dark" : "light"];
   const copy = translations[preferences.language];
-  const fontScale =
-    preferences.textSize === "small"
-      ? 0.9
-      : preferences.textSize === "large"
-        ? 1.15
-        : 1;
-  const shared = { theme, fontScale };
+  const shared = { theme, fontStyle };
   const close = () => {
     if (!logoutInProgress.current) {
       setDialog(null);
@@ -346,7 +340,7 @@ export default function SettingsScreen({
     }
   };
   const dialogTitle = dialog ? copy[dialog] : "";
-  const textStyle = { color: theme.muted, fontSize: 14 * fontScale };
+  const textStyle = { color: theme.muted, ...fontStyle(15, { lineHeight: 22, min: 14 }) };
   const dialogNotes = {
     password: copy.passwordNote,
     logout: copy.logoutNote,
@@ -381,9 +375,9 @@ export default function SettingsScreen({
       <Text
         style={[
           styles.actionText,
+          fontStyle(15, { min: 14 }),
           {
             color: secondary ? theme.text : "#FFFFFF",
-            fontSize: 14 * fontScale,
           },
         ]}
       >
@@ -398,33 +392,18 @@ export default function SettingsScreen({
       style={[styles.container, { backgroundColor: theme.surface }]}
     >
       {focused && <StatusBar style={preferences.darkMode ? "light" : "dark"} />}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.back}
-          onPress={() => navigation.navigate("Home")}
-          style={styles.headerButton}
-        >
-          <Ionicons name="chevron-back" size={21} color={theme.text} />
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[
-            styles.headerTitle,
-            { color: theme.text, fontSize: 16 * fontScale },
-          ]}
-        >
-          {copy.title}
-        </Text>
-        <View style={styles.headerButton} />
-      </View>
+      <ScreenHeader
+        title={copy.title}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home"))}
+        backLabel={copy.back}
+      />
 
       <ScrollView
         style={{ backgroundColor: theme.background }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <SettingsSection title={copy.account} theme={theme}>
+        <SettingsSection title={copy.account} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="person-outline"
@@ -438,6 +417,27 @@ export default function SettingsScreen({
             icon="lock-closed-outline"
             label={copy.password}
             last
+            onPress={() => setDialog("password")}
+          />
+        </SettingsSection>
+
+        <SettingsSection title={copy.general} theme={theme} fontStyle={fontStyle}>
+          <SettingsRow
+            {...shared}
+            icon="globe-outline"
+            label={copy.language}
+            value={preferences.language === "vi" ? "Tiếng Việt" : "English"}
+            onPress={() => setDialog("language")}
+          />
+          <SettingsRow
+            {...shared}
+            icon="moon-outline"
+            label={copy.darkMode}
+            last
+            toggle={{
+              value: preferences.darkMode,
+              onChange: (value) => updatePreference("darkMode", value),
+              disabled: !isLoaded,
             onPress={() => setDialog("password")}
           />
         </SettingsSection>
