@@ -2198,61 +2198,61 @@ export default function UploadScreen({ navigation }: Props) {
           if (navigation.canGoBack()) {
             navigation.goBack();
             return;
-                  style={[styles.confirmModalBtn, savingToDb && { opacity: 0.7 }]}
-                  disabled={savingToDb}
-                  onPress={confirmFromVerificationModal}
-                >
-                  {savingToDb ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
-                  )}
-                  <Text style={styles.confirmModalBtnText}>
-                    {savingToDb ? 'Đang lưu Database...' : 'Xác nhận & Lưu vào hồ sơ'}
-                  </Text>
-                </Pressable>
-              </View>
-            </KeyboardAvoidingView>
-          )}
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
-  );
-}
+          }
+          const parentNav = navigation.getParent();
+          if (parentNav?.canGoBack()) {
+            parentNav.goBack();
+            return;
+          }
+          navigation.navigate('Home');
+        }}
+        backLabel={lang === 'en' ? 'Go back' : 'Quay lại'}
+        rightIcon="add"
+        onRightPress={openChooser}
+        rightAccessibilityLabel={copy.uploadSingle}
+      />
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F5F8FA' },
-  header: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  headerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 },
-  dropZone: {
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: colors.primary,
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-  },
-  cameraCircle: {
+      <ScrollView
+        style={{ backgroundColor: theme.background }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Pressable
+          style={[styles.dropZone, { backgroundColor: theme.surface }]}
+          onPress={openChooser}
+        >
+          <View style={[styles.cameraCircle, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="cloud-upload-outline" size={28} color={theme.tealText} />
+          </View>
+
+          <Text style={[styles.dropTitle, fontStyle(15.5, { lineHeight: 22, min: 14 }), { color: theme.text }]}>
+            {copy.dropTitle}
+          </Text>
+          <View style={styles.uploadBtnRow}>
+            <Pressable style={styles.chooseButton} onPress={openChooser}>
+              <Ionicons name="document-attach-outline" size={15} color={colors.white} />
+              <Text style={[styles.chooseText, fontStyle(13.5, { min: 12.5, max: 16 })]}>
+                {copy.uploadSingle}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.batchButton, { backgroundColor: theme.tealSoft }]}
+              onPress={pickAndUploadBatch}
+            >
+              <Ionicons name="documents-outline" size={15} color={theme.tealText} />
+              <Text style={[styles.batchButtonText, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {copy.uploadBatch}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+
+        {!!batchProgressText && (
+          <View
+            style={[
+              styles.batchBanner,
     width: 58,
     height: 58,
     borderRadius: 29,
