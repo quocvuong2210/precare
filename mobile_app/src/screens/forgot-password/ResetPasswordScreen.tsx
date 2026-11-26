@@ -383,61 +383,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
               </View>
 
               {renderRequirement(hasMinLength, copy.reqMinLength)}
-    color: '#172033',
-    fontSize: 23,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  description: {
-    color: '#718096',
-    fontSize: 12,
-    lineHeight: 19,
-    marginBottom: 24,
-  },
-  form: {
-    width: '100%',
-  },
-  label: {
-    color: '#263449',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  labelConfirm: {
-    color: '#263449',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 19,
-    marginBottom: 8,
-  },
-  required: {
-    color: '#EF4444',
-  },
-  inputContainer: {
-    height: 47,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 9,
-    backgroundColor: '#FFFFFF',
-    paddingLeft: 12,
-    paddingRight: 5,
-  },
-  inputError: {
-    borderColor: '#EF4444',
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    color: '#263449',
-    fontSize: 13,
-  },
-  eyeButton: {
-    width: 35,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
+              {renderRequirement(hasUppercase, copy.reqUpperLower)}
+              {renderRequirement(hasNumber, copy.reqNumber)}
+              {renderRequirement(hasSpecial, copy.reqSpecial)}
+            </View>
+
+            <View
+              style={[
+                styles.note,
+                {
+                  backgroundColor: theme.tealSoft,
+                  borderColor: theme.tealBorder,
+                  borderWidth: isDark ? 1 : 0,
+                },
+              ]}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={16}
+                color={theme.tealText}
+              />
+              <Text style={[styles.noteText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+                {copy.securityNote}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.bottomArea}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                loading && styles.buttonDisabled,
+              ]}
+              onPress={handleResetPassword}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={[styles.buttonText, fontStyle(15.5, { min: 14.5, max: 18 })]}>{copy.submitButton}</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.footer}
+              onPress={() => navigation.navigate('Login')}
+              disabled={loading}
+            >
+              <Text style={[styles.footerText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                {copy.backToLogin}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
   },
   errorRow: {
     flexDirection: 'row',
