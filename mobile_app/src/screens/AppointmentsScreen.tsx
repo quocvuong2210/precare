@@ -248,23 +248,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { fontSize: 16, fontWeight: '800', color: colors.navy },
-
+  headerTitle: { fontSize: 17, fontWeight: '800' },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
-
-  /* ================= LỊCH ================= */
   calendarCard: {
-    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 14,
   },
   monthRow: {
@@ -273,31 +267,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  monthTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
+  monthTitle: { fontSize: 16, fontWeight: '800' },
   monthArrows: { flexDirection: 'row', alignItems: 'center' },
-
   weekRow: { flexDirection: 'row' },
   weekday: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textLight,
     marginBottom: 6,
   },
-
   dayCell: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dayCircleSelected: { backgroundColor: colors.primary },
-  dayText: { fontSize: 13, fontWeight: '500', color: colors.navy },
-  dayTextMuted: { color: '#CBD5E1' },
-  dayTextSelected: { color: colors.white, fontWeight: '800' },
+  dayText: { fontSize: 14, fontWeight: '500' },
+  dayTextSelected: { color: colors.white, fontWeight: '800', opacity: 1 },
   dot: {
     position: 'absolute',
     bottom: 3,
@@ -306,15 +296,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.primary,
   },
-
-  /* ================= NHẮC NHỞ ================= */
   reminderCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 12,
     marginTop: 14,
   },
@@ -322,62 +308,48 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   reminderInfo: { flex: 1, marginLeft: 12 },
-  reminderTitle: { fontSize: 13, fontWeight: '700', color: colors.navy },
-  reminderSub: { fontSize: 11, color: colors.textLight, marginTop: 2 },
-
-  /* ================= CHI TIẾT ================= */
+  reminderTitle: { fontSize: 15, fontWeight: '700' },
+  reminderSub: { fontSize: 13, marginTop: 2 },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: '700',
-    color: '#334155',
     marginTop: 22,
     marginBottom: 10,
   },
   detailCard: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 12,
   },
   detailIcon: {
     width: 46,
     height: 46,
     borderRadius: 12,
-    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   detailInfo: { flex: 1, marginLeft: 12 },
   detailTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  detailTitle: { flex: 1, fontSize: 13.5, fontWeight: '800', color: colors.navy, marginRight: 8 },
-  detailDoctor: { fontSize: 12, color: '#475569', marginTop: 4 },
-  detailTime: { fontSize: 11, color: colors.textLight, marginTop: 4 },
-
+  detailTitle: { flex: 1, fontSize: 15, fontWeight: '800', marginRight: 8 },
+  detailDoctor: { fontSize: 13.5, marginTop: 4 },
+  detailTime: { fontSize: 12.5, marginTop: 4 },
   badge: {
-    backgroundColor: '#CCFBF1',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
   },
-  badgeText: { fontSize: 10.5, fontWeight: '700', color: colors.primaryDark },
-
+  badgeText: { fontSize: 12, fontWeight: '700' },
   emptyBox: {
-    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 20,
     alignItems: 'center',
   },
-  emptyText: { fontSize: 12.5, color: colors.textMuted },
-
-  /* ================= NÚT DƯỚI ================= */
+  emptyText: { fontSize: 14.5 },
   bottomBar: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
 });

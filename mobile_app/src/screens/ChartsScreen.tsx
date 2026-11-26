@@ -5,26 +5,59 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/MainTabs';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 
-// Presentation fixtures only. Replace with confirmed measurements and validated
-// reference ranges from the backend before showing clinical interpretations.
 const weeks = [16, 20, 24, 28, 32, 36];
-const metrics = [
-  { id: 'weight', label: 'Cân nặng thai nhi', title: 'Biểu đồ cân nặng thai nhi', unit: 'g', max: 3500,
-    ticks: [100, 1000, 2000, 3000], values: [150, 340, 670, 1100, 1800, 2600], range: [200, 2800] },
-  { id: 'bpd', label: 'Đường kính lưỡng đỉnh', title: 'Biểu đồ đường kính lưỡng đỉnh', unit: 'mm', max: 100,
-    ticks: [20, 40, 60, 80], values: [34, 47, 60, 72, 82, 90], range: [25, 90] },
-  { id: 'hc', label: 'Chu vi vòng đầu', title: 'Biểu đồ chu vi vòng đầu', unit: 'mm', max: 360,
-    ticks: [80, 160, 240, 320], values: [125, 175, 220, 260, 295, 325], range: [100, 330] },
+const METRIC_ITEMS = [
+  {
+    id: 'weight',
+    labelVi: 'Cân nặng thai nhi',
+    labelEn: 'Estimated fetal weight',
+    titleVi: 'Biểu đồ cân nặng thai nhi',
+    titleEn: 'Fetal weight trajectory',
+    unit: 'g',
+    max: 3500,
+    ticks: [100, 1000, 2000, 3000],
+    values: [150, 340, 670, 1100, 1800, 2600],
+    range: [200, 2800],
+  },
+  {
+    id: 'bpd',
+    labelVi: 'Đường kính lưỡng đỉnh',
+    labelEn: 'Biparietal diameter (BPD)',
+    titleVi: 'Biểu đồ đường kính lưỡng đỉnh',
+    titleEn: 'Biparietal diameter (BPD) chart',
+    unit: 'mm',
+    max: 100,
+    ticks: [20, 40, 60, 80],
+    values: [34, 47, 60, 72, 82, 90],
+    range: [25, 90],
+  },
+  {
+    id: 'hc',
+    labelVi: 'Chu vi vòng đầu',
+    labelEn: 'Head circumference (HC)',
+    titleVi: 'Biểu đồ chu vi vòng đầu',
+    titleEn: 'Head circumference (HC) chart',
+    unit: 'mm',
+    max: 360,
+    ticks: [80, 160, 240, 320],
+    values: [125, 175, 220, 260, 295, 325],
+    range: [100, 330],
+  },
 ] as const;
-type Metric = (typeof metrics)[number];
+
+type Metric = (typeof METRIC_ITEMS)[number];
 
 function GrowthChart({ metric, selected, onSelect }: { metric: Metric; selected: number; onSelect: (index: number) => void }) {
+  const { preferences, theme, scaleText } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [width, setWidth] = useState(0);
   const plotHeight = 144;
-  const plotWidth = Math.max(0, width - 54);
-  const x = (index: number) => 44 + (index / (weeks.length - 1)) * plotWidth;
+  const plotWidth = Math.max(0, width - 58);
+  const x = (index: number) => 48 + (index / (weeks.length - 1)) * plotWidth;
   const y = (value: number) => 16 + plotHeight * (1 - value / metric.max);
   return (
     <View style={s.chart} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
