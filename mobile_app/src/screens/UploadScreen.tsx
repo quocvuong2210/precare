@@ -988,61 +988,61 @@ function parseBackendIngestResult(
   fallbackWeek: number = 24,
   lang: AppLang = 'vi'
 ): MedicalAnalysisResult | null {
-    async (
-      localItemId: string,
-      taskId: string,
-      fileId: string | undefined,
-      fileName: string
-    ) => {
-      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-        if (!isMountedRef.current) return;
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  if (!payload || typeof payload !== 'object') return null;
+  const isEn = lang === 'en';
+  const rawAnalysis =
+    payload.analysis ||
+    payload.extracted_data ||
+    payload.biometric_data ||
+    payload.result ||
+    payload.data ||
+    payload;
 
-        try {
-          const statusRes: any = await getIngestTaskStatus(taskId);
-          const taskData: any = statusRes?.data || statusRes;
-          const rawState = String(taskData?.state || taskData?.status || '').toUpperCase();
-          const resolvedFileId = String(taskData?.file_id || fileId || '');
-          const progress = Number(taskData?.progress_percentage ?? 0);
-          const stageMsg = taskData?.stage_message || taskData?.current_stage || '';
+  const weekFromDays = rawAnalysis?.gestational_age_days
+    ? Math.floor(Number(rawAnalysis.gestational_age_days) / 7)
+    : 0;
 
-          updateItemsAndPersist((prev) =>
-            prev.map((it) =>
-              it.id === localItemId
-                ? {
-                    ...it,
-                    fileId: resolvedFileId || it.fileId,
-                    progressPercentage: progress,
-                    stageMessage: stageMsg,
-                  }
-                : it
-            )
-          );
+  const week =
+    weekFromDays ||
+    Number(
+      rawAnalysis?.gestational_week ||
+        rawAnalysis?.gestationalWeek ||
+        payload?.gestational_week ||
+        fallbackWeek
+    ) ||
+    detectWeekFromFileName(fileName);
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week, lang);
 
-          if (
-            rawState === 'SUCCESS' ||
-            rawState === 'COMPLETED' ||
-            rawState === 'DONE' ||
-            rawState === 'PENDING_REVIEW' ||
-            rawState === 'READY' ||
-            progress >= 100
-          ) {
-            let fileDetail: any = null;
-            if (resolvedFileId) {
-              const detailRes: any = await getIngestFileDetail(resolvedFileId).catch(() => null);
-              fileDetail = detailRes?.data || detailRes;
-            }
-
-            const verificationPayload = await fetchVerificationDataFromUrl(
-              taskData?.verification_url,
-              resolvedFileId
-            );
-
-            const presignedViewUrl = fileDetail?.presigned_view_url || undefined;
-            const analysis =
-              parseBackendIngestResult(
-                verificationPayload || fileDetail || taskData,
-                fileName,
+  if (Array.isArray(rawAnalysis?.metrics) && rawAnalysis.metrics.length > 0) {
+    const metrics: MedicalMetric[] = rawAnalysis.metrics.map((m: any) =>
+      buildMetricByWeek(
+        String(m.key || m.code || 'metric').toLowerCase(),
+        String(m.label || m.name || m.key || (isEn ? 'Metric' : 'Chỉ số')),
+        String(m.value ?? ''),
+        String(m.unit ?? ''),
+        String(m.refRange || m.ref_range || ''),
+        clampedWeek,
+        lang
+      )
+    );
+    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek, lang);
+    return {
+      recordType:
+        rawAnalysis.recordType ||
+        rawAnalysis.record_type ||
+        (isEn
+          ? 'Prenatal Checkup & Paraclinical Lab Report'
+          : 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng'),
+      gestationalWeek: clampedWeek,
+      gestationalDays: Number(rawAnalysis.gestationalDays ?? rawAnalysis.gestational_days ?? 0),
+      gestationalAge: stageLabel,
+      summary:
+        rawAnalysis.summary ||
+        (isEn
+          ? `Extracted from Ingest pipeline (${stageLabel}).`
+          : `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`),
+      doctorConclusion:
+        rawAnalysis.explanation_patient ||
                 profileWeek
               ) ||
               parseBackendIngestResult(
