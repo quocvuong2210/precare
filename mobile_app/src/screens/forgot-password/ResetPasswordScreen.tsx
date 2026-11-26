@@ -163,61 +163,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
         result.message || copy.defaultSuccessMsg,
         [
           {
-                  setNewPassword(value);
-                  setSubmitted(false);
-                }}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-                returnKeyType="next"
-              />
+            text: copy.backToLoginBtn,
+            onPress: () => navigation.navigate('Login'),
+          },
+        ],
+      );
+    } catch (error: any) {
+      Alert.alert(
+        copy.errorTitle,
+        error.message || copy.defaultErrorMsg,
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={loading}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                  size={19}
-                  color="#64748B"
-                />
-              </TouchableOpacity>
-            </View>
+  const renderRequirement = (valid: boolean, text: string) => (
+    <View style={styles.requirementRow} key={text}>
+      <Ionicons
+        name={valid ? 'checkmark-circle' : 'ellipse-outline'}
+        size={14}
+        color={valid ? '#22B981' : theme.muted}
+      />
+      <Text
+        style={[
+          styles.requirementText,
+          fontStyle(13.5, { lineHeight: 19, min: 12.5 }),
+          { color: theme.muted },
+          valid && styles.requirementValid,
+        ]}
+      >
+        {text}
+      </Text>
+    </View>
+  );
 
-            <Text style={styles.labelConfirm}>
-              Xác nhận mật khẩu mới
-              <Text style={styles.required}> *</Text>
-            </Text>
-
-            <View
-              style={[
-                styles.inputContainer,
-                passwordsMismatch && styles.inputError,
-              ]}
-            >
-              <TextInput
-                style={styles.input}
-                placeholder="Nhập lại mật khẩu mới"
-                placeholderTextColor="#94A3B8"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-                returnKeyType="done"
-                onSubmitEditing={handleResetPassword}
-              />
-
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() =>
-                  setShowConfirmPassword(!showConfirmPassword)
-                }
-                disabled={loading}
-              >
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={preferences.language === 'en' ? 'Reset password' : 'Đặt lại mật khẩu'}
+        onBack={() => navigation.goBack()}
+      />
+      <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: theme.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.progressArea}>
+            <View style={styles.progressTrack}>
+              <View style={styles.progressDone} />
+              <View style={styles.progressDone} />
                 <Ionicons
                   name={
                     showConfirmPassword ? 'eye-outline' : 'eye-off-outline'
