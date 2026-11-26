@@ -13,7 +13,6 @@ export interface UserAccountInfo {
   full_name: string;
   email: string;
   phone_number: string;
-  birthday?: string;
 }
 
 // Lưu thông tin tài khoản hiện tại trong phiên
@@ -25,6 +24,42 @@ const ACCESS_TOKEN_KEY = 'precare_access_token';
 const REFRESH_TOKEN_KEY = 'precare_refresh_token';
 export const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
 export const REMEMBER_ME_KEY = 'precare_remember_me';
+const ACCOUNT_OVERRIDE_KEY_PREFIX = 'precare_account_override_';
+
+function getAccountOverrideKey(user?: Pick<UserAccountInfo, 'id' | 'email'> | null): string | null {
+  const idPart = user?.id ? String(user.id).trim() : '';
+  const emailPart = user?.email ? String(user.email).trim().toLowerCase() : '';
+  const key = idPart || emailPart;
+  return key ? `${ACCOUNT_OVERRIDE_KEY_PREFIX}${key}` : null;
+}
+
+export async function mergeLocalAccountOverride(user: UserAccountInfo): Promise<UserAccountInfo> {
+  const overrideKey = getAccountOverrideKey(user);
+  if (!overrideKey) return user;
+  try {
+    const raw = await AsyncStorage.getItem(overrideKey);
+    if (!raw) return user;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return user;
+    return {
+      id: user.id || '',
+      full_name:
+        typeof parsed.full_name === 'string' && parsed.full_name.trim()
+          ? parsed.full_name.trim()
+          : user.full_name,
+      email:
+        typeof parsed.email === 'string' && parsed.email.trim()
+          ? parsed.email.trim().toLowerCase()
+          : user.email,
+      phone_number:
+        parsed.phone_number !== undefined && parsed.phone_number !== null
+          ? String(parsed.phone_number).trim()
+          : user.phone_number,
+    };
+  } catch {
+    return user;
+  }
+}
 
 export type PostAuthDestination = 'Main' | 'PregnancySetup';
 
@@ -447,13 +482,13 @@ export async function verifySessionWithBackend(
       return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
     }
 
-    const resolvedUser: UserAccountInfo = {
+    const baseUser: UserAccountInfo = {
       id: userObj?.id || userObj?.user_id || '',
       full_name: userObj?.full_name || userObj?.name || '',
       email: (userObj?.email || rememberedEmail || '').trim().toLowerCase(),
       phone_number: userObj?.phone_number || userObj?.phone || '',
-      birthday: userObj?.birthday || '',
     };
+    const resolvedUser = await mergeLocalAccountOverride(baseUser);
 
     currentAccessToken = activeToken;
     sessionRevision += 1;
@@ -544,17 +579,17 @@ export async function login(email: string, password: string) {
 
   currentAccessToken = token;
   sessionRevision += 1;
-  currentUserProfile = {
+  currentUserProfile = await mergeLocalAccountOverride({
     id: userObj.id || userObj.user_id || '',
     full_name: userObj.full_name || userObj.name || '',
     email: (userObj.email || normalizedEmail).trim().toLowerCase(),
     phone_number: userObj.phone_number || userObj.phone || '',
-    birthday: userObj.birthday || '',
-  };
+  });
 
   // Lưu token trong SecureStore và thông tin hồ sơ phiên trong AsyncStorage (không lưu Password)
   let tokenStorageFailed = false;
   try {
+    await AsyncStorage.removeItem('precare_pregnancy_profile_id');
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
     if (refreshToken) {
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
@@ -678,41 +713,6 @@ async function medicalRequest(path: string, body?: object): Promise<any> {
   if (!currentAccessToken) {
     throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: body ? 'POST' : 'GET',
-      headers: {
-        Authorization: `Bearer ${currentAccessToken}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: controller.signal,
-    });
-    return await handleResponse(response);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export async function requestPregnancyDeletion(
-  reason: string,
-  allowResearch: boolean
-): Promise<string> {
-  if (reason.trim().length < 10) {
-    throw new Error('Lý do cần có ít nhất 10 ký tự.');
-  }
-  if (!currentAccessToken) await restoreSession();
-  if (!currentAccessToken) {
-    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
-  }
-
-  const profile = await fetchPregnancyProfileFromDB(currentAccessToken);
-  const profileId = profile?.id ? String(profile.id).trim() : '';
-  if (!profileId) {
-    throw new Error('Không tìm thấy hồ sơ thai kỳ hiện tại để gửi yêu cầu xóa.');
   }
 
   const result = await medicalRequest('/deletion-requests', {
