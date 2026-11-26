@@ -20,6 +20,7 @@ import {
 } from "react-native-safe-area-context";
 
 import appConfig from "../../app.json";
+import ScreenHeader from "../components/ScreenHeader";
 import { useAppSettings } from "../context/AppSettingsContext";
 import type { MainTabParamList } from "../navigation/MainTabs";
 import type { RootStackParamList } from "../navigation/AppNavigator";
@@ -35,9 +36,6 @@ const translations = {
     account: "Tài khoản",
     personal: "Thông tin cá nhân",
     password: "Đổi mật khẩu",
-    notifications: "Thông báo",
-    events: "Sự kiện sắp diễn ra",
-    email: "Email thông báo",
     general: "Chung",
     language: "Ngôn ngữ",
     darkMode: "Chế độ tối",
@@ -50,7 +48,6 @@ const translations = {
     delete: "Yêu cầu xóa dữ liệu",
     export: "Xuất hồ sơ y tế (PDF)",
     textSize: "Điều chỉnh cỡ chữ",
-    contacts: "Liên hệ khẩn cấp",
     logout: "Đăng xuất",
     cancel: "Hủy",
     continue: "Tiếp tục",
@@ -59,7 +56,7 @@ const translations = {
     standard: "Mặc định",
     large: "Lớn",
     sample: "Mẹ an tâm, bé khỏe mạnh",
-    textSizeNote: "Xem trước cỡ chữ trong màn hình Cài đặt.",
+    textSizeNote: "Chọn cỡ chữ phù hợp để áp dụng cho toàn bộ ứng dụng.",
     passwordNote: "Xác thực email của mẹ để đặt lại mật khẩu qua mã OTP.",
     logoutNote: "Mẹ có muốn đăng xuất khỏi PreCare?",
     loggingOut: "Đang đăng xuất…",
@@ -73,15 +70,12 @@ const translations = {
       "Điều khoản sử dụng chính thức chưa được cập nhật trong phiên bản này. Nội dung sẽ được hiển thị tại đây khi có sẵn.",
     privacyNote:
       "Chính sách bảo mật chính thức chưa được cập nhật trong phiên bản này. Mẹ có thể xem và chỉnh sửa thông tin cá nhân trong mục Hồ sơ.",
-    helpProfile: "Cập nhật thông tin cá nhân ở đâu?",
+    helpProfile: "Xem chỉ số thai kỳ & sửa tài khoản ở đâu?",
     helpProfileAnswer:
-      "Vào Hồ sơ → Chỉnh sửa hồ sơ để cập nhật thông tin của mẹ.",
+      "Vào mục Hồ sơ để xem các chỉ số thai kỳ đã lưu và bấm Chỉnh sửa tài khoản để cập nhật thông tin cá nhân.",
     helpUpload: "Làm sao thêm phiếu khám?",
     helpUploadAnswer:
       "Vào Tải lên để chọn ảnh, chụp phiếu khám hoặc thêm tệp PDF.",
-    helpContacts: "Quản lý người liên hệ như thế nào?",
-    helpContactsAnswer:
-      "Chọn Liên hệ khẩn cấp để thêm, chỉnh sửa hoặc gọi người thân đã lưu.",
     storageError: "Chưa thể lưu cài đặt trên thiết bị. Vui lòng thử lại.",
   },
   en: {
@@ -91,9 +85,6 @@ const translations = {
     account: "Account",
     personal: "Personal information",
     password: "Change password",
-    notifications: "Notifications",
-    events: "Upcoming events",
-    email: "Email notifications",
     general: "General",
     language: "Language",
     darkMode: "Dark mode",
@@ -106,8 +97,17 @@ const translations = {
     delete: "Request data deletion",
     export: "Export health records (PDF)",
     textSize: "Text size",
-    contacts: "Emergency contacts",
     logout: "Log out",
+    cancel: "Cancel",
+    continue: "Continue",
+    understood: "Got it",
+    small: "Small",
+    standard: "Default",
+    large: "Large",
+    sample: "Care for you, care for your baby",
+    textSizeNote: "Choose a comfortable text size for the entire app.",
+    passwordNote:
+      "Verify your email with a one-time code to reset your password.",
     cancel: "Cancel",
     continue: "Continue",
     understood: "Got it",

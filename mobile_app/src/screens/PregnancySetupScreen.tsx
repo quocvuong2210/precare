@@ -482,18 +482,56 @@ export default function PregnancySetupScreen({ navigation }: Props) {
           )}
 
           {!preview ? (
-            <Pressable onPress={calculate} disabled={loading} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]}>
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.primaryText}>Xem tuổi thai dự kiến</Text><Ionicons name="arrow-forward" size={18} color="#FFFFFF" /></>}
+            <Pressable
+              onPress={calculate}
+              disabled={loading}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={[styles.primaryText, fontStyle(15.5, { min: 14.5 })]}>
+                    {isEn ? 'Calculate gestational age' : 'Xem tuổi thai dự kiến'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                </>
+              )}
             </Pressable>
           ) : (
             <View style={styles.buttonRow}>
-              <Pressable onPress={() => setPreview(null)} disabled={loading} style={styles.secondaryButton}><Text style={styles.secondaryText}>Sửa lại</Text></Pressable>
-              <Pressable onPress={save} disabled={loading} style={({ pressed }) => [styles.primaryButton, styles.saveButton, pressed && styles.pressed, loading && styles.disabled]}>
-                {loading ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.primaryText}>Lưu và tiếp tục</Text><Ionicons name="arrow-forward" size={18} color="#FFFFFF" /></>}
+              <Pressable
+                onPress={() => setPreview(null)}
+                disabled={loading}
+                style={[styles.secondaryButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <Text style={[styles.secondaryText, fontStyle(15, { min: 14 }), { color: theme.text }]}>
+                  {isEn ? 'Edit' : 'Sửa lại'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={save}
+                disabled={loading}
+                style={({ pressed }) => [styles.primaryButton, styles.saveButton, pressed && styles.pressed, loading && styles.disabled]}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Text style={[styles.primaryText, fontStyle(15.5, { min: 14.5 })]}>
+                      {isEn ? 'Save & Continue' : 'Lưu và tiếp tục'}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                  </>
+                )}
               </Pressable>
             </View>
           )}
-          <Text style={styles.disclaimer}>Kết quả chỉ để hỗ trợ theo dõi. Bác sĩ có thể điều chỉnh ngày dự sinh dựa trên hồ sơ khám của mẹ.</Text>
+          <Text style={[styles.disclaimer, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.muted }]}>
+            {isEn
+              ? 'Results are for tracking support only. Your doctor may adjust the due date based on clinical exams.'
+              : 'Kết quả chỉ để hỗ trợ theo dõi. Bác sĩ có thể điều chỉnh ngày dự sinh dựa trên hồ sơ khám của mẹ.'}
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -502,49 +540,47 @@ export default function PregnancySetupScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { flex: 1, backgroundColor: '#F4F9FC' },
+  screen: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, width: '100%', maxWidth: 600, alignSelf: 'center' },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  stepPill: { backgroundColor: '#DDF5F1', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  stepText: { color: colors.primaryDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  skip: { color: colors.textMuted, fontSize: 14, fontWeight: '600', padding: 8 },
+  stepPill: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  stepText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  skip: { fontSize: 14, fontWeight: '600', padding: 8 },
   heroIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, marginBottom: 15 },
-  title: { color: colors.navy, fontSize: 25, lineHeight: 32, fontWeight: '800', letterSpacing: -0.4 },
-  subtitle: { color: colors.textMuted, fontSize: 15, lineHeight: 22, marginTop: 9, marginBottom: 22 },
-  sectionTitle: { color: colors.navy, fontSize: 16, fontWeight: '700', marginBottom: 11 },
-  methodCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, marginBottom: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2EAF0', borderRadius: 15 },
-  methodSelected: { borderColor: colors.primary, backgroundColor: '#F0FBF8' },
-  methodIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F5F3' },
-  methodIconSelected: { backgroundColor: colors.primary },
+  title: { fontSize: 25, lineHeight: 32, fontWeight: '800', letterSpacing: -0.4 },
+  subtitle: { fontSize: 15, lineHeight: 22, marginTop: 9, marginBottom: 22 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 11 },
+  methodCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, marginBottom: 9, borderWidth: 1, borderRadius: 15 },
+  methodIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   methodCopy: { flex: 1 },
-  methodTitle: { color: colors.navy, fontSize: 14, fontWeight: '700' },
-  methodDescription: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  methodHelp: { color: colors.textMuted, fontSize: 12, marginTop: 0, marginBottom: 14 },
-  formCard: { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E8EEF2', marginBottom: 14 },
+  methodTitle: { fontSize: 14, fontWeight: '700' },
+  methodDescription: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  methodHelp: { fontSize: 12, marginTop: 0, marginBottom: 14 },
+  formCard: { padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 14 },
   field: { marginBottom: 3 },
-  label: { color: colors.navy, fontWeight: '700', fontSize: 13, marginBottom: 7 },
-  inputWrap: { minHeight: 48, borderRadius: 11, borderWidth: 1, borderColor: '#D8E2E9', flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, backgroundColor: '#FFFFFF' },
-  input: { flex: 1, paddingVertical: 11, color: colors.navy, fontSize: 15 },
-  unit: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
-  hint: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 6, marginBottom: 13 },
+  label: { fontWeight: '700', fontSize: 13, marginBottom: 7 },
+  inputWrap: { minHeight: 48, borderRadius: 11, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12 },
+  input: { flex: 1, paddingVertical: 11, fontSize: 15 },
+  unit: { fontSize: 14, fontWeight: '600' },
+  hint: { fontSize: 12, lineHeight: 17, marginTop: 6, marginBottom: 13 },
   twoColumns: { flexDirection: 'row', gap: 12 },
   column: { flex: 1 },
-  simpleInput: { minHeight: 48, borderRadius: 11, borderWidth: 1, borderColor: '#D8E2E9', paddingHorizontal: 12, color: colors.navy, fontSize: 15 },
-  errorBox: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 12, borderRadius: 11, backgroundColor: '#FEF2F2', marginBottom: 12 },
-  errorText: { flex: 1, color: '#991B1B', fontSize: 13, lineHeight: 19 },
-  previewCard: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 15, borderRadius: 15, backgroundColor: '#EAF8F4', borderWidth: 1, borderColor: '#BCE8DC', marginBottom: 14 },
+  simpleInput: { minHeight: 48, borderRadius: 11, borderWidth: 1, paddingHorizontal: 12, fontSize: 15 },
+  errorBox: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 12, borderRadius: 11, marginBottom: 12 },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  previewCard: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 15, borderRadius: 15, borderWidth: 1, marginBottom: 14 },
   previewIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   previewText: { flex: 1 },
-  previewTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: '700' },
-  previewAge: { color: colors.navy, fontSize: 20, fontWeight: '800', marginTop: 2 },
-  previewMeta: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+  previewTitle: { fontSize: 12, fontWeight: '700' },
+  previewAge: { fontSize: 20, fontWeight: '800', marginTop: 2 },
+  previewMeta: { fontSize: 12, marginTop: 3 },
   primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 },
   saveButton: { flex: 1 },
   primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   buttonRow: { flexDirection: 'row', gap: 10 },
-  secondaryButton: { minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
-  secondaryText: { color: colors.navy, fontSize: 14, fontWeight: '700' },
+  secondaryButton: { minHeight: 52, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  secondaryText: { fontSize: 14, fontWeight: '700' },
   pressed: { opacity: 0.86 },
   disabled: { opacity: 0.65 },
-  disclaimer: { color: colors.textMuted, fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
+  disclaimer: { fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
 });
