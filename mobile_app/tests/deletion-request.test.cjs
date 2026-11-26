@@ -91,6 +91,14 @@ test('full profile deletion fetches active pregnancy profile ID and sends checku
   }
 });
 
+test('full profile deletion defaults allow_anonymized_research to true when omitted', async () => {
+  const { api, calls } = setup({ success: true, data: { status: 'pending', request_id: 'receipt' } });
+  assert.equal(await api.requestPregnancyDeletion(' Lý do yêu cầu xóa hồ sơ '), 'receipt');
+  const deletionCall = calls.find((c) => c.url.endsWith('/deletion-requests'));
+  assert.ok(deletionCall);
+  assert.equal(JSON.parse(deletionCall.options.body).allow_anonymized_research, true);
+});
+
 test('invalid input and missing session never submit a deletion request', async () => {
   const { api, calls } = setup({}, 200, false);
   await assert.rejects(api.requestPregnancyDeletion('', false));

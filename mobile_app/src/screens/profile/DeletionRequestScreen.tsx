@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -29,7 +28,6 @@ export default function DeletionRequestScreen({
   const isEn = preferences.language === "en";
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
-  const [allowResearch, setAllowResearch] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [receipt, setReceipt] = useState("");
@@ -57,7 +55,7 @@ export default function DeletionRequestScreen({
     setSending(true);
     setError("");
     try {
-      const requestId = await requestPregnancyDeletion(reason, allowResearch);
+      const requestId = await requestPregnancyDeletion(reason);
       if (!alive.current) return;
       setReceipt(requestId);
       setConfirming(false);
@@ -142,33 +140,6 @@ export default function DeletionRequestScreen({
                 placeholderTextColor={theme.muted}
                 style={[s.input, inputFont, card, text]}
               />
-              <View style={[s.card, card]}>
-                <View style={s.row}>
-                  <Text style={[s.label, labelFont, text, s.container]}>
-                    {isEn
-                      ? "Allow anonymized data for clinical research"
-                      : "Cho phép dùng dữ liệu ẩn danh cho nghiên cứu"}
-                  </Text>
-                  <Switch
-                    accessibilityLabel={
-                      isEn
-                        ? "Allow anonymized data for clinical research"
-                        : "Cho phép dùng dữ liệu ẩn danh cho nghiên cứu"
-                    }
-                    value={allowResearch}
-                    onValueChange={setAllowResearch}
-                    trackColor={{
-                      true: colors.primary,
-                      false: theme.switchTrack,
-                    }}
-                  />
-                </View>
-                <Text style={[s.body, bodyFont, muted]}>
-                  {isEn
-                    ? "This option is optional. When disabled, your data will not be retained for research."
-                    : "Tùy chọn này không bắt buộc. Khi tắt, yêu cầu sẽ không cho phép giữ dữ liệu cho nghiên cứu."}
-                </Text>
-              </View>
               <Text style={[s.body, bodyFont, muted]}>
                 {isEn
                   ? "Scope: your active pregnancy profile and related checkups. Submitting this request will not delete your login account."
@@ -224,13 +195,6 @@ export default function DeletionRequestScreen({
               {isEn
                 ? "Are you sure you want to submit a pregnancy profile deletion request?"
                 : "Mẹ có chắc muốn gửi yêu cầu xóa hồ sơ thai kỳ hiện tại?"}
-            </Text>
-            <Text style={[s.body, bodyFont, muted]}>
-              {isEn ? "Anonymized research:" : "Nghiên cứu ẩn danh:"}{" "}
-              {allowResearch
-                ? (isEn ? "Allowed" : "Cho phép")
-                : (isEn ? "Not allowed" : "Không cho phép")}
-              .
             </Text>
             {sending && <ActivityIndicator color={colors.primary} />}
             <Pressable

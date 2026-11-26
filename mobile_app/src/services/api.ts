@@ -844,7 +844,7 @@ export async function updateLocalUserAccount(
 
 export async function requestPregnancyDeletion(
   reason: string,
-  allowResearch: boolean
+  allowResearch: boolean = true
 ): Promise<string> {
   if (reason.trim().length < 10) {
     throw new Error('Lý do cần có ít nhất 10 ký tự.');

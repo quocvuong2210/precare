@@ -5,11 +5,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Database,
-  Trash2,
-  AlertCircle,
-  User,
-  Filter,
 } from 'lucide-react';
 import { deletionApi } from '../services/deletion.service';
 import { DeletionRequestItem } from '../types/deletion.types';
@@ -129,7 +124,6 @@ export const DeletionRequestsReview: React.FC = () => {
                   <th className="py-3.5 px-4">Thai phụ yêu cầu</th>
                   <th className="py-3.5 px-4">Phạm vi xóa</th>
                   <th className="py-3.5 px-4">Lý do y khoa</th>
-                  <th className="py-3.5 px-4">Quyền riêng tư NCKH</th>
                   <th className="py-3.5 px-4">Trạng thái</th>
                   <th className="py-3.5 px-4 text-center">Hành động</th>
                 </tr>
@@ -161,19 +155,6 @@ export const DeletionRequestsReview: React.FC = () => {
                     {/* Lý do */}
                     <td className="py-4 px-4 max-w-xs">
                       <p className="line-clamp-2 text-slate-700 leading-relaxed">{item.reason}</p>
-                    </td>
-
-                    {/* Quyền riêng tư NCKH */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {item.allow_anonymized_research ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
-                          <Database className="w-3 h-3 text-teal-600" /> Cho phép ẩn danh AI
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                          <AlertCircle className="w-3 h-3 text-rose-500" /> Xóa sạch khỏi AI (Purge)
-                        </span>
-                      )}
                     </td>
 
                     {/* Trạng thái */}
