@@ -18,9 +18,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { forgotPassword } from '../../services/api';
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { colors } from '../../theme/colors';
 
 export default function ForgotPasswordScreen({ navigation }: any) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,12 +33,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     if (loading) return;
 
     if (!email.trim()) {
-      setError('Vui lòng nhập địa chỉ email.');
+      setError(isEn ? 'Please enter your email address.' : 'Vui lòng nhập địa chỉ email.');
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Email không hợp lệ. Vui lòng kiểm tra và nhập lại.');
+      setError(isEn ? 'Invalid email address. Please try again.' : 'Email không hợp lệ. Vui lòng kiểm tra và nhập lại.');
       return;
     }
 
@@ -52,20 +56,24 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     console.log('3. Đã gọi navigate');
   } catch (err: any) {
     console.log('FAIL:', err?.message);
-    setError(err?.message || 'Không thể gửi OTP. Vui lòng thử lại.');
+    setError(err?.message || (isEn ? 'Unable to send OTP. Please try again.' : 'Không thể gửi OTP. Vui lòng thử lại.'));
   } finally {
     setLoading(false);
   }
 };
 
   return (
-    <LinearGradient
-      colors={['#F7F9FC', '#F4F8FB']}
-      style={styles.flex}
-    >
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Forgot password' : 'Quên mật khẩu'}
+        onBack={() => navigation.goBack()}
+      />
 
-      <SafeAreaView style={styles.flex}>
+      <LinearGradient
+        colors={[theme.gradientTop, theme.gradientBottom]}
+        style={styles.flex}
+      >
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -78,12 +86,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
             <View style={styles.progressArea}>
               <View style={styles.progressTrack}>
                 <View style={styles.progressActive} />
-                <View style={styles.progressInactive} />
-                <View style={styles.progressInactive} />
+                <View style={[styles.progressInactive, { backgroundColor: theme.border }]} />
+                <View style={[styles.progressInactive, { backgroundColor: theme.border }]} />
               </View>
 
-              <Text style={styles.progressText}>
-                Bước 1/3 · Thông tin tài khoản
+              <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
+                {isEn ? 'Step 1/3 · Account details' : 'Bước 1/3 · Thông tin tài khoản'}
               </Text>
             </View>
 
@@ -96,18 +104,10 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                 />
               </View>
 
-              <Text style={styles.appName}>PreCare</Text>
+              <Text style={[styles.appName, fontStyle(19, { min: 17.5, max: 22 }), { color: theme.tealText }]}>PreCare</Text>
             </View>
 
             <View style={styles.heading}>
-              <Text style={styles.title}>Quên mật khẩu?</Text>
-
-              <Text style={styles.description}>
-                Đừng lo, PreCare sẽ giúp bạn lấy lại quyền truy cập.
-                Nhập email hoặc số điện thoại đã đăng ký nhé.
-              </Text>
-            </View>
-
             <View style={styles.form}>
               <Text style={styles.label}>
                 Email hoặc số điện thoại
