@@ -1098,61 +1098,61 @@ function parseBackendIngestResult(
     if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
       extractedMetrics.push(
         buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek, lang)
-              prev.map((item) =>
-                item.id === localItemId
-                  ? {
-                      ...item,
-                      fileId: resolvedFileId || item.fileId,
-                      taskId,
-                      canRetry: taskData?.can_retry ?? true,
-                      status: 'failed',
-                      errorMessage: String(errMsg),
-                    }
-                  : item
-              )
-            );
-            return;
-          }
-        } catch {
-          // Tiếp tục chờ Celery
-        }
-      }
-
-      let fileDetail: any = null;
-      if (fileId) {
-        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
-        fileDetail = detailRes?.data || detailRes;
-      }
-
-      const analysis =
-        parseBackendIngestResult(fileDetail, fileName, profileWeek) ||
-        buildDefaultExtractedAnalysis(fileName, profileWeek);
-
-      let fallbackItem: UploadItem | null = null;
-      updateItemsAndPersist((prev) =>
-        prev.map((item) => {
-          if (item.id !== localItemId) return item;
-          fallbackItem = {
-            ...item,
-            fileId: fileId || item.fileId,
-            taskId,
-            presignedUrl: fileDetail?.presigned_view_url || item.presignedUrl,
-            status: 'pending',
-            analysis,
-          };
-          return fallbackItem;
-        })
       );
-      if (fallbackItem) {
-        if (isMountedRef.current) {
-          openVerificationModal(fallbackItem, false);
-        }
-      }
-    },
-    [openVerificationModal, persistConfirmedItemToPostgreSQL, profileWeek, updateItemsAndPersist]
-  );
+    }
+  }
 
-  /* =========================================================================
+  if (extractedMetrics.length > 0) {
+    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek, lang);
+    return {
+      recordType:
+        rawAnalysis.record_type ||
+        (isEn
+          ? 'Prenatal Checkup & Paraclinical Lab Report'
+          : 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng'),
+      gestationalWeek: clampedWeek,
+      gestationalDays: 0,
+      gestationalAge: stageLabel,
+      summary: isEn
+        ? `Extracted ${extractedMetrics.length} paraclinical metrics.`
+        : `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
+      doctorConclusion: evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: false,
+      metrics: extractedMetrics,
+    };
+  }
+
+  return null;
+}
+
+const buildDefaultExtractedAnalysis = (
+  fileName: string,
+  defaultWeek: number = 24,
+  lang: AppLang = 'vi'
+): MedicalAnalysisResult => {
+  const isEn = lang === 'en';
+  const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek, lang);
+
+  const metrics: MedicalMetric[] = [
+    buildMetricByWeek('bp', localizeMetricLabel('bp', 'BP', lang), '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek, lang),
+    buildMetricByWeek(
+      'weight',
+      localizeMetricLabel('weight', 'Weight', lang),
+      '56.5',
+      'kg',
+      isEn ? '+6.5 kg (BMI 22.1)' : 'Tăng 6.5 kg (BMI 22.1)',
+      clampedWeek,
+      lang
+    ),
+    buildMetricByWeek('fhr', localizeMetricLabel('fhr', 'FHR', lang), '148', 'bpm', '120 – 160 bpm', clampedWeek, lang),
+    buildMetricByWeek('bpd', localizeMetricLabel('bpd', 'BPD', lang), '58', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('hc', localizeMetricLabel('hc', 'HC', lang), '215', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('fl', localizeMetricLabel('fl', 'FL', lang), '43', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('ac', localizeMetricLabel('ac', 'AC', lang), '195', 'mm', '', clampedWeek, lang),
      API 1: POST /api/v1/ingest/upload
      ========================================================================= */
   const uploadAndAnalyzeFile = async (
