@@ -1153,61 +1153,61 @@ const buildDefaultExtractedAnalysis = (
     buildMetricByWeek('hc', localizeMetricLabel('hc', 'HC', lang), '215', 'mm', '', clampedWeek, lang),
     buildMetricByWeek('fl', localizeMetricLabel('fl', 'FL', lang), '43', 'mm', '', clampedWeek, lang),
     buildMetricByWeek('ac', localizeMetricLabel('ac', 'AC', lang), '195', 'mm', '', clampedWeek, lang),
-     API 1: POST /api/v1/ingest/upload
-     ========================================================================= */
-  const uploadAndAnalyzeFile = async (
-    uri: string,
-    name: string,
-    size?: number | null,
-    mimeType: string = 'application/pdf'
-  ) => {
-    if (size && size > MAX_SIZE) {
-      Alert.alert('File quá lớn', 'Vui lòng chọn file tối đa 10MB.');
-      return;
-    }
+    buildMetricByWeek('efw', localizeMetricLabel('efw', 'EFW', lang), '710', 'g', '', clampedWeek, lang),
+    buildMetricByWeek('afi', localizeMetricLabel('afi', 'AFI', lang), '135', 'mm', '80 – 180 mm', clampedWeek, lang),
+    buildMetricByWeek('hgb', localizeMetricLabel('hgb', 'HGB', lang), '11.8', 'g/dL', '', clampedWeek, lang),
+    buildMetricByWeek('wbc', localizeMetricLabel('wbc', 'WBC', lang), '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek, lang),
+    buildMetricByWeek('glu', localizeMetricLabel('glu', 'Glucose', lang), '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek, lang),
+    buildMetricByWeek(
+      'pro',
+      localizeMetricLabel('pro', 'Protein', lang),
+      isEn ? '0.15 (Trace)' : '0.15 (Vết)',
+      'g/L',
+      isEn ? '< 0.15 g/L (Negative)' : '< 0.15 g/L (Âm tính)',
+      clampedWeek,
+      lang
+    ),
+    buildMetricByWeek('ph', localizeMetricLabel('ph', 'pH', lang), '6.9', '', '5.0 – 7.5', clampedWeek, lang),
+    buildMetricByWeek(
+      'leu',
+      localizeMetricLabel('leu', 'Leukocytes', lang),
+      isEn ? 'Negative' : 'Âm tính',
+      '',
+      isEn ? 'Negative' : 'Âm tính (Negative)',
+      clampedWeek,
+      lang
+    ),
+  ];
 
-    const newItemId = String(Date.now());
-    const newItem: UploadItem = {
-      id: newItemId,
-      profileId: profileId || undefined,
-      name,
-      time: nowLabel(),
-      status: 'processing',
-      uri,
-      mimeType,
-    };
+  const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek, lang);
+  return {
+    recordType: isEn
+      ? 'Prenatal Checkup, 4D Ultrasound & Screening Report'
+      : 'Phiếu Khám Thai, Siêu Âm 4D & Xét Nghiệm Tiền Sản',
+    gestationalWeek: clampedWeek,
+    gestationalDays: 3,
+    gestationalAge: stageLabel,
+    summary: isEn
+      ? `Analyzed and matched against ${stageLabel}.`
+      : `Đã phân tích và đối chiếu theo chuẩn ${stageLabel}.`,
+    doctorConclusion: evalState.doctorConclusion,
+    rule_version: DEFAULT_RULE_VERSION,
+    model_version: DEFAULT_MODEL_VERSION,
+    overallSeverity: evalState.overallSeverity,
+    savedToProfile: false,
+    metrics,
+  };
+};
 
-    updateItemsAndPersist((prev) => [newItem, ...prev]);
+const pad = (n: number) => String(n).padStart(2, '0');
+const nowLabel = (lang: AppLang = 'vi') => {
+  const d = new Date();
+  return `${UPLOAD_COPY[lang].todayPrefix}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
-    try {
-      const validPid = await ensureActivePregnancyProfileId(profileWeek);
-      setProfileId(validPid);
-
-      const uploadRes: any = await ingestUploadSingle(
-        { uri, name, type: mimeType },
-        validPid
-      );
-
-      const resData: any = uploadRes?.data || uploadRes;
-      const fileId = resData?.file_id ? String(resData.file_id) : undefined;
-      const taskId = resData?.task_id ? String(resData.task_id) : undefined;
-      const checkupId = resData?.checkup_id ?? null;
-
-      updateItemsAndPersist((prev) =>
-        prev.map((it) =>
-          it.id === newItemId
-            ? { ...it, fileId, taskId, checkupId, profileId: validPid }
-            : it
-        )
-      );
-
-      if (taskId) {
-        await pollCeleryTaskStatus(newItemId, taskId, fileId, name);
-        return;
-      }
-
-      let fileDetail: any = null;
-      if (fileId) {
+export function decodeFileName(name?: string, lang: AppLang = 'vi'): string {
+  if (!name) return UPLOAD_COPY[lang].defaultFileName;
+  try {
         const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
         fileDetail = detailRes?.data || detailRes;
       }
