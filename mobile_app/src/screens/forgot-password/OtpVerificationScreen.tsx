@@ -218,61 +218,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
       setResending(false);
     }
   };
-            >
-              <Text style={styles.changeEmail}>Thay đổi</Text>
-            </TouchableOpacity>
-          </View>
 
-          <Text style={styles.label}>Mã OTP</Text>
+  const handleContinue = () => {
+    if (otpExpiresIn === 0) {
+      Alert.alert(copy.expiredTitle, copy.expiredBody);
+      return;
+    }
 
-          <View style={styles.otpRow}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => {
-                  inputRefs.current[index] = ref;
-                }}
+    if (!/^\d{6}$/.test(otp)) {
+      Alert.alert(copy.notice, copy.enterSixDigits);
+      return;
+    }
+
+    navigation.navigate('ResetPassword', {
+      email,
+      otp_code: otp,
+    });
+  };
+
+  const canResend =
+    resendCooldown === 0 &&
+    resendCount < MAX_RESEND_COUNT &&
+    !resending;
+
+  const isOtpExpired = otpExpiresIn === 0;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={preferences.language === 'en' ? 'Verify OTP' : 'Xác thực mã OTP'}
+        onBack={() => navigation.goBack()}
+      />
+      <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: theme.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.progressArea}>
+            <View style={styles.progressTrack}>
+              <View style={styles.progressDone} />
+              <View style={styles.progressActive} />
+              <View
                 style={[
-                  styles.otpInput,
-                  otp[index] ? styles.otpFilled : null,
-                  index === otp.length && otp.length < 6
-                    ? styles.otpFocused
-                    : null,
-                  isOtpExpired && styles.otpExpired,
+                  styles.progressInactive,
+                  { backgroundColor: theme.divider },
                 ]}
-                value={otp[index] || ''}
-                onChangeText={(value) => handleOtpChange(value, index)}
-                onKeyPress={({ nativeEvent }) => {
-                  if (
-                    nativeEvent.key === 'Backspace' &&
-                    !otp[index] &&
-                    index > 0
-                  ) {
-                    inputRefs.current[index - 1]?.focus();
-                  }
-                }}
-                keyboardType="number-pad"
-                maxLength={6}
-                textAlign="center"
-                selectTextOnFocus
-                editable={!isOtpExpired}
-                autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                accessibilityLabel={`Chữ số OTP ${index + 1}`}
               />
-            ))}
-          </View>
+            </View>
 
-          <View style={styles.timerArea}>
-            <View style={styles.timerRow}>
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color={isOtpExpired ? '#DC2626' : '#64748B'}
-              />
-              <Text
-                style={[
-                  styles.timerText,
-                  isOtpExpired && styles.expiredText,
+            <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
+              {copy.stepText}
                 ]}
               >
                 {isOtpExpired
