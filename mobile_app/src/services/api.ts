@@ -1373,61 +1373,61 @@ export async function uploadMultipartViaXHR<T = any>(
     };
 
     xhr.onerror = () => {
-      ? profileId
-      : await ensureActivePregnancyProfileId();
+      console.log(`[XHR Error Event] status=${xhr.status}, response=${xhr.responseText}`);
+      if (xhr.status > 0) {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          const msg =
+            json?.detail?.message ||
+            (typeof json?.detail === 'string' ? json.detail : null) ||
+            json?.message;
+          if (msg) {
+            reject(new Error(msg));
+            return;
+          }
+        } catch {}
+      }
+      reject(
+        new Error(
+          'Lỗi kết nối mạng khi tải tài liệu lên máy chủ. Vui lòng kiểm tra kết nối mạng hoặc máy chủ Backend.'
+        )
+      );
+    };
 
-  const queryParams = new URLSearchParams();
-  if (params?.status) queryParams.append('status', params.status);
-  if (params?.document_type) queryParams.append('document_type', params.document_type);
-  queryParams.append('page', String(params?.page ?? 1));
-  queryParams.append('page_size', String(params?.page_size ?? 20));
+    xhr.ontimeout = () => {
+      reject(new Error('Hết thời gian chờ kết nối đến máy chủ PreCare (Timeout 60s).'));
+    };
 
-  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-  console.log(
-    `[API 7/8] Đang lấy danh sách tài liệu của hồ sơ: ${validProfileId} (GET /api/v1/ingest/profiles/${validProfileId}/files${queryString})...`
-  );
-
-  const headers = await getIngestAuthHeaders(false);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/profiles/${encodeURIComponent(validProfileId)}/files${queryString}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  );
-
-  const data: any = await handleResponse(response);
-  console.log(`Lấy danh sách tài liệu hồ sơ (${validProfileId}) thành công!`);
-  return data;
+    xhr.timeout = 60000;
+    xhr.send(formData);
+  });
 }
 
-// 8. POST /api/v1/ingest/files/{file_id}/retry — Thử lại quá trình trích xuất nếu task Celery bị failed
-export async function retryIngestFile(
-  fileId: string
-): Promise<{ success: boolean; message: string; data: string }> {
-  console.log(
-    `[API 8/8] Đang gửi yêu cầu thử lại trích xuất: ${fileId} (POST /api/v1/ingest/files/${fileId}/retry)...`
-  );
-  const headers = await getIngestAuthHeaders(true);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/files/${encodeURIComponent(fileId)}/retry`,
-    {
+/**
+ * Hàm điều phối tải tài liệu cận lâm sàng:
+ * Thử tải qua Fetch trước (khi đã kích hoạt EXPO_PUBLIC_USE_RN_FETCH=1),
+ * nếu môi trường gặp sự cố FormDataPart sẽ tự động Fallback sang native XMLHttpRequest.
+ */
+export async function uploadParaclinicalFile<T = any>(
+  url: string,
+  formData: FormData,
+  token?: string
+): Promise<T> {
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+
+  try {
+    const res = await fetch(url, {
       method: 'POST',
-      headers,
-    }
-  );
+      headers: {
+        Accept: 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: formData,
+    });
 
-  const data: any = await handleResponse(response);
-  console.log(`Thử lại trích xuất tài liệu (${fileId}) thành công!`);
-  return data;
-}
-
-// =========================================================================
-// --- ĐỒNG BỘ CHỈ SỐ SIÊU ÂM & KẾT QUẢ PHÂN TÍCH XUỐNG DATABASE POSTGRESQL ---
-// =========================================================================
-
-export interface SaveVerifiedAnalysisPayload {
-  fileId?: string;
+    const resJson: any = await safeParseJson(res);
+    if (res.ok) {
   profileId?: string;
   checkupId?: string | null;
   verificationUrl?: string;
