@@ -548,61 +548,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
             onPress={handleSaveManualResult}
             style={({ pressed }) => [
               styles.saveButton,
-                            `${pad(day)}/${pad(calendarMonth.month + 1)}/${calendarMonth.year}`
-                          );
-                          setCalendarOpen(false);
-                        }}
-                        style={[styles.calendarDay, selected && styles.calendarDaySelected]}
-                      >
-                        <Text
-                          style={[
-                            styles.calendarDayText,
-                            selected && styles.calendarDayTextSelected,
-                          ]}
-                        >
-                          {day}
-                        </Text>
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </View>
+              !canSave && { backgroundColor: theme.surfaceAlt },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons
+              name={canSave ? 'save-outline' : 'lock-closed-outline'}
+              size={18}
+              color={canSave ? colors.white : theme.muted}
+            />
+            <Text style={[styles.saveButtonText, fontStyle(15, { min: 14, max: 17 }), !canSave && { color: theme.muted }]}>
+              {isEn ? 'Save & View on Upload' : 'Lưu kết quả & Xem trên trang Tải lên'}
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
-    </SafeAreaView>
-  );
-}
+      </KeyboardAvoidingView>
 
-const WARNING_COLOR = '#B45309';
-const BORDER_COLOR = '#DCE5F0';
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  screen: { flex: 1, backgroundColor: '#F7F9FC' },
-  header: {
-    height: 54,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F7F9FC',
-  },
-  headerSpacer: { width: 32 },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: colors.navy },
-  pressed: { opacity: 0.75 },
-  scrollContent: { padding: 18, paddingBottom: 24 },
-  title: { fontSize: 18, fontWeight: '700', color: colors.navy },
+      <Modal
+        visible={calendarOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalendarOpen(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setCalendarOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel={isEn ? 'Close calendar' : 'Đóng lịch'}
+          />
+          <View style={[styles.calendarCard, { backgroundColor: theme.surface }]} accessibilityViewIsModal>
+            <View style={styles.calendarHeader}>
+              <Text style={[styles.calendarTitle, fontStyle(17, { max: 20 }), { color: theme.text }]}>
+                {isEn ? 'Select checkup date' : 'Chọn ngày khám'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Close calendar' : 'Đóng lịch'}
+                onPress={() => setCalendarOpen(false)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={22} color={theme.muted} />
+              </Pressable>
+            </View>
+            <View style={styles.calendarMonthRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Previous month' : 'Tháng trước'}
+                onPress={() => changeMonth(-1)}
+                style={styles.monthButton}
+              >
+                <Ionicons name="chevron-back" size={20} color={theme.text} />
+              </Pressable>
+              <Text style={[styles.calendarMonth, fontStyle(15, { min: 14, max: 17.5 }), { color: theme.text }]}>
+                {isEn
+                  ? `${MONTH_NAMES_EN[calendarMonth.month]} ${calendarMonth.year}`
   subtitle: {
     fontSize: 12,
     lineHeight: 18,
