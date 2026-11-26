@@ -493,13 +493,112 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  label: {
+    color: '#263449',
+    fontSize: 14.5,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  labelConfirm: {
+    color: '#263449',
+    fontSize: 14.5,
+    fontWeight: '700',
+    marginTop: 19,
+    marginBottom: 8,
+  },
+  required: {
+    color: '#EF4444',
+  },
+  inputContainer: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    paddingLeft: 12,
+    paddingRight: 5,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 10,
+    color: '#263449',
+    fontSize: 15.5,
+  },
+  eyeButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+    marginTop: 6,
+  },
+  errorText: {
+    flex: 1,
+    color: '#EF4444',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  strengthCard: {
+    padding: 12,
+    marginTop: 17,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7EDF3',
+    borderRadius: 10,
+  },
+  strengthHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  strengthTitle: {
+    color: '#64748B',
+    fontSize: 13.5,
+  },
+  strengthLabel: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  strengthStrong: {
+    color: '#22B981',
+  },
+  strengthWeak: {
+    color: '#EF4444',
+  },
+  strengthBars: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 3,
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+  },
+  requirementRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
     gap: 5,
   },
   requirementText: {
     color: '#94A3B8',
-    fontSize: 10,
+    fontSize: 13.5,
   },
   requirementValid: {
     color: '#22A879',
@@ -517,15 +616,16 @@ const styles = StyleSheet.create({
   noteText: {
     flex: 1,
     color: '#39847E',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
   bottomArea: {
     marginTop: 'auto',
     paddingTop: 24,
   },
   button: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     backgroundColor: '#438F87',
     borderRadius: 7,
     alignItems: 'center',
@@ -536,16 +636,18 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15.5,
     fontWeight: '700',
   },
   footer: {
+    minHeight: 44,
     alignItems: 'center',
-    paddingTop: 13,
+    justifyContent: 'center',
+    paddingTop: 10,
   },
   footerText: {
     color: '#168C80',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

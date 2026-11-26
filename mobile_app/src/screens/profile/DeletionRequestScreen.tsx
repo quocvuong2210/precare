@@ -13,19 +13,20 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/AppNavigator";
 import { requestPregnancyDeletion } from "../../services/api";
+import ScreenHeader from "../../components/ScreenHeader";
 import { useAppSettings } from "../../context/AppSettingsContext";
-import { settingsThemes } from "../../theme/settings";
 import { colors } from "../../theme/colors";
 
 export default function DeletionRequestScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, "DeletionRequest">) {
-  const { preferences } = useAppSettings();
-  const theme = settingsThemes[preferences.darkMode ? "dark" : "light"];
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === "en";
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const [allowResearch, setAllowResearch] = useState(false);
@@ -37,6 +38,11 @@ export default function DeletionRequestScreen({
   const text = { color: theme.text };
   const muted = { color: theme.muted };
   const card = { backgroundColor: theme.surface, borderColor: theme.border };
+  const titleFont = fontStyle(18, { lineHeight: 25, max: 21 });
+  const bodyFont = fontStyle(15, { lineHeight: 22, min: 14 });
+  const labelFont = fontStyle(15, { lineHeight: 22, min: 14 });
+  const inputFont = fontStyle(15.5, { lineHeight: 22, min: 14.5 });
+  const btnFont = fontStyle(15, { min: 14 });
 
   useEffect(() => {
     alive.current = true;
@@ -61,7 +67,9 @@ export default function DeletionRequestScreen({
         setError(
           err instanceof Error
             ? err.message
-            : "Không thể gửi yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi thử lại.",
+            : (isEn
+                ? "Unable to submit request. Please contact support before trying again."
+                : "Không thể gửi yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi thử lại."),
         );
       }
     } finally {
