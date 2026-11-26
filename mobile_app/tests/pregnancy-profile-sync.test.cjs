@@ -218,3 +218,113 @@ test('fetchCurrentUserFromDB syncs user info from DB without extra local-only fi
   });
 
   const user = await api.fetchCurrentUserFromDB();
+  assert.equal(calls[0].options.method, 'GET');
+  assert.deepEqual(JSON.parse(JSON.stringify(user)), {
+    id: '33333333-3333-4333-8333-333333333333',
+    full_name: 'Tran Thi B',
+    email: 'tranthib@example.com',
+    phone_number: '0901234567',
+  });
+  assert.equal('birthday' in user, false);
+  assert.deepEqual(JSON.parse(stored.get('precare_current_user')), JSON.parse(JSON.stringify(user)));
+});
+
+test('fetchCheckupHistoryFromDB validates UUID and fetches checkups with biometric_data from DB', async () => {
+  const { api, calls } = setup((url) => {
+    assert.ok(url.endsWith(`/checkups/pregnancy-profile/${PROFILE_UUID}`));
+    return {
+      status: 200,
+      body: {
+        success: true,
+        data: [
+          {
+            id: CHECKUP_UUID,
+            pregnancy_profile_id: PROFILE_UUID,
+            checkup_date: '2026-06-15',
+            biometric_data: { id: '44444444-4444-4444-8444-444444444444', bpd: 60, efw: 720 },
+          },
+        ],
+      },
+    };
+  });
+
+  const nonUuidResult = await api.fetchCheckupHistoryFromDB('profile_demo_01');
+  assert.equal(nonUuidResult.length, 0);
+  assert.equal(calls.length, 0);
+
+  const checkups = await api.fetchCheckupHistoryFromDB(PROFILE_UUID);
+  assert.equal(calls.length, 1);
+  assert.equal(checkups.length, 1);
+  assert.equal(checkups[0].id, CHECKUP_UUID);
+  assert.equal(checkups[0].biometric_data.efw, 720);
+});
+
+test('updateLocalUserAccount validates, persists per-user override and preserves edits across fetchCurrentUserFromDB', async () => {
+  const { api, stored } = setup(
+    (url) => {
+      assert.ok(url.endsWith('/auth/me'));
+      return {
+        status: 200,
+        body: {
+          id: '33333333-3333-4333-8333-333333333333',
+          full_name: 'Nguyen Thi A',
+          email: 'a@example.com',
+          phone_number: '0911111111',
+          role: 'pregnant_woman',
+        },
+      };
+    },
+    { precare_remembered_email: 'a@example.com' }
+  );
+
+  const updated = await api.updateLocalUserAccount({
+    full_name: '  Nguyen Thi Moi  ',
+    phone_number: ' 0909888777 ',
+    email: '  Moi@Example.com ',
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(updated)), {
+    id: '33333333-3333-4333-8333-333333333333',
+    full_name: 'Nguyen Thi Moi',
+    email: 'moi@example.com',
+    phone_number: '0909888777',
+  });
+  assert.equal(stored.get('precare_remembered_email'), 'moi@example.com');
+  assert.deepEqual(
+    JSON.parse(stored.get('precare_current_user')),
+    JSON.parse(JSON.stringify(updated))
+  );
+
+  const reloaded = await api.fetchCurrentUserFromDB();
+  assert.deepEqual(JSON.parse(JSON.stringify(reloaded)), JSON.parse(JSON.stringify(updated)));
+});
+
+test('updateLocalUserAccount rejects invalid full_name, phone_number and email', async () => {
+  const { api } = setup(() => ({ status: 200, body: {} }));
+
+  await assert.rejects(
+    api.updateLocalUserAccount({ full_name: '   ', email: 'a@example.com' }),
+    /Họ và tên không được để trống/
+  );
+  await assert.rejects(
+    api.updateLocalUserAccount({ full_name: 'Nguyen Thi A', phone_number: 'abc', email: 'a@example.com' }),
+    /Số điện thoại không hợp lệ/
+  );
+  await assert.rejects(
+    api.updateLocalUserAccount({ full_name: 'Nguyen Thi A', email: 'invalid-email' }),
+    /Email không hợp lệ/
+  );
+});
+
+test('date helpers enforce fixed DD/MM/YYYY format and convert cleanly with backend ISO', () => {
+  const dateSource = fs.readFileSync(path.join(__dirname, '../src/utils/date.ts'), 'utf8');
+  const transpiledDate = ts.transpileModule(dateSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  const dateExports = {};
+  vm.runInNewContext(transpiledDate, { exports: dateExports });
+
