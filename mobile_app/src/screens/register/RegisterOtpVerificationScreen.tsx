@@ -438,61 +438,61 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F7FAFC",
   },
+  scrollContent: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    paddingBottom: 20,
   },
-  otpRow: {
-    flexDirection: "row",
-    gap: 8,
-    height: "100%",
+  backButton: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    marginTop: 4,
   },
-  otpBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#DFE8F3",
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
+  brand: {
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 28,
+  },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
     alignItems: "center",
     justifyContent: "center",
   },
-  otpBoxFilled: {
-    borderColor: "#91D3CA",
-    backgroundColor: "#F0FDFA",
+  pulse: {
+    position: "absolute",
   },
-  otpBoxActive: {
-    borderWidth: 2,
-    borderColor: PRIMARY,
+  appName: {
+    marginTop: 10,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#00847C",
   },
-  otpDigit: {
-    fontSize: 23,
+  mailIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: "#E2F5F1",
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    lineHeight: 32,
     fontWeight: "700",
     color: "#0F172A",
+    textAlign: "center",
   },
-  otpInput: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-
-    opacity: 0,
-    color: "transparent",
-    backgroundColor: "transparent",
-  },
-  message: {
+  description: {
     marginTop: 10,
-    fontSize: 12,
-    color: "#B45309",
-    lineHeight: 18,
-  },
-  messageError: {
-    color: "#DC2626",
-  },
-  messageSuccess: {
-    color: "#0D9488",
-  },
-  verifyButton: {
-    minHeight: 46,
-    marginTop: 24,
-    borderRadius: 8,
     backgroundColor: PRIMARY,
     flexDirection: "row",
     alignItems: "center",
