@@ -14,45 +14,45 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { forgotPassword } from '../../services/api';
 
 const OTP_VALID_SECONDS = 15 * 60;
 const RESEND_WAIT_SECONDS = 3 * 60;
 const MAX_RESEND_COUNT = 3;
 
-export default function OtpVerificationScreen({ navigation, route }: any) {
-  const email = route.params?.email || '';
-
-  const [otp, setOtp] = useState('');
-  const [otpExpiresIn, setOtpExpiresIn] = useState(OTP_VALID_SECONDS);
-  const [resendCooldown, setResendCooldown] = useState(RESEND_WAIT_SECONDS);
-  const [resendCount, setResendCount] = useState(0);
-  const [resending, setResending] = useState(false);
-
-  const inputRefs = useRef<Array<TextInput | null>>([]);
-
-  // Đếm ngược thời hạn OTP và thời gian chờ gửi lại.
-  useEffect(() => {
-    if (otpExpiresIn === 0 && resendCooldown === 0) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setOtpExpiresIn((prev) => Math.max(0, prev - 1));
-      setResendCooldown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [otpExpiresIn, resendCooldown]);
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-
-    return `${String(minutes).padStart(2, '0')}:${String(
-      remainingSeconds,
+const translations = {
+  vi: {
+    notice: 'Thông báo',
+    limitReached: 'Bạn đã sử dụng hết 3 lượt gửi lại OTP.',
+    pleaseWait: 'Vui lòng chờ',
+    waitMessage: (time: string) => `Bạn có thể gửi lại mã sau ${time}.`,
+    resendSuccessTitle: 'Gửi mã thành công',
+    resendSuccessBody:
+      'OTP mới đã được gửi đến email của bạn. Mã có hiệu lực trong 15 phút.',
+    resendErrorTitle: 'Không thể gửi mã',
+    retryLater: 'Vui lòng thử lại sau.',
+    expiredTitle: 'OTP đã hết hạn',
+    expiredBody: 'Mã xác thực đã hết hạn. Vui lòng gửi lại mã mới.',
+    enterSixDigits: 'Vui lòng nhập đủ 6 chữ số OTP.',
+    stepText: 'Bước 2/3 · Xác thực tài khoản',
+    title: 'Nhập mã xác thực',
+    description:
+      'Nhập mã OTP 6 số được gửi đến email để tiếp tục đặt lại mật khẩu.',
+    change: 'Thay đổi',
+    otpLabel: 'Mã OTP',
+    digitAccessibility: (idx: number) => `Chữ số OTP ${idx}`,
+    otpExpiredText: 'Mã OTP đã hết hạn',
+    validFor: (time: string) => `Mã có hiệu lực trong ${time}`,
+    sendingCode: 'Đang gửi mã...',
+    noMoreResends: 'Đã hết 3 lượt gửi lại',
+    resendIn: (time: string) => `Gửi lại mã sau ${time}`,
+    resendPrompt: 'Chưa nhận được mã? Gửi lại mã',
+    resentCount: (count: number, max: number) =>
     ).padStart(2, '0')}`;
   };
 
