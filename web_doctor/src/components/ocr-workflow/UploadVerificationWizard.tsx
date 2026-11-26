@@ -389,7 +389,25 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
             : null,
         });
         if (isValidUuid(activeExtraction.fileId)) {
-          await ingestService.verifyUploadedFile(activeExtraction.fileId, savedCheckup?.id);
+          await ingestService.verifyUploadedFile(activeExtraction.fileId, savedCheckup?.id, {
+            visit_date: formattedDate,
+            biometrics: {
+              bpd_mm: bpdVal,
+              hc_mm: hcVal,
+              ac_mm: acVal,
+              fl_mm: flVal,
+              efw_g: efwVal,
+            },
+            vitals: {
+              weight_kg: validWeight,
+              blood_pressure_systolic: validBp ? sysBp : null,
+              blood_pressure_diastolic: validBp ? diaBp : null,
+              heart_rate_bpm: activeExtraction.vitals.heartRateBpm || null,
+              temperature_c: activeExtraction.vitals.temperatureC || null,
+              bmi: activeExtraction.vitals.bmi || null,
+            },
+            conclusions: activeExtraction.conclusions,
+          });
         }
       } catch (err) {
         console.warn('[Checkup API] Không thể lưu checkup lên Backend, tiếp tục lưu trạng thái UI:', err);

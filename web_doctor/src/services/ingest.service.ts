@@ -196,10 +196,12 @@ export const ingestService = {
    */
   async verifyUploadedFile(
     fileId: string,
-    checkupId?: string
+    checkupId?: string,
+    correctedPayload?: Record<string, unknown>
   ): Promise<void> {
     await apiClient.post(`/ingest/files/${fileId}/verify`, {
       checkup_id: checkupId || null,
+      corrected_payload: correctedPayload || null,
     });
   },
 

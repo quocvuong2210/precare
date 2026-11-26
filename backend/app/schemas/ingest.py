@@ -186,3 +186,4 @@ class WorklistQueueResponse(BaseModel):
 
 class VerifyFileRequest(BaseModel):
     checkup_id: Optional[uuid.UUID] = None
+    corrected_payload: Optional[Dict[str, Any]] = None
