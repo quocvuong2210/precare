@@ -1043,61 +1043,61 @@ function parseBackendIngestResult(
           : `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`),
       doctorConclusion:
         rawAnalysis.explanation_patient ||
-                profileWeek
-              ) ||
-              parseBackendIngestResult(
-                {
-                  extracted_fields: {
-                    bpd_mm: 77.5,
-                    hc_mm: 282.0,
-                    ac_mm: 260.0,
-                    fl_mm: 57.0,
-                    efw_g: 1650.0,
-                    bp: '118/76',
-                    weight: '56.5',
-                    fhr: '145',
-                  },
-                  gestational_week: profileWeek,
-                },
-                fileName,
-                profileWeek
-              ) ||
-              buildDefaultExtractedAnalysis(fileName, profileWeek);
+        rawAnalysis.app_explanation ||
+        rawAnalysis.doctorConclusion ||
+        evalState.doctorConclusion,
+      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
+      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
+      overallSeverity: evalState.overallSeverity,
+      savedToProfile: Boolean(rawAnalysis.savedToProfile ?? rawAnalysis.saved_to_profile ?? false),
+      metrics,
+    };
+  }
 
-            let finishedItem: UploadItem | null = null;
-            updateItemsAndPersist((prev) =>
-              prev.map((item) => {
-                if (item.id !== localItemId) return item;
-                finishedItem = {
-                  ...item,
-                  fileId: resolvedFileId || item.fileId,
-                  taskId,
-                  checkupId: fileDetail?.checkup_id ?? item.checkupId,
-                  presignedUrl: presignedViewUrl || item.presignedUrl,
-                  verificationUrl: taskData?.verification_url || item.verificationUrl,
-                  progressPercentage: 100,
-                  status: 'pending',
-                  errorMessage: undefined,
-                  analysis,
-                };
-                return finishedItem;
-              })
-            );
+  const knownKeys: { key: string; label: string; unit: string; ref: string }[] = [
+    { key: 'bp', label: localizeMetricLabel('bp', 'BP', lang), unit: 'mmHg', ref: '< 130/85 mmHg' },
+    {
+      key: 'weight',
+      label: localizeMetricLabel('weight', 'Weight', lang),
+      unit: 'kg',
+      ref: isEn ? 'By pregnancy BMI' : 'Theo BMI thai kỳ',
+    },
+    { key: 'fhr', label: localizeMetricLabel('fhr', 'FHR', lang), unit: 'bpm', ref: '120 – 160 bpm' },
+    { key: 'bpd', label: localizeMetricLabel('bpd', 'BPD', lang), unit: 'mm', ref: '' },
+    { key: 'hc', label: localizeMetricLabel('hc', 'HC', lang), unit: 'mm', ref: '' },
+    { key: 'fl', label: localizeMetricLabel('fl', 'FL', lang), unit: 'mm', ref: '' },
+    { key: 'ac', label: localizeMetricLabel('ac', 'AC', lang), unit: 'mm', ref: '' },
+    { key: 'efw', label: localizeMetricLabel('efw', 'EFW', lang), unit: 'g', ref: '' },
+    { key: 'afi', label: localizeMetricLabel('afi', 'AFI', lang), unit: 'mm', ref: '80 – 180 mm' },
+    { key: 'hgb', label: localizeMetricLabel('hgb', 'HGB', lang), unit: 'g/dL', ref: '' },
+    { key: 'wbc', label: localizeMetricLabel('wbc', 'WBC', lang), unit: 'G/L', ref: '4.5 – 11.0 G/L' },
+    { key: 'glu', label: localizeMetricLabel('glu', 'Glucose', lang), unit: 'mmol/L', ref: '< 5.1 mmol/L' },
+    { key: 'pro', label: localizeMetricLabel('pro', 'Protein', lang), unit: 'g/L', ref: '< 0.15 g/L' },
+    { key: 'ph', label: localizeMetricLabel('ph', 'pH', lang), unit: '', ref: '5.0 – 7.5' },
+  ];
 
-            if (finishedItem) {
-              if (isMountedRef.current) {
-                openVerificationModal(finishedItem, false);
-              }
-            }
-            return;
-          }
+  const fields =
+    rawAnalysis?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload?.extracted_fields ||
+    rawAnalysis?.ocr_raw_payload ||
+    rawAnalysis?.payload?.extracted_fields ||
+    rawAnalysis?.payload ||
+    rawAnalysis;
 
-          if (rawState === 'FAILURE' || rawState === 'FAILED' || rawState === 'ERROR') {
-            const errMsg =
-              taskData?.stage_message ||
-              taskData?.error_code ||
-              'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.';
-            updateItemsAndPersist((prev) =>
+  const extractedMetrics: MedicalMetric[] = [];
+  for (const item of knownKeys) {
+    const rawVal =
+      fields?.[item.key] ??
+      fields?.[`${item.key}_mm`] ??
+      fields?.[`${item.key}_g`] ??
+      fields?.[item.key.toUpperCase()] ??
+      rawAnalysis?.[item.key] ??
+      rawAnalysis?.[`${item.key}_mm`] ??
+      rawAnalysis?.[`${item.key}_g`] ??
+      rawAnalysis?.[item.key.toUpperCase()];
+    if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+      extractedMetrics.push(
+        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek, lang)
               prev.map((item) =>
                 item.id === localItemId
                   ? {
