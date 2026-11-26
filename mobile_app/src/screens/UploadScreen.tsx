@@ -823,61 +823,61 @@ export function evaluateMetricByWeek(
             : 'Mức Vàng: Nhịp tim thai lệch nhẹ ngưỡng 120–160 bpm, cần theo dõi thêm',
         };
       }
-      });
-    },
-    [profileId, profileWeek]
-  );
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Regular fetal heart rate within normal range (120–160 bpm)'
+          : 'Nhịp tim thai đều rõ, đáp ứng tốt (120–160 bpm)',
+      };
 
-  /* =========================================================================
-     API 7: GET /api/v1/ingest/profiles/{profile_id}/files
-     ========================================================================= */
-  const loadAccountData = useCallback(async () => {
-    if (isPickingFileRef.current) return;
-    try {
-      await restoreSession();
-      const storageKey = await resolveAccountStorageKey();
-      const savedData = await AsyncStorage.getItem(storageKey);
-      const localList: UploadItem[] = savedData ? JSON.parse(savedData) : [];
-      if (isMountedRef.current) {
-        setItems(localList);
+    case 'afi':
+      if (num < 50 || num > 240) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: Amniotic fluid index significantly abnormal (< 50mm or > 240mm), see a doctor promptly'
+            : 'Mức Đỏ: Chỉ số nước ối lệch nhiều (< 50mm hoặc > 240mm), mẹ nên đi khám sớm nhé',
+        };
       }
-
-      const realProfileId = await ensureActivePregnancyProfileId(24);
-      const dbProfile = await fetchPregnancyProfileFromDB();
-      const dbWeek = Number(
-        dbProfile?.gestational_weeks || dbProfile?.q1_gestational_weeks || 24
-      );
-      const safeWeek = dbWeek >= 12 && dbWeek <= 41 ? dbWeek : 24;
-
-      if (isMountedRef.current) {
-        setProfileId(realProfileId);
-        setProfileWeek(safeWeek);
+      if (num < 80 || num > 180) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Amniotic fluid mildly outside 80–180 mm — Remember to stay well hydrated'
+            : 'Mức Vàng: Nước ối lệch nhẹ khoảng 80–180 mm — Mẹ nhớ uống đủ nước nhé',
+        };
       }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal amniotic fluid volume (80–180 mm)'
+          : 'Lượng nước ối bình thường (80–180 mm)',
+      };
 
-      const filesRes: any = await getProfileIngestFiles(realProfileId, {
-        page: 1,
-        page_size: 50,
-      });
-      const remoteItems: any[] = Array.isArray(filesRes?.data?.items)
-        ? filesRes.data.items
-        : Array.isArray(filesRes?.items)
-        ? filesRes.items
-        : [];
+    case 'wbc':
+      if (num > 15.0 || num < 3.5) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: White blood cell count significantly off normal range, consult your doctor'
+            : 'Mức Đỏ: Bạch cầu lệch nhiều so với chuẩn, mẹ nên nhờ bác sĩ kiểm tra nhé',
+        };
+      }
+      if (num > 11.0 || num < 4.5) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Mild physiological WBC variation in pregnancy'
+            : 'Mức Vàng: Bạch cầu thay đổi nhẹ sinh lý thai kỳ',
+        };
+      }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal white blood cell count (4.5–11.0 G/L)'
+          : 'Số lượng bạch cầu bình thường (4.5–11.0 G/L)',
+      };
 
-      if (isMountedRef.current) {
-        const remoteIdSet = new Set<string>();
-        const syncedItems: UploadItem[] = [];
-
-        for (const rf of remoteItems) {
-          const fId = String(rf.id || rf.file_id || '');
-          if (!fId) continue;
-          remoteIdSet.add(fId);
-
-          const rawFileName = rf.file_name || `Phieu_kham_${fId.slice(0, 6)}.pdf`;
-          const fName = decodeFileName(rawFileName);
-
-          // Tìm dữ liệu tương ứng trong localList nếu có cache URI/analysis
-          const existing = localList.find(
             (it) =>
               it.fileId === fId ||
               it.id === fId ||
