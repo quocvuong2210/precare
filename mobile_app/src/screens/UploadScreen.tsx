@@ -1813,61 +1813,61 @@ export default function UploadScreen({ navigation }: Props) {
           if (!isMountedRef.current) break;
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-                      <Text style={styles.failedTitle}>
-                        {item.errorMessage || 'Quá trình trích xuất Celery bị gián đoạn.'}
-                      </Text>
-                    </View>
-                    <View style={styles.failedActionRow}>
-                      <Pressable
-                        style={styles.retryBtn}
-                        onPress={() => retryFailedFile(item)}
-                      >
-                        <Ionicons name="refresh" size={15} color={colors.white} />
-                        <Text style={styles.retryBtnText}>Thử lại trích xuất (Retry)</Text>
-                      </Pressable>
+          try {
+            const statusRes: any = await getIngestBatchStatus(batchId);
+            const stData: any = statusRes?.data || statusRes;
+            const completed = Number(stData?.completed_files ?? 0);
+            const total = Number(stData?.total_files ?? newBatchItems.length);
+            const pct = Number(stData?.overall_progress_percentage ?? 0);
 
-                      {deletingFileId === item.id ? (
-                        <ActivityIndicator size="small" color="#EF4444" style={{ marginHorizontal: 16 }} />
-                      ) : (
-                        <Pressable
-                          style={styles.removeFailedBtn}
-                          onPress={() => deleteItem(item)}
-                        >
-                          <Text style={styles.removeFailedBtnText}>Xoá file</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                )}
+            if (isMountedRef.current) {
+              setBatchProgressText(copyRef.current.batchProcessing(completed, total, pct));
+            }
 
-                {/* CHỈ HIỂN THỊ KHUNG MỞ MÀN HÌNH ĐỐI CHIẾU, KHÔNG HIỂN THỊ CÁC CHỈ SỐ Ở NGOÀI */}
-                {item.analysis && (
-                  <View style={styles.compactVerifyBox}>
-                    <View style={styles.slipPreviewHeader}>
-                      <View style={styles.slipPreviewTitleRow}>
-                        <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
-                        <Text style={styles.slipPreviewTitle}>
-                          {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
-                        </Text>
-                      </View>
-                      <Pressable
-                        style={styles.compareSplitBtn}
-                        onPress={() => openVerificationModal(item)}
-                      >
-                        <Ionicons name="git-compare-outline" size={14} color={colors.white} />
-                        <Text style={styles.compareSplitBtnText}>
-                          Mở màn hình Đối chiếu
-                        </Text>
-                      </Pressable>
-                    </View>
+            if (stData?.is_all_finished || (total > 0 && completed >= total)) {
+              break;
+            }
+          } catch {
+            break;
+          }
+        }
 
-                    {hasImagePreview ? (
-                      <Pressable onPress={() => openVerificationModal(item)}>
-                        <Image
-                          source={{ uri: previewSourceUri }}
-                          style={styles.slipThumbnail}
-                          resizeMode="cover"
-                        />
+        const newIds = new Set(newBatchItems.map((i) => i.id));
+        updateItemsAndPersist((prev) =>
+          prev.map((item) =>
+            newIds.has(item.id)
+              ? {
+                  ...item,
+                  status: 'pending',
+                  analysis: buildDefaultExtractedAnalysis(
+                    item.name,
+                    profileWeek,
+                    langRef.current
+                  ),
+                }
+              : item
+          )
+        );
+
+        setBatchProgressText(null);
+        Alert.alert(
+          copyRef.current.batchDoneTitle,
+          copyRef.current.batchDoneBody(newBatchItems.length)
+        );
+      } catch (err: any) {
+        setBatchProgressText(null);
+        Alert.alert(
+          copyRef.current.batchErrorTitle,
+          err?.message || copyRef.current.batchErrorBody
+        );
+      }
+    } finally {
+      isPickingFileRef.current = false;
+    }
+  };
+
+  /* =========================================================================
+     API 8: POST /api/v1/ingest/files/{file_id}/retry
                         <View style={styles.slipOverlayHint}>
                           <Ionicons name="expand-outline" size={14} color={colors.white} />
                           <Text style={styles.slipOverlayHintText}>
