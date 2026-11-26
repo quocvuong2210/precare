@@ -14,6 +14,7 @@ from app.api.deletion_request import router as deletion_request_router
 from app.models.uploaded_file import UploadedFile
 from app.models.growth_reference import GrowthReference
 from app.api.ingest import router as ingest_router
+from app.api.growth_reference import router as growth_reference_router
   
 
 # Initialize database tables
@@ -50,6 +51,9 @@ app.include_router(deletion_request_router, prefix="/api/v1/deletion-requests", 
 
 # Paraclinical Ingest & Queue Routes
 app.include_router(ingest_router, prefix="/api/v1/ingest", tags=["Paraclinical Ingest & Queue"])
+
+# Growth Reference LMS & Z-score Routes
+app.include_router(growth_reference_router, prefix="/api/v1/growth-references", tags=["Growth References & LMS"])
 
 
 @app.get("/", tags=["System"])
