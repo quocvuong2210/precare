@@ -383,61 +383,61 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                       styles.resendDisabled,
                       { color: theme.muted },
                     ],
-    color: "#00847C",
+                  ]}
+                >
+                  {verificationToken
+                    ? copy.verified
+                    : resending
+                      ? copy.resending
+                      : countdown > 0
+                        ? copy.resendIn(countdown)
+                        : copy.resend}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View
+              style={[
+                styles.note,
+                isDark && { backgroundColor: theme.surfaceAlt },
+              ]}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={19}
+                color={theme.muted}
+              />
+
+              <Text style={[styles.noteText, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.textSecondary }]}>
+                {copy.spamNote}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.footer}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={15}
+              color={theme.muted}
+            />
+            <Text style={[styles.footerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>
+              {copy.securityFooter}
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
   },
-  mailIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: "#E2F5F1",
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
+  screen: {
+    flex: 1,
+    backgroundColor: "#F7FAFC",
   },
-  title: {
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: "700",
-    color: "#0F172A",
-    textAlign: "center",
-  },
-  description: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 21,
-    textAlign: "center",
-    color: "#64748B",
-  },
-  email: {
-    marginTop: 4,
-    fontSize: 14,
-    lineHeight: 22,
-    fontWeight: "600",
-    color: "#0F172A",
-    textAlign: "center",
-  },
-  changeEmailButton: {
-    alignSelf: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 2,
-  },
-  changeEmailText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: PRIMARY,
-  },
-  label: {
-    marginTop: 24,
-    marginBottom: 10,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
-  },
-  otpContainer: {
-    position: "relative",
-    height: 54,
   },
   otpRow: {
     flexDirection: "row",
