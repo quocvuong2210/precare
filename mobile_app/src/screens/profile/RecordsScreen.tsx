@@ -626,38 +626,107 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             </View>
 
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-              {editor && (
-                <>
-                  <Text style={styles.formNote}>Thông tin được lưu theo tài khoản của mẹ.</Text>
-                  {fields[editor].map((field) => {
-                    const isTargetDate = field.key === 'target_date';
-                    return (
-                      <View key={field.key} style={styles.field}>
-                        <Text style={styles.inputLabel}>{field.label}</Text>
-                        <TextInput
-                          accessibilityLabel={field.label}
-                          style={styles.input}
-                          value={isTargetDate ? getTodayISO() : draft[field.key]}
-                          editable={!isTargetDate}
-                          placeholder={field.placeholder || field.label}
-                          placeholderTextColor={colors.textLight}
-                          keyboardType={field.key === 'email' ? 'email-address' : field.key.toLowerCase().includes('phone') ? 'phone-pad' : 'default'}
-                          autoCapitalize={field.key === 'email' ? 'none' : 'sentences'}
-                          onChangeText={(value) => {
-                            if (!isTargetDate) {
-                              setDraft((current) => ({ ...current, [field.key]: value }));
-                            }
-                          }}
-                        />
-                      </View>
-                    );
-                  })}
-                  {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-                  <Pressable accessibilityRole="button" style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]} onPress={save}>
-                    <Text style={styles.saveText}>Lưu thay đổi</Text>
-                  </Pressable>
-                </>
+              <Text style={[styles.formNote, fontStyle(14.5, { lineHeight: 22, min: 13.5 }), { color: theme.muted }]}>
+                {isEn
+                  ? 'Update your display name, phone number, and email on this device. Initial pregnancy metrics are locked here to keep clinical records consistent.'
+                  : 'Cập nhật họ tên, số điện thoại và email hiển thị cho tài khoản PreCare trên thiết bị này. Chỉ số thai kỳ ban đầu được khóa chỉnh sửa tại đây để đảm bảo nhất quán hồ sơ y tế.'}
+              </Text>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                  {isEn ? 'Full name' : 'Họ và tên'}
+                </Text>
+                <TextInput
+                  accessibilityLabel={isEn ? 'Full name' : 'Họ và tên'}
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.full_name}
+                  editable={!saving}
+                  placeholder={isEn ? 'Enter full name' : 'Nhập họ và tên'}
+                  placeholderTextColor={theme.muted}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, full_name: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                  {isEn ? 'Phone number' : 'Số điện thoại'}
+                </Text>
+                <TextInput
+                  accessibilityLabel={isEn ? 'Phone number' : 'Số điện thoại'}
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.phone_number}
+                  editable={!saving}
+                  placeholder={isEn ? 'e.g. 0912345678' : 'VD: 0912345678'}
+                  placeholderTextColor={theme.muted}
+                  keyboardType="phone-pad"
+                  maxLength={20}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, phone_number: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>Email</Text>
+                <TextInput
+                  accessibilityLabel="Email"
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.email}
+                  editable={!saving}
+                  placeholder="example@email.com"
+                  placeholderTextColor={theme.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, email: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              {!!error && (
+                <Text
+                  accessibilityRole="alert"
+                  style={[styles.error, fontStyle(14, { lineHeight: 20, min: 13 }), { color: theme.danger }]}
+                >
+                  {error}
+                </Text>
               )}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.saveButton,
+                  (pressed || saving) && styles.pressed,
+                ]}
+                onPress={() => void saveAccount()}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={[styles.saveText, fontStyle(15.5, { min: 14.5 })]}>
+                    {isEn ? 'Save account changes' : 'Lưu thông tin tài khoản'}
+                  </Text>
+                )}
+              </Pressable>
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
