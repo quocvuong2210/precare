@@ -658,61 +658,61 @@ export function evaluateMetricByWeek(
       return {
         severity: 'normal',
         clinicalNote: isEn
-    if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
-      extractedMetrics.push(
-        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek)
-      );
+          ? `Adequate hemoglobin for Trimester ${trimester} (≥ ${minHgb} g/dL).`
+          : `Đủ huyết sắc tố chuẩn Tam cá nguyệt ${trimester} (≥ ${minHgb} g/dL).`,
+        refRange: refText,
+      };
     }
   }
 
-  if (extractedMetrics.length > 0) {
-    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek);
+  if (key === 'pro') {
+    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
+    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
+    if (!isNaN(num)) {
+      if (num >= 0.3) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? `Red: High urine protein (${num} g/L ≥ 0.3) at week ${clampedWeek} — Please see your doctor promptly to check alongside blood pressure.`
+            : `Mức Đỏ: Đạm niệu cao (${num} g/L ≥ 0.3) ở tuần ${clampedWeek} — Mẹ nên đi khám sớm để bác sĩ kiểm tra kết hợp cùng huyết áp nhé.`,
+        };
+      }
+      if (num >= 0.15) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? `Yellow: Trace urine protein (${num} g/L) at week ${clampedWeek} — Stay hydrated and monitor blood pressure.`
+            : `Mức Vàng: Có vết Protein niệu (${num} g/L) ở tuần ${clampedWeek} — Mẹ nhớ uống đủ nước và theo dõi huyết áp nhé.`,
+        };
+      }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Negative (< 0.15 g/L) — Normal urinalysis.'
+          : 'Âm tính (< 0.15 g/L) — Chỉ số nước tiểu bình thường.',
+      };
+    }
+    if (lower.includes('++') || lower.includes('+++')) {
+      return {
+        severity: 'danger',
+        clinicalNote: isEn
+          ? 'Red: High urine protein — Please visit your doctor soon.'
+          : 'Mức Đỏ: Đạm niệu cao — Mẹ nên đi khám sớm nhé.',
+      };
+    }
+    if (lower.includes('vết') || lower.includes('trace') || lower.includes('+')) {
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
+          ? 'Yellow: Trace urine protein — Monitor and recheck.'
+          : 'Mức Vàng: Có vết Protein niệu — Cần theo dõi và kiểm tra lại.',
+      };
+    }
     return {
-      recordType: rawAnalysis.record_type || 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
-      gestationalWeek: clampedWeek,
-      gestationalDays: 0,
-      gestationalAge: stageLabel,
-      summary: `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
-      doctorConclusion: evalState.doctorConclusion,
-      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
-      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
-      overallSeverity: evalState.overallSeverity,
-      savedToProfile: false,
-      metrics: extractedMetrics,
+      severity: 'normal',
+      clinicalNote: isEn ? 'Negative — Normal' : 'Âm tính (Negative) — Bình thường',
     };
   }
-
-  return null;
-}
-
-const buildDefaultExtractedAnalysis = (
-  fileName: string,
-  defaultWeek: number = 24
-): MedicalAnalysisResult => {
-  const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
-  const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
-
-  const metrics: MedicalMetric[] = [
-    buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
-    buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
-    buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
-    buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-    buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
-    buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-    buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-    buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
-    buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
-    buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
-    buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
-    buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-    buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
-    buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.9', '', '5.0 – 7.5', clampedWeek),
-    buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
-  ];
-
-  const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
-  return {
-    recordType: 'Phiếu Khám Thai, Siêu Âm 4D & Xét Nghiệm Tiền Sản',
     gestationalWeek: clampedWeek,
     gestationalDays: 3,
     gestationalAge: stageLabel,
