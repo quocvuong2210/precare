@@ -53,61 +53,61 @@ const translations = {
     securityNote:
       'Không chia sẻ mật khẩu của bạn với bất kỳ ai, kể cả người tự xưng là nhân viên PreCare.',
     submitButton: 'Đổi mật khẩu',
-    submitted &&
-    confirmPassword.length > 0 &&
-    newPassword !== confirmPassword;
+    backToLogin: 'Quay lại đăng nhập',
+  },
+  en: {
+    strengthNone: 'None',
+    strengthWeak: 'Weak',
+    strengthMedium: 'Fair',
+    strengthStrong: 'Strong',
+    strengthVeryStrong: 'Very strong',
+    notice: 'Notice',
+    fillBothPasswords: 'Please fill in both password fields.',
+    minLengthError: 'Password must be at least 8 characters long.',
+    mismatchError: 'Confirmation password does not match.',
+    successTitle: 'Success',
+    defaultSuccessMsg: 'Your password has been updated.',
+    backToLoginBtn: 'Go to Sign in',
+    errorTitle: 'Unable to reset password',
+    defaultErrorMsg: 'Invalid or expired OTP.',
+    stepText: 'Step 3/3 · New password',
+    title: 'Set a new password',
+    description:
+      'Create a new password to protect your account and pregnancy records.',
+    newPasswordLabel: 'New password',
+    newPasswordPlaceholder: 'Enter new password',
+    confirmPasswordLabel: 'Confirm new password',
+    confirmPasswordPlaceholder: 'Re-enter new password',
+    mismatchInline: 'Confirmation password does not match. Please try again.',
+    strengthTitle: 'Password strength',
+    reqMinLength: 'At least 8 characters',
+    reqUpperLower: 'Contains lowercase and uppercase letters',
+    reqNumber: 'Contains at least one number',
+    reqSpecial: 'Contains at least one special character',
+    securityNote:
+      'Never share your password with anyone, even someone claiming to be PreCare staff.',
+    submitButton: 'Update password',
+    backToLogin: 'Back to Sign in',
+  },
+};
 
-  const handleResetPassword = async () => {
-    setSubmitted(true);
+export default function ResetPasswordScreen({ navigation, route }: any) {
+  const email = route.params?.email || '';
+  const otp_code = route.params?.otp_code || '';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const copy = translations[preferences.language];
 
-    if (loading) return;
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-    if (!newPassword || !confirmPassword) {
-      Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ mật khẩu.');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      Alert.alert('Thông báo', 'Mật khẩu phải có ít nhất 8 ký tự.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Thông báo', 'Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const result = await resetPassword(email, otp_code, newPassword);
-
-      Alert.alert(
-        'Thành công',
-        result.message || 'Mật khẩu đã được thay đổi.',
-        [
-          {
-            text: 'Về đăng nhập',
-            onPress: () => navigation.navigate('Login'),
-          },
-        ],
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Không thể đổi mật khẩu',
-        error.message || 'OTP không hợp lệ hoặc đã hết hạn.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderRequirement = (valid: boolean, text: string) => (
-    <View style={styles.requirementRow} key={text}>
-      <Ionicons
-        name={valid ? 'checkmark-circle' : 'ellipse-outline'}
-        size={14}
-        color={valid ? '#22B981' : '#A3AFBF'}
+  const hasMinLength = newPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
       />
       <Text
         style={[
