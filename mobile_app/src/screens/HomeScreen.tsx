@@ -365,46 +365,57 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ================= QUICK ACCESS ================= */}
-        <Text style={styles.sectionTitle}>Lối tắt nhanh</Text>
+        <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Quick Actions' : 'Lối tắt nhanh'}
+        </Text>
 
         <View style={styles.quickGrid}>
           <QuickButton
             icon="add-circle-outline"
-            title="Tải phiếu khám"
+            title={isEn ? 'Upload scan' : 'Tải phiếu khám'}
             onPress={() => navigation.navigate('Upload')}
           />
 
           <QuickButton
             icon="analytics-outline"
-            title="Lịch sử kết quả"
+            title={isEn ? 'Result history' : 'Lịch sử kết quả'}
             onPress={() => navigation.navigate('HistoryResults')}
           />
 
           <QuickButton
             icon="pulse-outline"
-            title="Biểu đồ thai"
+            title={isEn ? 'Growth charts' : 'Biểu đồ thai'}
             onPress={() => navigation.navigate('Charts')}
           />
 
           <QuickButton
             icon="calendar-outline"
-            title="Lịch hẹn khám"
+            title={isEn ? 'Appointments' : 'Lịch hẹn khám'}
             onPress={() => navigation.navigate('Appointments')}
           />
         </View>
 
-        {/* ================= APPOINTMENT ================= */}
-        <Text style={styles.sectionTitle}>Lịch khám sắp tới</Text>
+        <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Upcoming Appointments' : 'Lịch khám sắp tới'}
+        </Text>
 
         <TouchableOpacity
-          style={styles.appointmentCard}
+          style={[
+            styles.appointmentCard,
+            { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+          ]}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Appointments')}
         >
           <View style={styles.appointmentInfo}>
-            <Text style={styles.appointmentTitle}>Chưa có lịch khám nào</Text>
-            <Text style={styles.appointmentNote}>Lịch hẹn sẽ hiển thị tại đây sau khi được tạo.</Text>
+            <Text style={[styles.appointmentTitle, fontStyle(15, { min: 14 }), { color: theme.tealText }]}>
+              {isEn ? 'No upcoming appointments' : 'Chưa có lịch khám nào'}
+            </Text>
+            <Text style={[styles.appointmentNote, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Appointments will appear here once scheduled.'
+                : 'Lịch hẹn sẽ hiển thị tại đây sau khi được tạo.'}
+            </Text>
           </View>
         </TouchableOpacity>
       </ScrollView>
@@ -421,45 +432,52 @@ function QuickButton({
   title: string;
   onPress?: () => void;
 }) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <TouchableOpacity style={styles.quickButton} activeOpacity={0.8} onPress={onPress}>
-      <View style={styles.quickIcon}>
+    <TouchableOpacity
+      style={[styles.quickButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: theme.tealSoft }]}>
         <Ionicons name={icon} size={21} color={colors.primary} />
       </View>
-      <Text style={styles.quickTitle}>{title}</Text>
+      <Text style={[styles.quickTitle, fontStyle(14, { lineHeight: 19, min: 13, max: 16.5 }), { color: theme.text }]}>
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7FBFC' },
+  container: { flex: 1 },
   header: {
-    height: 75,
+    minHeight: 75,
     paddingHorizontal: 20,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F7FBFC',
+    gap: 10,
   },
-  userInfo: { flexDirection: 'row', alignItems: 'center' },
+  userInfo: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  userTextCol: { flex: 1 },
   avatar: {
     width: 43,
     height: 43,
     borderRadius: 22,
-    backgroundColor: '#DDEDEA',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
-  hello: { fontSize: 11, color: '#7C8B98' },
-  userName: { marginTop: 2, fontSize: 14, fontWeight: '800', color: colors.navy },
+  hello: { fontSize: 13 },
+  userName: { marginTop: 2, fontSize: 16, fontWeight: '800' },
   weekBadge: {
     paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#D9FAF4',
   },
-  weekText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+  weekText: { fontSize: 12.5, fontWeight: '700' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
   pregnancyCard: {
     minHeight: 113,
@@ -476,9 +494,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   pregnancyInfo: { flex: 1, paddingRight: 10 },
-  smallWhite: { fontSize: 9, color: '#D8F7F2', letterSpacing: 0.5 },
-  weekNumber: { marginTop: 3, fontSize: 22, fontWeight: '800', color: colors.white },
-  dueDate: { marginTop: 3, fontSize: 9, color: '#D8F7F2' },
+  smallWhite: { fontSize: 11.5, color: '#D8F7F2', letterSpacing: 0.5 },
+  weekNumber: { marginTop: 3, fontSize: 24, fontWeight: '800', color: colors.white },
+  dueDate: { marginTop: 3, fontSize: 12.5, color: '#D8F7F2' },
   progressBackground: {
     marginTop: 10,
     width: '100%',
@@ -488,7 +506,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progress: { width: '60%', height: '100%', backgroundColor: colors.white },
-  progressText: { marginTop: 5, fontSize: 8, color: '#D8F7F2' },
+  progressText: { marginTop: 5, fontSize: 12, color: '#D8F7F2' },
   pregnancyImageContainer: {
     width: 54,
     height: 72,
@@ -504,8 +522,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#DDE8E5',
-    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#0F172A',
@@ -513,10 +529,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
-  },
-  doctorCardUnassigned: {
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
   },
   doctorIcon: {
     width: 44,
@@ -531,33 +543,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  doctorIconUnassigned: {
-    backgroundColor: '#EEF2F5',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   doctorInfo: { flex: 1, marginLeft: 12 },
-  doctorLabel: { fontSize: 8.5, lineHeight: 12, color: '#748995', fontWeight: '800', letterSpacing: 0.7 },
-  doctorNameRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
-  assignedDoctorName: { flexShrink: 1, fontSize: 13.5, lineHeight: 19, color: colors.navy, fontWeight: '800' },
-  assignedDoctorNameUnassigned: { color: colors.textMuted },
+  doctorLabel: { fontSize: 11, lineHeight: 15, fontWeight: '800', letterSpacing: 0.7 },
+  doctorNameRow: { marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  assignedDoctorName: { flexShrink: 1, fontSize: 15.5, lineHeight: 22, fontWeight: '800' },
   assignedBadge: {
-    marginLeft: 8,
-    height: 24,
+    minHeight: 24,
     paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: '#EAF8F4',
     flexDirection: 'row',
     alignItems: 'center',
   },
   assignedDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5, backgroundColor: '#18A878' },
-  assignedBadgeText: { fontSize: 8.5, color: '#3C7668', fontWeight: '700' },
+  assignedBadgeText: { fontSize: 11.5, fontWeight: '700' },
   sectionTitle: {
     marginTop: 18,
     marginBottom: 10,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '800',
-    color: colors.navy,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -566,13 +570,12 @@ const styles = StyleSheet.create({
   },
   quickButton: {
     width: '48%',
-    height: 65,
+    minHeight: 65,
     marginBottom: 10,
     paddingHorizontal: 10,
+    paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#E1EAF0',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#0F172A',
@@ -585,23 +588,20 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 9,
-    backgroundColor: '#E9FAF7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
-  quickTitle: { flex: 1, fontSize: 10.5, fontWeight: '600', color: colors.navy },
+  quickTitle: { flex: 1, fontSize: 14, fontWeight: '600' },
   appointmentCard: {
     minHeight: 66,
-    padding: 10,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#A8EEDF',
-    backgroundColor: '#F0FFFC',
     flexDirection: 'row',
     alignItems: 'center',
   },
   appointmentInfo: { flex: 1 },
-  appointmentTitle: { fontSize: 10.5, color: colors.primaryDark, fontWeight: '700' },
-  appointmentNote: { marginTop: 3, fontSize: 9, color: '#7B8C99' },
+  appointmentTitle: { fontSize: 15, fontWeight: '700' },
+  appointmentNote: { marginTop: 3, fontSize: 13 },
 });

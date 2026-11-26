@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import {
   loadRememberedLoginState,
   login,
@@ -31,6 +34,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation, route }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,7 +89,11 @@ export default function LoginScreen({ navigation, route }: Props) {
         }
       } catch {
         if (isMounted) {
-          setError('Không thể tải thông tin đăng nhập đã lưu.');
+          setError(
+            isEn
+              ? 'Unable to load saved login credentials.'
+              : 'Không thể tải thông tin đăng nhập đã lưu.',
+          );
         }
       } finally {
         if (isMounted) {
@@ -98,16 +107,7 @@ export default function LoginScreen({ navigation, route }: Props) {
     return () => {
       isMounted = false;
     };
-  }, [navigation, route.params?.sessionMessage, route.params?.skipAutoLogin]);
-
-  const isBusy = loading || autoAuthenticating;
-
-  const handleLogin = async () => {
-    if (isBusy) {
-      return;
-    }
-
-    const trimmedEmail = email.trim();
+  }, [isEn, navigation, route.params?.sessionMessage, route.params?.skipAutoLogin]);
     if (!trimmedEmail || !password) {
       setError('Vui lòng nhập email và mật khẩu.');
       return;
