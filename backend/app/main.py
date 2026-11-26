@@ -13,8 +13,10 @@ from app.api.deletion_request import router as deletion_request_router
 
 from app.models.uploaded_file import UploadedFile
 from app.models.growth_reference import GrowthReference
+from app.models.analysis_result import AnalysisResult
 from app.api.ingest import router as ingest_router
 from app.api.growth_reference import router as growth_reference_router
+from app.api.clinical_rule import router as clinical_rule_router
   
 
 # Initialize database tables
@@ -54,6 +56,9 @@ app.include_router(ingest_router, prefix="/api/v1/ingest", tags=["Paraclinical I
 
 # Growth Reference LMS & Z-score Routes
 app.include_router(growth_reference_router, prefix="/api/v1/growth-references", tags=["Growth References & LMS"])
+
+# Clinical Rule Engine Routes
+app.include_router(clinical_rule_router, prefix="/api/v1/clinical-rules", tags=["Clinical Rule Engine"])
 
 
 @app.get("/", tags=["System"])
