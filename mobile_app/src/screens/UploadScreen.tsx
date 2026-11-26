@@ -438,61 +438,61 @@ const UPLOAD_COPY = {
       'Server denied deletion or connection failed. Please try again.',
     successTitle: 'Success',
     deleteSuccessBody: 'Document deleted from app and database.',
-        };
-      }
-    }
-    return { severity: 'normal', clinicalNote: 'Huyết áp ổn định (< 130/85 mmHg).' };
-  }
+    savedDbTitle: 'Verified & Saved to Database',
+    savedDbBody:
+      'Report metrics have been verified and synced directly to PostgreSQL!',
+    savedDbEndpointsLabel: 'Database connection details:',
+    saveProfileErrorTitle: 'Save profile',
+    saveProfileFallback: 'Profile updated. Please check server connectivity.',
+    permissionDeniedTitle: 'Permission required',
+    cameraPermissionBody: 'Please allow camera access in device Settings.',
+    chooserTitle: 'Upload paraclinical report',
+    chooserSub: 'Choose upload method:',
+    chooserTakePhoto: 'Take report photo (Single)',
+    chooserPickImage: 'Choose 1 photo from library',
+    chooserPickPdf: 'Choose 1 PDF / Image file',
+    chooserBatch: 'Batch upload multiple files',
+  },
+} as const;
 
-  if (key === 'leu') {
-    if (lower.includes('dương') || lower.includes('+') || (parseFloat(clean) || 0) > 25) {
-      return { severity: 'warning', clinicalNote: 'Bạch cầu niệu dương tính — Cần trao đổi thêm với bác sĩ' };
-    }
-    return { severity: 'normal', clinicalNote: 'Âm tính — Bình thường' };
-  }
+type RangePair = [number, number];
+type WeeklyFetalStandard = {
+  bpd: RangePair;
+  hc: RangePair;
+  ac: RangePair;
+  fl: RangePair;
+  efw: RangePair;
+};
 
-  const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
-  const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-  if (isNaN(num)) return { severity: 'normal', clinicalNote: 'Trong giới hạn sinh lý' };
-
-  switch (key) {
-    case 'fhr':
-      if (num < 110 || num > 170) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Nhịp tim thai ngoài ngưỡng 110–170 bpm, mẹ nên đi khám ngay nhé' };
-      }
-      if (num < 120 || num > 160) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Nhịp tim thai lệch nhẹ ngưỡng 120–160 bpm, cần theo dõi thêm' };
-      }
-      return { severity: 'normal', clinicalNote: 'Nhịp tim thai đều rõ, đáp ứng tốt (120–160 bpm)' };
-
-    case 'afi':
-      if (num < 50 || num > 240) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Chỉ số nước ối lệch nhiều (< 50mm hoặc > 240mm), mẹ nên đi khám sớm nhé' };
-      }
-      if (num < 80 || num > 180) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Nước ối lệch nhẹ khoảng 80–180 mm — Mẹ nhớ uống đủ nước nhé' };
-      }
-      return { severity: 'normal', clinicalNote: 'Lượng nước ối bình thường (80–180 mm)' };
-
-    case 'wbc':
-      if (num > 15.0 || num < 3.5) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Bạch cầu lệch nhiều so với chuẩn, mẹ nên nhờ bác sĩ kiểm tra nhé' };
-      }
-      if (num > 11.0 || num < 4.5) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Bạch cầu thay đổi nhẹ sinh lý thai kỳ' };
-      }
-      return { severity: 'normal', clinicalNote: 'Số lượng bạch cầu bình thường (4.5–11.0 G/L)' };
-
-    case 'ph':
-      if (num < 4.5 || num > 8.0) {
-        return { severity: 'warning', clinicalNote: 'Độ pH nước tiểu lệch ngưỡng 5.0–7.5' };
-      }
-      return { severity: 'normal', clinicalNote: 'Độ pH nước tiểu bình thường (5.0–7.5)' };
-
-    default:
-      return { severity: 'normal', clinicalNote: 'Ổn định theo tuổi thai' };
-  }
-}
+const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
+  12: { bpd: [18, 24], hc: [65, 85],   ac: [52, 68],   fl: [7, 12],  efw: [12, 20] },
+  13: { bpd: [21, 28], hc: [78, 98],   ac: [64, 82],   fl: [10, 15], efw: [20, 32] },
+  14: { bpd: [25, 32], hc: [92, 114],  ac: [76, 96],   fl: [13, 19], efw: [35, 55] },
+  15: { bpd: [29, 36], hc: [105, 128], ac: [88, 108],  fl: [16, 22], efw: [58, 88] },
+  16: { bpd: [32, 39], hc: [118, 142], ac: [98, 120],  fl: [19, 25], efw: [85, 125] },
+  17: { bpd: [35, 43], hc: [130, 156], ac: [110, 134], fl: [22, 28], efw: [120, 170] },
+  18: { bpd: [39, 46], hc: [144, 170], ac: [122, 146], fl: [25, 31], efw: [165, 230] },
+  19: { bpd: [42, 49], hc: [155, 182], ac: [133, 158], fl: [28, 34], efw: [215, 295] },
+  20: { bpd: [45, 52], hc: [166, 194], ac: [144, 170], fl: [31, 37], efw: [275, 375] },
+  21: { bpd: [48, 55], hc: [178, 206], ac: [154, 182], fl: [33, 40], efw: [340, 455] },
+  22: { bpd: [50, 58], hc: [188, 218], ac: [165, 193], fl: [36, 42], efw: [410, 550] },
+  23: { bpd: [53, 60], hc: [198, 228], ac: [174, 203], fl: [38, 45], efw: [490, 650] },
+  24: { bpd: [54, 62], hc: [206, 236], ac: [182, 208], fl: [39, 46], efw: [600, 780] },
+  25: { bpd: [58, 66], hc: [218, 248], ac: [195, 225], fl: [43, 49], efw: [680, 900] },
+  26: { bpd: [61, 69], hc: [228, 258], ac: [205, 236], fl: [45, 52], efw: [800, 1060] },
+  27: { bpd: [64, 72], hc: [238, 268], ac: [216, 248], fl: [48, 54], efw: [920, 1230] },
+  28: { bpd: [67, 75], hc: [248, 278], ac: [226, 260], fl: [50, 56], efw: [1060, 1410] },
+  29: { bpd: [70, 78], hc: [258, 288], ac: [236, 270], fl: [52, 59], efw: [1210, 1610] },
+  30: { bpd: [72, 80], hc: [266, 296], ac: [246, 282], fl: [54, 61], efw: [1380, 1820] },
+  31: { bpd: [75, 83], hc: [274, 304], ac: [256, 292], fl: [57, 63], efw: [1550, 2050] },
+  32: { bpd: [77, 85], hc: [282, 312], ac: [266, 304], fl: [59, 65], efw: [1730, 2280] },
+  33: { bpd: [80, 88], hc: [290, 320], ac: [276, 314], fl: [61, 67], efw: [1930, 2530] },
+  34: { bpd: [82, 90], hc: [296, 326], ac: [286, 324], fl: [63, 69], efw: [2130, 2790] },
+  35: { bpd: [84, 92], hc: [303, 333], ac: [295, 334], fl: [65, 71], efw: [2340, 3050] },
+  36: { bpd: [86, 94], hc: [309, 339], ac: [304, 344], fl: [66, 73], efw: [2540, 3300] },
+  37: { bpd: [88, 96], hc: [314, 344], ac: [313, 354], fl: [68, 75], efw: [2740, 3540] },
+  38: { bpd: [89, 97], hc: [319, 349], ac: [321, 362], fl: [70, 76], efw: [2920, 3760] },
+  39: { bpd: [90, 98], hc: [323, 353], ac: [329, 370], fl: [71, 78], efw: [3080, 3950] },
 
 export function summarizeAnalysisState(
   metrics: MedicalMetric[],
