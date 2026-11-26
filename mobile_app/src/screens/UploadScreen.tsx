@@ -1758,61 +1758,61 @@ export default function UploadScreen({ navigation }: Props) {
       const batchNow = Date.now();
       const resolveMime = (fName: string, rawMime?: string | null) => {
         if (rawMime && rawMime !== 'application/octet-stream') return rawMime;
-                    <Ionicons
-                      name={
-                        hasImagePreview
-                          ? 'image-outline'
-                          : isPdf
-                          ? 'document-attach-outline'
-                          : 'document-text-outline'
-                      }
-                      size={18}
-                      color={isPdf ? '#EF4444' : colors.primary}
-                    />
-                  </View>
+        const lower = (fName || '').toLowerCase();
+        if (lower.endsWith('.pdf')) return 'application/pdf';
+        if (lower.endsWith('.png')) return 'image/png';
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+        return 'application/pdf';
+      };
 
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {decodeFileName(item.name)}
-                    </Text>
-                    <Text style={styles.itemTime}>
-                      {item.time}
-                      {item.taskId ? ` • Task: #${item.taskId.slice(-6)}` : ''}
-                    </Text>
-                  </View>
+      const newBatchItems: UploadItem[] = result.assets.map((asset, idx) => ({
+        id: `${batchNow}_${idx}`,
+        name: asset.name,
+        time: nowLabel(activeLang),
+        status: 'processing',
+        uri: asset.uri,
+        mimeType: resolveMime(asset.name, asset.mimeType),
+      }));
 
-                  <View style={[styles.badge, { backgroundColor: s.bg }]}>
-                    <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
-                  </View>
+      updateItemsAndPersist((prev) => [...newBatchItems, ...prev]);
+      setBatchProgressText(activeCopy.batchUploading(newBatchItems.length));
 
-                  {deletingFileId === item.id ? (
-                    <ActivityIndicator size="small" color="#EF4444" style={{ marginLeft: 8 }} />
-                  ) : (
-                    <Pressable
-                      onPress={() => deleteItem(item)}
-                      hitSlop={8}
-                      style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </Pressable>
-                  )}
-                </View>
+      try {
+        const validPid = await ensureActivePregnancyProfileId(profileWeek);
+        setProfileId(validPid);
 
-                {item.status === 'processing' && (
-                  <View style={styles.processingBox}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.processingText}>
-                      {item.stageMessage
-                        ? `${item.stageMessage} (${item.progressPercentage ?? 0}%)`
-                        : 'Đang phân tích trên Celery Queue...'}
-                    </Text>
-                  </View>
-                )}
+        const batchRes: any = await ingestUploadBatch(
+          result.assets.map((a) => ({
+            uri: a.uri,
+            name: a.name,
+            type: resolveMime(a.name, a.mimeType),
+          })),
+          validPid
+        );
 
-                {item.status === 'failed' && (
-                  <View style={styles.failedBox}>
-                    <View style={styles.failedHeader}>
-                      <Ionicons name="alert-circle" size={18} color="#DC2626" />
+        const batchData: any = batchRes?.data || batchRes;
+        const batchId = String(batchData?.batch_id || `batch_${batchNow}`);
+        const enqueuedItems = Array.isArray(batchData?.items) ? batchData.items : [];
+
+        updateItemsAndPersist((prev) =>
+          prev.map((item) => {
+            const idx = newBatchItems.findIndex((b) => b.id === item.id);
+            if (idx === -1) return item;
+            const eq = enqueuedItems[idx];
+            return {
+              ...item,
+              batchId,
+              profileId: validPid,
+              fileId: eq?.file_id ? String(eq.file_id) : item.fileId,
+              taskId: eq?.task_id ? String(eq.task_id) : item.taskId,
+            };
+          })
+        );
+
+        for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+          if (!isMountedRef.current) break;
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
                       <Text style={styles.failedTitle}>
                         {item.errorMessage || 'Quá trình trích xuất Celery bị gián đoạn.'}
                       </Text>
