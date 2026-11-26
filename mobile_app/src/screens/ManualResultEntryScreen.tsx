@@ -20,6 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { UploadStackParamList } from '../navigation/UploadNavigator';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import {
   evaluateMetricByWeek,
@@ -35,21 +37,24 @@ type MetricKey = 'bpd' | 'hc' | 'ac' | 'fl' | 'efw';
 
 type MetricMeta = {
   key: MetricKey;
-  label: string;
+  labelVi: string;
+  labelEn: string;
   unit: string;
 };
 
 const METRICS_META: MetricMeta[] = [
-  { key: 'bpd', label: 'BPD · Đường kính lưỡng đỉnh', unit: 'mm' },
-  { key: 'hc',  label: 'HC · Chu vi đầu',             unit: 'mm' },
-  { key: 'ac',  label: 'AC · Chu vi vòng bụng',       unit: 'mm' },
-  { key: 'fl',  label: 'FL · Chiều dài xương đùi',    unit: 'mm' },
-  { key: 'efw', label: 'EFW · Cân nặng thai ước tính', unit: 'g' },
+  { key: 'bpd', labelVi: 'BPD · Đường kính lưỡng đỉnh', labelEn: 'BPD · Biparietal diameter', unit: 'mm' },
+  { key: 'hc',  labelVi: 'HC · Chu vi đầu',             labelEn: 'HC · Head circumference', unit: 'mm' },
+  { key: 'ac',  labelVi: 'AC · Chu vi vòng bụng',       labelEn: 'AC · Abdominal circumference', unit: 'mm' },
+  { key: 'fl',  labelVi: 'FL · Chiều dài xương đùi',    labelEn: 'FL · Femur length', unit: 'mm' },
+  { key: 'efw', labelVi: 'EFW · Cân nặng thai ước tính', labelEn: 'EFW · Estimated fetal weight', unit: 'g' },
 ];
 
 const DUE_DATE = Date.UTC(2026, 8, 22);
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS_VI = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const pad = (value: number) => String(value).padStart(2, '0');
 
 function parseDate(value: string): Date | null {
@@ -73,6 +78,8 @@ function getGestationalAge(date: Date | null) {
 }
 
 export default function ManualResultEntryScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [examDate, setExamDate] = useState('05/06/2026');
   const [autoAge, setAutoAge] = useState(true);
   const [manualAge, setManualAge] = useState({ weeks: '24', days: '3' });
@@ -101,13 +108,6 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
     Number(effectiveDays) <= 6;
 
   const activeWeek = ageValid ? Number(age.weeks) : 24;
-  const stageInfo = getPregnancyStageInfo(activeWeek);
-
-  const evaluatedMetrics = METRICS_META.map((meta) => {
-    const rawVal = values[meta.key].trim();
-    const bounds = getFetalMetricBoundsByWeek(meta.key, activeWeek, meta.unit);
-    const num = Number(rawVal.replace(',', '.'));
-    const isValidNumber =
       Boolean(rawVal) && /^\d+(?:[.,]\d+)?$/.test(rawVal) && Number.isFinite(num) && num > 0;
 
     if (!isValidNumber) {

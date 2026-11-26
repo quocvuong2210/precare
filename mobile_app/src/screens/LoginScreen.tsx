@@ -328,6 +328,33 @@ export default function LoginScreen({ navigation, route }: Props) {
           )}
 
           <View style={styles.registerRow}>
+            <Text style={[styles.registerText, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.muted }]}>
+              {isEn ? "Don't have an account?" : 'Chưa có tài khoản?'}
+            </Text>
+
+            <Pressable
+              onPress={() => navigation.navigate('Register')}
+              style={styles.linkTouch}
+              disabled={isBusy}
+            >
+              <Text style={[styles.registerLink, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {isEn ? 'Sign up now' : 'Đăng ký ngay'}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </LinearGradient>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 28,
     paddingTop: 10,
     paddingBottom: 19,
@@ -368,8 +395,8 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   tagline: {
     marginTop: 3,
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     letterSpacing: 0.5,
     color: colors.textLight,
     textAlign: 'center',
@@ -399,14 +426,14 @@ export default function LoginScreen({ navigation, route }: Props) {
   },
 
   label: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#475569',
     marginBottom: 7,
   },
 
   labelPassword: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#475569',
     marginTop: 18,
@@ -415,7 +442,7 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   inputContainer: {
     width: '100%',
-    height: 41,
+    minHeight: 48,
     borderRadius: 9,
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -427,48 +454,51 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   input: {
     flex: 1,
-    height: '100%',
-    fontSize: 13,
+    paddingVertical: 10,
+    fontSize: 15.5,
     color: colors.navy,
   },
 
   passwordInput: {
     flex: 1,
-    height: '100%',
-    fontSize: 13,
+    paddingVertical: 10,
+    fontSize: 15.5,
     color: colors.navy,
   },
 
   eyeButton: {
-    width: 30,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   errorText: {
     color: '#DC2626',
-    fontSize: 12,
+    fontSize: 13.5,
     marginTop: 8,
   },
 
   optionsRow: {
     width: '100%',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 15,
   },
 
   rememberContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
   },
 
   checkbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: colors.primary,
     alignItems: 'center',
@@ -482,18 +512,24 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   rememberText: {
     marginLeft: 7,
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: '#64748B',
   },
 
+  linkTouch: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+
   forgotPassword: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '600',
     color: colors.primaryDark,
   },
 
   spacer: {
     flex: 1,
+    minHeight: 16,
   },
 
   loading: {
@@ -502,19 +538,21 @@ export default function LoginScreen({ navigation, route }: Props) {
 
   registerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     marginTop: 14,
   },
 
   registerText: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: '#64748B',
   },
 
   registerLink: {
     marginLeft: 4,
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '700',
     color: colors.primaryDark,
   },
