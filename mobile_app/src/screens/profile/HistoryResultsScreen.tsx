@@ -261,58 +261,96 @@ export default function HistoryResultsScreen({ navigation }: Props) {
             </Text>
           </View>
         ) : (
-          groupedResults.map((group, idx) => (
-            <View key={`${group.date}-${idx}`} style={styles.dateGroup}>
-              <View style={styles.dateHeading}>
-                <Ionicons name="calendar-outline" size={16} color="#009688" />
-                <Text style={styles.dateText}>
-                  {group.date} • {group.week}
-                </Text>
-              </View>
+          <View style={styles.sectionGroup}>
+            <Text style={[styles.groupHeading, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+              {isEn
+                ? `Checkups & Fetal Biometrics (${filteredCheckups.length})`
+                : `Lần khám & Chỉ số sinh trắc (${filteredCheckups.length})`}
+            </Text>
+            {filteredCheckups.map((item) => {
+              const bio = item.biometric_data;
+              const biometricGridItems = bio
+                ? [
+                    bio.bpd !== null && bio.bpd !== undefined
+                      ? { key: 'bpd', label: isEn ? 'BPD · Biparietal' : 'BPD · Lưỡng đỉnh', value: `${bio.bpd} mm` }
+                      : null,
+                    bio.hc !== null && bio.hc !== undefined
+                      ? { key: 'hc', label: isEn ? 'HC · Head circ.' : 'HC · Chu vi đầu', value: `${bio.hc} mm` }
+                      : null,
+                    bio.ac !== null && bio.ac !== undefined
+                      ? { key: 'ac', label: isEn ? 'AC · Abdominal circ.' : 'AC · Chu vi bụng', value: `${bio.ac} mm` }
+                      : null,
+                    bio.fl !== null && bio.fl !== undefined
+                      ? { key: 'fl', label: isEn ? 'FL · Femur length' : 'FL · Xương đùi', value: `${bio.fl} mm` }
+                      : null,
+                  ].filter((v): v is { key: string; label: string; value: string } => Boolean(v))
+                : [];
+              const efwValue =
+                bio?.efw !== null && bio?.efw !== undefined
+                  ? `${bio.efw.toLocaleString(isEn ? 'en-US' : 'vi-VN')} g`
+                  : null;
+              const hasVitals =
+                item.vitals.weight_kg !== null ||
+                (item.vitals.blood_pressure_systolic !== null &&
+                  item.vitals.blood_pressure_diastolic !== null);
+              const bpStatusText =
+                BP_STATUS_LABELS[preferences.language][item.vitals.blood_pressure_status] ||
+                item.vitals.blood_pressure_status;
+              const isBpAlert =
+                item.vitals.blood_pressure_status &&
+                item.vitals.blood_pressure_status !== 'normal';
 
-              {group.items.map((item) => {
-                const badgeStyle =
-                  item.severity === 'danger'
-                    ? styles.dangerBadge
-                    : item.severity === 'warning'
-                    ? styles.followBadge
-                    : styles.normalBadge;
+              const gaLine = isEn
+                ? `Week ${item.gestational_age.weeks}${item.gestational_age.remaining_days > 0 ? ` ${item.gestational_age.remaining_days}d` : ''}`
+                : `Tuần ${item.gestational_age.weeks}${item.gestational_age.remaining_days > 0 ? ` ${item.gestational_age.remaining_days} ngày` : ''}`;
 
-                const badgeTextStyle =
-                  item.severity === 'danger'
-                    ? styles.dangerText
-                    : item.severity === 'warning'
-                    ? styles.followText
-                    : styles.normalText;
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.resultCard,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                  ]}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={styles.flexOne}>
+                      <Text style={[styles.resultTitle, fontStyle(17, { lineHeight: 24, min: 15.5 }), { color: theme.text }]}>
+                        {isEn
+                          ? `Checkup ${formatDate(item.checkup_date)}`
+                          : `Khám ngày ${formatDate(item.checkup_date)}`}
+                      </Text>
+                      <Text style={[styles.weekSubtitle, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.muted }]}>
+                        {gaLine} · {item.doctor?.full_name || (isEn ? 'Doctor not assigned' : 'Chưa rõ bác sĩ')}
+                      </Text>
+                    </View>
 
-                return (
-                  <Pressable
-                    key={item.id}
-                    style={[
-                      styles.resultCard,
-                      item.severity === 'danger' && { borderColor: '#FCA5A5' },
-                      item.severity === 'warning' && { borderColor: '#FDE047' },
-                    ]}
-                    onPress={() => {
-                      const detailLines = item.metrics
-                        .map(
-                          (m) =>
-                            `• ${m.label}: ${m.value} ${m.unit} (${m.refRange})`
-                        )
-                        .join('\n');
-                      Alert.alert(
-                        item.title,
-                        `Tệp: ${item.fileName}\n\n${detailLines}\n\nNhận định: ${item.description}`
-                      );
-                    }}
-                  >
-                    <View style={styles.cardHeader}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.resultTitle}>{item.title}</Text>
-                        <Text style={styles.fileSubtitle} numberOfLines={1}>
-                          Nguồn: {item.fileName}
+                    {bio && (
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          {
+                            backgroundColor:
+                              bio.status === 'verified' ? theme.badgeGreenBg : theme.badgeWarnBg,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            fontStyle(12.5, { min: 11.5, max: 14.5 }),
+                            {
+                              color:
+                                bio.status === 'verified' ? theme.badgeGreenText : theme.badgeWarnText,
+                            },
+                          ]}
+                        >
+                          {bio.status === 'verified'
+                            ? (isEn ? 'Verified' : 'Đã xác thực')
+                            : (isEn ? 'Pending' : 'Chờ duyệt')}
                         </Text>
                       </View>
+                    )}
+                  </View>
 
                       <View style={[styles.statusBadge, badgeStyle]}>
                         <Text style={[styles.statusText, badgeTextStyle]}>
