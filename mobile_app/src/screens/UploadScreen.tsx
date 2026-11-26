@@ -218,61 +218,61 @@ function getSeverityTheme(
       icon: 'checkmark-circle',
     },
     warning: {
-  39: { bpd: [90, 98], hc: [323, 353], ac: [329, 370], fl: [71, 78], efw: [3080, 3950] },
-  40: { bpd: [91, 99], hc: [327, 357], ac: [336, 378], fl: [72, 79], efw: [3220, 4100] },
-  41: { bpd: [91, 100], hc: [328, 360], ac: [340, 382], fl: [73, 80], efw: [3300, 4200] },
+      cardBg: isDark ? '#332908' : '#FEFCE8',
+      border: isDark ? '#CA8A04' : '#FACC15',
+      valueColor: isDark ? '#FDE047' : '#A16207',
+      badgeBg: theme.badgeWarnBg,
+      badgeColor: theme.badgeWarnText,
+      badgeLabel: lang === 'en' ? 'Yellow (Monitor)' : 'Mức Vàng (Cần theo dõi)',
+      icon: 'warning',
+    },
+    danger: {
+      cardBg: theme.dangerBackground,
+      border: theme.dangerBorder,
+      valueColor: theme.danger,
+      badgeBg: isDark ? '#7F1D1D' : '#FEE2E2',
+      badgeColor: isDark ? '#FCA5A5' : '#991B1B',
+      badgeLabel: lang === 'en' ? 'Red (<3rd / >97th)' : 'Mức Đỏ (<3rd / >97th)',
+      icon: 'alert-circle',
+    },
+  };
+}
+
+const METRIC_LABELS_BY_LANG: Record<string, { vi: string; en: string }> = {
+  bp: { vi: 'Huyết áp mẹ (BP)', en: 'Maternal Blood Pressure (BP)' },
+  weight: { vi: 'Cân nặng mẹ', en: 'Maternal Weight' },
+  fhr: { vi: 'Nhịp tim thai (FHR)', en: 'Fetal Heart Rate (FHR)' },
+  bpd: { vi: 'Đường kính lưỡng đỉnh (BPD)', en: 'Biparietal Diameter (BPD)' },
+  hc: { vi: 'Chu vi đầu (HC)', en: 'Head Circumference (HC)' },
+  fl: { vi: 'Chiều dài xương đùi (FL)', en: 'Femur Length (FL)' },
+  ac: { vi: 'Chu vi vòng bụng (AC)', en: 'Abdominal Circumference (AC)' },
+  efw: { vi: 'Cân nặng thai ước tính (EFW)', en: 'Estimated Fetal Weight (EFW)' },
+  afi: { vi: 'Chỉ số nước ối (AFI)', en: 'Amniotic Fluid Index (AFI)' },
+  hgb: { vi: 'Hemoglobin máu (HGB)', en: 'Blood Hemoglobin (HGB)' },
+  wbc: { vi: 'Bạch cầu máu (WBC)', en: 'White Blood Cells (WBC)' },
+  glu: { vi: 'Đường huyết lúc đói (Fasting Glucose)', en: 'Fasting Glucose' },
+  pro: { vi: 'Protein niệu (Urine Protein)', en: 'Urine Protein' },
+  ph: { vi: 'Độ pH nước tiểu', en: 'Urine pH' },
+  leu: { vi: 'Bạch cầu niệu (Leukocytes)', en: 'Urine Leukocytes' },
 };
 
-export function getPregnancyStageInfo(week: number) {
-  const clampedWeek = Math.max(12, Math.min(41, Math.round(week || 24)));
-  const month = Math.min(9, Math.max(3, Math.ceil(clampedWeek / 4.3)));
-  const trimester = clampedWeek <= 13 ? 1 : clampedWeek <= 27 ? 2 : 3;
-  return {
-    clampedWeek,
-    month,
-    trimester,
-    stageLabel: `Tuần ${clampedWeek} · Tháng thứ ${month} (Tam cá nguyệt ${trimester})`,
-  };
+function localizeMetricLabel(key: string, fallbackLabel: string, lang: AppLang): string {
+  const entry = METRIC_LABELS_BY_LANG[key.toLowerCase()];
+  if (entry) return entry[lang];
+  return fallbackLabel;
 }
 
-export function getFetalMetricBoundsByWeek(
-  key: 'bpd' | 'hc' | 'ac' | 'fl' | 'efw',
-  week: number,
-  unit: string
-) {
-  const { clampedWeek } = getPregnancyStageInfo(week);
-  const std = FETAL_GROWTH_BY_WEEK[clampedWeek] || FETAL_GROWTH_BY_WEEK[24];
-  const [minNormal, maxNormal] = std[key];
-  const span = Math.max(4, maxNormal - minNormal);
-  const margin = key === 'efw' ? Math.round(span * 0.55) : Math.max(3, Math.round(span * 0.5));
-  const dangerLow = Math.max(1, minNormal - margin);
-  const dangerHigh = maxNormal + margin;
-
-  return {
-    clampedWeek,
-    minNormal,
-    maxNormal,
-    dangerLow,
-    dangerHigh,
-    refRange: `${minNormal} – ${maxNormal} ${unit} (Chuẩn tuần ${clampedWeek})`,
-  };
-}
-
-export async function resolveAccountStorageKey(): Promise<string> {
-  if (currentUserProfile?.email) {
-    return `precare_uploaded_records_${currentUserProfile.email.trim().toLowerCase()}`;
+function localizeUploadTime(rawTime: string, lang: AppLang): string {
+  if (!rawTime) return rawTime;
+  if (lang === 'en') {
+    return rawTime
+      .replace(/^Hôm nay,/, 'Today,')
+      .replace(/^Ngày khám:/, 'Exam date:');
   }
-  const restored = await restoreSession();
-  if (restored?.email) {
-    return `precare_uploaded_records_${restored.email.trim().toLowerCase()}`;
-  }
-  return 'precare_uploaded_records_guest_account';
+  return rawTime
+    .replace(/^Today,/, 'Hôm nay,')
+    .replace(/^Exam date:/, 'Ngày khám:');
 }
-
-export function evaluateMetricByWeek(
-  key: string,
-  rawValue: string,
-  gestationalWeek: number = 24
 ): {
   severity: SeverityLevel;
   clinicalNote: string;
