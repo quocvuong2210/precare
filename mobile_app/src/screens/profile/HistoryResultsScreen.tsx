@@ -352,53 +352,119 @@ export default function HistoryResultsScreen({ navigation }: Props) {
                     )}
                   </View>
 
-                      <View style={[styles.statusBadge, badgeStyle]}>
-                        <Text style={[styles.statusText, badgeTextStyle]}>
-                          {item.statusLabel}
-                        </Text>
-                      </View>
-
-                      <Pressable
-                        onPress={() => handleDeleteRecord(item.id, item.fileName)}
-                        hitSlop={8}
-                        style={styles.deleteIconBtn}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                      </Pressable>
-                    </View>
-
-                    <Text style={styles.valueLabel}>Các chỉ số đã lưu:</Text>
-                    <View style={styles.metricsChipsWrap}>
-                      {item.metrics.map((m) => (
-                        <View
-                          key={m.key}
-                          style={[
-                            styles.metricChip,
-                            m.severity === 'danger' && styles.metricChipDanger,
-                            m.severity === 'warning' && styles.metricChipWarning,
-                          ]}
-                        >
-                          <Text
+                  {hasVitals && (
+                    <View style={styles.sectionBlock}>
+                      <Text style={[styles.valueLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                        {isEn ? 'Maternal vitals' : 'Sinh hiệu của mẹ'}
+                      </Text>
+                      <View style={styles.metricsGrid}>
+                        {item.vitals.weight_kg !== null && (
+                          <View
                             style={[
-                              styles.metricChipText,
-                              m.severity === 'danger' && { color: '#DC2626' },
-                              m.severity === 'warning' && { color: '#A16207' },
+                              styles.metricTile,
+                              { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
                             ]}
                           >
-                            {m.label}: {m.value} {m.unit}
+                            <Text style={[styles.metricTileLabel, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.muted }]}>
+                              {isEn ? 'Maternal weight' : 'Cân nặng mẹ'}
+                            </Text>
+                            <Text style={[styles.metricTileValue, fontStyle(17, { lineHeight: 23, min: 15.5 }), { color: theme.text }]}>
+                              {item.vitals.weight_kg} kg
+                            </Text>
+                          </View>
+                        )}
+                        {item.vitals.blood_pressure_systolic !== null &&
+                          item.vitals.blood_pressure_diastolic !== null && (
+                            <View
+                              style={[
+                                styles.metricTile,
+                                { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                              ]}
+                            >
+                              <Text style={[styles.metricTileLabel, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.muted }]}>
+                                {isEn ? 'Blood pressure' : 'Huyết áp'}
+                              </Text>
+                              <Text style={[styles.metricTileValue, fontStyle(17, { lineHeight: 23, min: 15.5 }), { color: theme.text }]}>
+                                {item.vitals.blood_pressure_systolic}/
+                                {item.vitals.blood_pressure_diastolic} mmHg
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.metricTileNote,
+                                  fontStyle(13, { min: 12 }),
+                                  { color: isBpAlert ? theme.danger : theme.tealText },
+                                ]}
+                              >
+                                {bpStatusText}
+                              </Text>
+                            </View>
+                          )}
+                      </View>
+                    </View>
+                  )}
+
+                  {(biometricGridItems.length > 0 || efwValue) && (
+                    <View style={styles.sectionBlock}>
+                      <Text style={[styles.valueLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                        {isEn ? 'Fetal biometry' : 'Chỉ số sinh trắc thai nhi'}
+                      </Text>
+                      {biometricGridItems.length > 0 && (
+                        <View style={styles.metricsGrid}>
+                          {biometricGridItems.map((metric) => (
+                            <View
+                              key={metric.key}
+                              style={[
+                                styles.metricTile,
+                                { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                              ]}
+                            >
+                              <Text style={[styles.metricTileLabel, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.muted }]}>
+                                {metric.label}
+                              </Text>
+                              <Text style={[styles.metricTileValue, fontStyle(17, { lineHeight: 23, min: 15.5 }), { color: theme.text }]}>
+                                {metric.value}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                      {efwValue && (
+                        <View
+                          style={[
+                            styles.efwHighlightCard,
+                            { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+                          ]}
+                        >
+                          <Text style={[styles.efwLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]}>
+                            {isEn ? 'EFW · Estimated fetal weight' : 'EFW · Cân nặng thai ước tính'}
+                          </Text>
+                          <Text style={[styles.efwValue, fontStyle(18, { min: 16.5, max: 21 }), { color: theme.tealText }]}>
+                            {efwValue}
                           </Text>
                         </View>
-                      ))}
+                      )}
                     </View>
+                  )}
 
-                    <View style={styles.descriptionBox}>
-                      <Text style={styles.description}>{item.description}</Text>
+                  {!!item.notes && (
+                    <View
+                      style={[
+                        styles.descriptionBox,
+                        { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                      ]}
+                    >
+                      <Text style={[styles.descriptionLabel, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+                        {isEn ? 'Clinical notes' : 'Nhận xét của bác sĩ'}
+                      </Text>
+                      <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.text }]}>
+                        {item.notes}
+                      </Text>
                     </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))
+                  )}
+                </View>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
 
