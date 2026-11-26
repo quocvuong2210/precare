@@ -70,42 +70,6 @@ export const DeletionRequestsReview: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-slate-800">
-            <ShieldCheck className="w-6 h-6 text-[#4D7D74]" />
-            <h2 className="text-lg font-bold">Thẩm Định & Xét Duyệt Xóa Hồ Sơ Y Tế</h2>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Quy trình phê duyệt hai bước (Two-Step Approval) tuân thủ tiêu chuẩn bảo mật dữ liệu y tế và quyền riêng tư NCKH.
-          </p>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium self-start">
-          {(['pending', 'all', 'approved', 'rejected'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setActiveFilter(filter)}
-              className={`px-3 py-1.5 rounded-lg transition-all capitalize ${
-                activeFilter === filter
-                  ? 'bg-white text-slate-800 font-semibold shadow-xs'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {filter === 'pending'
-                ? 'Chờ duyệt'
-                : filter === 'all'
-                ? 'Tất cả'
-                : filter === 'approved'
-                ? 'Đã duyệt'
-                : 'Đã từ chối'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {statusMessage && (
         <div
           className={`p-3.5 rounded-xl text-xs font-medium border ${
@@ -120,6 +84,39 @@ export const DeletionRequestsReview: React.FC = () => {
 
       {/* Main Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        {/* Table Toolbar */}
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-slate-800">
+            <ShieldCheck className="w-5 h-5 text-[#4D7D74]" />
+            <h2 className="text-sm font-bold">Danh sách yêu cầu xét duyệt</h2>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+              {requests.length}
+            </span>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium self-start sm:self-auto">
+            {(['pending', 'all', 'approved', 'rejected'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  activeFilter === filter
+                    ? 'bg-white text-slate-800 font-semibold shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {filter === 'pending'
+                  ? 'Chờ duyệt'
+                  : filter === 'all'
+                  ? 'Tất cả'
+                  : filter === 'approved'
+                  ? 'Đã duyệt'
+                  : 'Đã từ chối'}
+              </button>
+            ))}
+          </div>
+        </div>
         {isLoading ? (
           <div className="py-12 text-center text-xs text-slate-400">Đang tải danh sách yêu cầu...</div>
         ) : requests.length === 0 ? (

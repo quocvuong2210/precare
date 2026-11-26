@@ -26,6 +26,8 @@ import { CheckupTimelineRecord } from '../services/checkup.service';
 import { DocumentExtractionData, formatFileSize } from '../components/ocr-workflow/mockOcrData';
 import { ingestService } from '../services/ingest.service';
 import { apiClient } from '../services/auth.service';
+import { DataTable, DataTableColumn } from '../components/ui/DataTable';
+import { TableActionButton } from '../components/ui/TableActionButton';
 
 export interface ParaclinicalWorklistItem {
   id: string;
@@ -132,11 +134,13 @@ const INITIAL_WORKLIST: ParaclinicalWorklistItem[] = [
 
 interface TestResultsProps {
   initialPatientId?: string | null;
+  newUploadSignal?: number;
   onNavigateToProfile?: (patientId: string) => void;
 }
 
 export const TestResults: React.FC<TestResultsProps> = ({
   initialPatientId,
+  newUploadSignal = 0,
   onNavigateToProfile,
 }) => {
   const [worklist, setWorklist] = useState<ParaclinicalWorklistItem[]>([]);
@@ -311,6 +315,12 @@ export const TestResults: React.FC<TestResultsProps> = ({
     setIsWizardOpen(true);
   };
 
+  useEffect(() => {
+    if (newUploadSignal > 0) {
+      handleOpenNewUpload();
+    }
+  }, [newUploadSignal]);
+
   // Action: Open review for a pending document
   const handleReviewPending = (item: ParaclinicalWorklistItem) => {
     setReviewingItem(item);
@@ -416,31 +426,6 @@ export const TestResults: React.FC<TestResultsProps> = ({
           <span>{toastMessage}</span>
         </div>
       )}
-
-      {/* Top Header Banner */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#275248] uppercase tracking-wider">
-            <ScanText className="w-4 h-4 text-[#275248]" />
-            <span>KHOA CẬN LÂM SÀNG &amp; SỐ HÓA BỆNH ÁN PRECARE</span>
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-            Hàng đợi Tiếp nhận &amp; Đối chiếu cận lâm sàng
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Trung tâm tiếp nhận tài liệu, trích xuất OCR số hóa và đối chiếu kết quả siêu âm, xét nghiệm toàn khoa.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => handleOpenNewUpload()}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Tiếp nhận hồ sơ mới</span>
-        </button>
-      </div>
 
       {/* 4 KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -602,147 +587,146 @@ export const TestResults: React.FC<TestResultsProps> = ({
         </div>
       </div>
 
-      {/* Main Worklist Table */}
+      {/* Main Worklist Table (Using Shared DataTable & TableActionButton) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
-                <th className="py-3 px-4">THAI PHỤ / MÃ BN</th>
-                <th className="py-3 px-4">LOẠI TÀI LIỆU CẬN LÂM SÀNG</th>
-                <th className="py-3 px-4">NGÀY THỰC HIỆN</th>
-                <th className="py-3 px-4 text-center">ĐỘ TIN CẬY AI</th>
-                <th className="py-3 px-4 text-center">TRẠNG THÁI</th>
-                <th className="py-3 px-4 text-right">THAO TÁC</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredList.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    Không tìm thấy phiếu cận lâm sàng nào phù hợp với bộ lọc.
-                  </td>
-                </tr>
-              ) : (
-                filteredList.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="hover:bg-slate-50/70 transition-colors"
-                  >
-                    {/* Thai phụ */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-teal-50 text-[#275248] font-bold text-xs flex items-center justify-center shrink-0 border border-teal-200">
-                          {item.patientName
-                            .split(' ')
-                            .map((w) => w[0])
-                            .slice(-2)
-                            .join('')}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900">
-                            {item.patientName}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Tuổi thai: <strong>{item.gestationalAge}</strong> • {item.patientPhone}
-                          </div>
-                          {item.primaryDoctorName && item.primaryDoctorId !== currentDoctorId && (
-                            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-600">
-                              BS phụ trách: {item.primaryDoctorName}
-                            </div>
-                          )}
-                        </div>
+        <DataTable<ParaclinicalWorklistItem>
+          data={filteredList}
+          rowKey={(item) => item.id}
+          emptyMessage="Không tìm thấy phiếu cận lâm sàng nào phù hợp với bộ lọc."
+          columns={[
+            {
+              key: 'patient',
+              header: 'THAI PHỤ / MÃ BN',
+              widthClass: 'w-[22%]',
+              align: 'left',
+              render: (item) => (
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-teal-50 text-[#275248] font-bold text-xs flex items-center justify-center shrink-0 border border-teal-200">
+                    {item.patientName
+                      .split(' ')
+                      .map((w) => w[0])
+                      .slice(-2)
+                      .join('')}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 truncate">
+                      {item.patientName}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      Tuổi thai: <strong>{item.gestationalAge}</strong> • {item.patientPhone}
+                    </div>
+                    {item.primaryDoctorName && item.primaryDoctorId !== currentDoctorId && (
+                      <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-600 max-w-full truncate">
+                        BS phụ trách: {item.primaryDoctorName}
                       </div>
-                    </td>
-
-                    {/* Loại tài liệu */}
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-800">
-                        {item.documentTypeName}
+                    )}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'document',
+              header: 'LOẠI TÀI LIỆU CẬN LÂM SÀNG',
+              widthClass: 'w-[22%]',
+              align: 'left',
+              render: (item) => (
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-800 truncate">
+                    {item.documentTypeName}
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 min-w-0">
+                    <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate" title={`${item.fileName} (${item.fileSize})`}>
+                      {item.fileName} ({item.fileSize})
+                    </span>
+                  </div>
+                  {item.hasWarning && (
+                    <div className="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-1">
+                      <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span className="truncate">{item.warningSummary}</span>
+                    </div>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'received',
+              header: 'NGÀY THỰC HIỆN',
+              widthClass: 'w-[14%]',
+              align: 'left',
+              render: (item) => (
+                <div className="text-slate-600 min-w-0">
+                  <div className="truncate">{item.receivedAt}</div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    BS: {item.doctorPerformer}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'confidence',
+              header: 'ĐỘ TIN CẬY AI',
+              widthClass: 'w-[11%]',
+              align: 'center',
+              render: (item) => (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#275248] border border-teal-200/80 whitespace-nowrap">
+                  <Sparkles className="w-3 h-3 text-teal-600" />
+                  {item.ocrConfidence}%
+                </span>
+              ),
+            },
+            {
+              key: 'status',
+              header: 'TRẠNG THÁI',
+              widthClass: 'w-[12%]',
+              align: 'center',
+              render: (item) =>
+                item.status === 'pending_review' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
+                    <Clock className="w-3 h-3 text-amber-600" />
+                    Chờ duyệt OCR
+                  </span>
+                ) : (
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Đã xác nhận
+                    </span>
+                    {item.verifiedByName && (
+                      <div className="text-[10px] text-slate-500 truncate">
+                        Duyệt: <strong className="text-slate-700">{item.verifiedByName}</strong>
+                        {item.verifiedAt && (
+                          <> ({new Date(item.verifiedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})</>
+                        )}
                       </div>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <FileText className="w-3 h-3 text-slate-400" />
-                        <span>
-                          {item.fileName} ({item.fileSize})
-                        </span>
-                      </div>
-                      {item.hasWarning && (
-                        <div className="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-1">
-                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span>{item.warningSummary}</span>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Ngày tiếp nhận */}
-                    <td className="py-3.5 px-4 text-slate-600">
-                      <div>{item.receivedAt}</div>
-                      <div className="text-[10px] text-slate-400">
-                        BS: {item.doctorPerformer}
-                      </div>
-                    </td>
-
-                    {/* Độ tin cậy OCR */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#275248] border border-teal-200/80">
-                        <Sparkles className="w-3 h-3 text-teal-600" />
-                        {item.ocrConfidence}%
-                      </span>
-                    </td>
-
-                    {/* Trạng thái */}
-                    <td className="py-3.5 px-4 text-center">
-                      {item.status === 'pending_review' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                          <Clock className="w-3 h-3 text-amber-600" />
-                          Chờ duyệt OCR
-                        </span>
-                      ) : (
-                        <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Đã xác nhận
-                          </span>
-                          {item.verifiedByName && (
-                            <div className="text-[10px] text-slate-500">
-                              Duyệt: <strong className="text-slate-700">{item.verifiedByName}</strong>
-                              {item.verifiedAt && (
-                                <> ({new Date(item.verifiedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})</>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Thao tác */}
-                    <td className="py-3.5 px-4 text-right">
-                      {item.status === 'pending_review' ? (
-                        <button
-                          type="button"
-                          onClick={() => handleReviewPending(item)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Duyệt &amp; Đối chiếu</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleViewVerifiedDetails(item)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-2xs transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Xem chi tiết &amp; dặn dò</span>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                  </div>
+                ),
+            },
+            {
+              key: 'actions',
+              header: 'THAO TÁC',
+              widthClass: 'w-[19%]',
+              align: 'right',
+              render: (item) =>
+                item.status === 'pending_review' ? (
+                  <TableActionButton
+                    label="Duyệt & Đối chiếu"
+                    icon={Eye}
+                    variant="primary"
+                    onClick={() => handleReviewPending(item)}
+                  />
+                ) : (
+                  <TableActionButton
+                    label="Xem chi tiết & dặn dò"
+                    icon={Eye}
+                    variant="outline"
+                    onClick={() => handleViewVerifiedDetails(item)}
+                  />
+                ),
+            },
+          ] as DataTableColumn<ParaclinicalWorklistItem>[]}
+        />
 
         {/* Footer info */}
         <div className="p-3.5 bg-slate-50/60 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">

@@ -1,4 +1,8 @@
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     background-color: #F8FAFC;
     color: #1E293B;
