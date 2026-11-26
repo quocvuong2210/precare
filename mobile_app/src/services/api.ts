@@ -1263,61 +1263,61 @@ export interface IngestTaskStatusData {
 
 export interface IngestBatchStatusData {
   batch_id: string;
-    formData.append('document_type', options.documentType);
+  total_files: number;
+  completed_files: number;
+  failed_files: number;
+  overall_progress_percentage: number;
+  is_all_finished: boolean;
+  files: {
+    file_id: string;
+    file_name: string;
+    state: string;
+    progress_percentage: number;
+    status: string;
+    verification_url?: string;
+  }[];
+  [key: string]: any;
+}
+
+export interface IngestFileDetailData {
+  id: string;
+  file_id?: string;
+  pregnancy_profile_id: string;
+  checkup_id?: string | null;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  document_type: string;
+  status: string;
+  presigned_view_url: string;
+  presigned_url?: string;
+  url?: string;
+  presigned_url_expires_in_seconds: number;
+  uploaded_by?: {
+    id: string;
+    full_name: string;
+    role: string;
+  };
+  created_at: string;
+  [key: string]: any;
+}
+
+export function isUuid(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+}
+
+async function getIngestAuthHeaders(isJson = false): Promise<Record<string, string>> {
+  if (!currentAccessToken) {
+    await restoreSession();
   }
-
-  const data: any = await uploadParaclinicalFile(
-    `${API_BASE_URL}/ingest/upload-batch`,
-    formData
-  );
-
-  console.log(`Tải lên hàng loạt (${files.length} file) thành công!`);
-  return data;
-}
-
-// 3. GET /api/v1/ingest/tasks/{task_id}/status — Polling tiến trình tác vụ Celery đơn lẻ
-export async function getIngestTaskStatus(
-  taskId: string
-): Promise<{ success: boolean; data: IngestTaskStatusData }> {
-  console.log(
-    `[API 3/8] Đang kiểm tra trạng thái Task Celery: ${taskId} (GET /api/v1/ingest/tasks/${taskId}/status)...`
-  );
-  const headers = await getIngestAuthHeaders(false);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/tasks/${encodeURIComponent(taskId)}/status`,
-    {
-      method: 'GET',
-      headers,
-    }
-  );
-
-  const data: any = await handleResponse(response);
-  console.log(`Kiểm tra trạng thái Task Celery (${taskId}) thành công!`);
-  return data;
-}
-
-// 4. GET /api/v1/ingest/batches/{batch_id}/status — Polling tiến trình tổng hợp của đợt tải hàng loạt
-export async function getIngestBatchStatus(
-  batchId: string
-): Promise<{ success: boolean; data: IngestBatchStatusData }> {
-  console.log(
-    `[API 4/8] Đang kiểm tra tiến trình Batch: ${batchId} (GET /api/v1/ingest/batches/${batchId}/status)...`
-  );
-  const headers = await getIngestAuthHeaders(false);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/batches/${encodeURIComponent(batchId)}/status`,
-    {
-      method: 'GET',
-      headers,
-    }
-  );
-
-  const data: any = await handleResponse(response);
-  console.log(`Kiểm tra tiến trình Batch (${batchId}) thành công!`);
-  return data;
-}
-
-// 5. GET /api/v1/ingest/files/{file_id} — Chi tiết file & lấy Presigned URL xem trước bản gốc
+  const authToken =
+    currentAccessToken || (await getStoredAccessToken()) || '';
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  if (isJson) {
+    headers['Content-Type'] = 'application/json';
 export async function getIngestFileDetail(
   fileId: string
 ): Promise<{ success: boolean; data: IngestFileDetailData }> {
