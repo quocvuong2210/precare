@@ -328,61 +328,61 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
               onPress={handleVerify}
               accessibilityRole="button"
               accessibilityState={{
-              size={15}
-              color="#94A3B8"
-            />
-            <Text style={styles.footerText}>
-              Không chia sẻ mã xác nhận với người khác.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
+                disabled:
+                  !isComplete || verifying || resending || !!verificationToken,
+              }}
+              style={({ pressed }) => [
+                styles.verifyButton,
+                (!isComplete || verifying || resending) && [
+                  styles.buttonDisabled,
+                  isDark && { backgroundColor: theme.surfaceAlt },
+                ],
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.verifyText, fontStyle(15.5, { min: 14.5, max: 18 })]}>
+                {verifying
+                  ? copy.verifying
+                  : verificationToken
+                    ? copy.verified
+                    : copy.verify}
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </Pressable>
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#F7FAFC",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    width: "100%",
-    maxWidth: 480,
-    alignSelf: "center",
-    paddingHorizontal: 22,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  brand: {
-    alignItems: "center",
-    marginTop: 4,
-    marginBottom: 28,
-  },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: PRIMARY,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pulse: {
-    position: "absolute",
-  },
-  appName: {
-    marginTop: 10,
-    fontSize: 19,
-    fontWeight: "700",
+            <View style={styles.resendRow}>
+              <Text style={[styles.resendHint, fontStyle(14, { min: 13 }), { color: theme.textSecondary }]}>
+                {copy.resendHint}
+              </Text>
+
+              <Pressable
+                style={styles.resendButton}
+                disabled={
+                  countdown > 0 || verifying || resending || !!verificationToken
+                }
+                onPress={handleResend}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled:
+                    countdown > 0 ||
+                    verifying ||
+                    resending ||
+                    !!verificationToken,
+                }}
+              >
+                <Text
+                  style={[
+                    styles.resendLink,
+                    fontStyle(14, { min: 13 }),
+                    { color: theme.tealText },
+                    (countdown > 0 ||
+                      verifying ||
+                      resending ||
+                      !!verificationToken) && [
+                      styles.resendDisabled,
+                      { color: theme.muted },
+                    ],
     color: "#00847C",
   },
   mailIcon: {
