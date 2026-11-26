@@ -53,61 +53,61 @@ const translations = {
     resendIn: (time: string) => `Gửi lại mã sau ${time}`,
     resendPrompt: 'Chưa nhận được mã? Gửi lại mã',
     resentCount: (count: number, max: number) =>
-    ).padStart(2, '0')}`;
-  };
+      `Đã gửi lại ${count}/${max} lượt`,
+    sentNotice: 'Mã OTP đã được gửi đến email của bạn',
+    securityTip:
+      'Không chia sẻ mã OTP với bất kỳ ai, kể cả người tự xưng là nhân viên PreCare.',
+    confirmButton: 'Xác nhận mã',
+    backToLogin: 'Quay lại đăng nhập',
+  },
+  en: {
+    notice: 'Notice',
+    limitReached: 'You have used all 3 OTP resend attempts.',
+    pleaseWait: 'Please wait',
+    waitMessage: (time: string) => `You can resend a code in ${time}.`,
+    resendSuccessTitle: 'Code sent',
+    resendSuccessBody:
+      'A new OTP has been sent to your email. It is valid for 15 minutes.',
+    resendErrorTitle: 'Unable to send code',
+    retryLater: 'Please try again later.',
+    expiredTitle: 'OTP expired',
+    expiredBody: 'The verification code has expired. Please request a new one.',
+    enterSixDigits: 'Please enter all 6 OTP digits.',
+    stepText: 'Step 2/3 · Verify account',
+    title: 'Enter verification code',
+    description:
+      'Enter the 6-digit OTP sent to your email to continue resetting your password.',
+    change: 'Change',
+    otpLabel: 'OTP Code',
+    digitAccessibility: (idx: number) => `OTP digit ${idx}`,
+    otpExpiredText: 'OTP code has expired',
+    validFor: (time: string) => `Code expires in ${time}`,
+    sendingCode: 'Sending code...',
+    noMoreResends: 'All 3 resends used',
+    resendIn: (time: string) => `Resend code in ${time}`,
+    resendPrompt: "Didn't receive a code? Resend",
+    resentCount: (count: number, max: number) =>
+      `Resent ${count}/${max} times`,
+    sentNotice: 'An OTP code has been sent to your email',
+    securityTip:
+      'Never share your OTP code with anyone, even someone claiming to be PreCare staff.',
+    confirmButton: 'Verify code',
+    backToLogin: 'Back to Sign in',
+  },
+};
 
-  const maskedEmail = (value: string) => {
-    const parts = value.split('@');
+export default function OtpVerificationScreen({ navigation, route }: any) {
+  const email = route.params?.email || '';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const copy = translations[preferences.language];
 
-    if (parts.length !== 2) {
-      return value;
-    }
+  const [otp, setOtp] = useState('');
+  const [otpExpiresIn, setOtpExpiresIn] = useState(OTP_VALID_SECONDS);
+  const [resendCooldown, setResendCooldown] = useState(RESEND_WAIT_SECONDS);
+  const [resendCount, setResendCount] = useState(0);
+  const [resending, setResending] = useState(false);
 
-    const username = parts[0];
-    const visible = username.slice(0, Math.min(3, username.length));
-
-    return `${visible}***@${parts[1]}`;
-  };
-
-  const handleOtpChange = (value: string, index: number) => {
-    if (otpExpiresIn === 0) {
-      return;
-    }
-
-    // Hỗ trợ nhập nhanh hoặc dán mã OTP 6 số.
-    const digits = value.replace(/[^0-9]/g, '');
-
-    if (digits.length > 1) {
-      const nextOtp = digits.slice(0, 6);
-      setOtp(nextOtp);
-
-      if (nextOtp.length === 6) {
-        inputRefs.current[5]?.focus();
-        Keyboard.dismiss();
-      } else {
-        inputRefs.current[nextOtp.length]?.focus();
-      }
-
-      return;
-    }
-
-    const currentOtp = otp.split('');
-    currentOtp[index] = digits;
-
-    const nextOtp = currentOtp.join('').slice(0, 6);
-    setOtp(nextOtp);
-
-    if (digits && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (nextOtp.length === 6) {
-      Keyboard.dismiss();
-    }
-  };
-
-  // Gửi OTP mới ngay tại màn hình hiện tại.
-  const handleResendOtp = async () => {
     if (resending) {
       return;
     }
