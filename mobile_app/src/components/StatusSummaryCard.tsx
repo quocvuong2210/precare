@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppSettings } from '../context/AppSettingsContext';
 
 export type AlertLevel = 'normal' | 'warning' | 'danger';
 
@@ -52,7 +53,6 @@ const LEVEL_CONFIG: Record<
   },
   danger: {
     badgeText: 'Mức Đỏ • Cần thăm khám sớm (< 3rd / > 97th)',
-    defaultTitle: 'Có chỉ số lệch nhiều so với khoảng chuẩn',
     bg: '#FEF2F2',
     border: '#EF4444',
     headerBg: '#FEE2E2',
