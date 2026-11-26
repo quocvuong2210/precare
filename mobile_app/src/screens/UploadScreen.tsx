@@ -713,61 +713,61 @@ export function evaluateMetricByWeek(
       clinicalNote: isEn ? 'Negative — Normal' : 'Âm tính (Negative) — Bình thường',
     };
   }
-    gestationalWeek: clampedWeek,
-    gestationalDays: 3,
-    gestationalAge: stageLabel,
-    summary: `Đã phân tích và đối chiếu theo chuẩn ${stageLabel}.`,
-    doctorConclusion: evalState.doctorConclusion,
-    rule_version: DEFAULT_RULE_VERSION,
-    model_version: DEFAULT_MODEL_VERSION,
-    overallSeverity: evalState.overallSeverity,
-    savedToProfile: false,
-    metrics,
-  };
-};
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const nowLabel = () => {
-  const d = new Date();
-  return `Hôm nay, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
-export function decodeFileName(name?: string): string {
-  if (!name) return 'Tài liệu phiếu khám';
-  try {
-    return decodeURIComponent(name);
-  } catch {
-    return name;
+  if (key === 'glu') {
+    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
+    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
+    if (!isNaN(num)) {
+      if (num >= 5.6) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? `Red: High fasting glucose (${num} ≥ 5.6 mmol/L) at week ${clampedWeek} — Please see your doctor for specialist evaluation.`
+            : `Mức Đỏ: Đường huyết lúc đói cao (${num} ≥ 5.6 mmol/L) ở tuần ${clampedWeek} — Mẹ nên đến gặp bác sĩ để kiểm tra chuyên sâu hơn nhé.`,
+        };
+      }
+      if (num >= 5.1) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? `Yellow: Fasting glucose slightly elevated (${num} ≥ 5.1 mmol/L) — Limit refined carbs/sugar and consult your doctor.`
+            : `Mức Vàng: Đường huyết lúc đói vượt nhẹ ngưỡng chuẩn (${num} ≥ 5.1 mmol/L) — Mẹ nên hạn chế tinh bột/đường và trao đổi với bác sĩ nhé.`,
+        };
+      }
+      if (num < 3.3) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? `Low fasting glucose (${num} < 3.3 mmol/L) — Ensure adequate balanced meals.`
+            : `Đường huyết lúc đói thấp (${num} < 3.3 mmol/L) — Mẹ lưu ý ăn uống đầy đủ nhé.`,
+        };
+      }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? `Stable fasting glucose (${num} < 5.1 mmol/L).`
+          : `Đường huyết lúc đói ổn định (${num} < 5.1 mmol/L).`,
+      };
+    }
   }
-}
 
-function isImageItem(item: UploadItem): boolean {
-  const lowerName = item.name.toLowerCase();
-  const lowerMime = (item.mimeType || '').toLowerCase();
-  return (
-    lowerMime.startsWith('image/') ||
-    lowerName.endsWith('.jpg') ||
-    lowerName.endsWith('.jpeg') ||
-    lowerName.endsWith('.png') ||
-    lowerName.endsWith('.webp')
-  );
-}
-
-export default function UploadScreen({ navigation }: Props) {
-  const [items, setItems] = useState<UploadItem[]>([]);
-  const [loadingStorage, setLoadingStorage] = useState(true);
-  const [savingToDb, setSavingToDb] = useState(false);
-  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
-  const [profileId, setProfileId] = useState<string>('');
-  const [profileWeek, setProfileWeek] = useState<number>(24);
-  const [batchProgressText, setBatchProgressText] = useState<string | null>(null);
-
-  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
-  const [isModalEditing, setIsModalEditing] = useState<boolean>(false);
-  const [draftWeek, setDraftWeek] = useState<string>('24');
-  const [draftMetrics, setDraftMetrics] = useState<Record<string, string>>({});
-  const [zoomSlipImage, setZoomSlipImage] = useState(false);
-
+  if (key === 'bp') {
+    const parts = clean.split('/');
+    const sys = parseFloat(parts[0]);
+    const dia = parseFloat(parts[1] || '0');
+    if (!isNaN(sys) && !isNaN(dia)) {
+      if (sys >= 140 || dia >= 90 || sys < 90) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? `Red: Blood pressure (${clean} mmHg) is outside the stable range — Rest and see a doctor promptly.`
+            : `Mức Đỏ: Huyết áp (${clean} mmHg) nằm ngoài khoảng ổn định — Mẹ hãy nghỉ ngơi và sớm đến gặp bác sĩ nhé.`,
+        };
+      }
+      if (sys >= 130 || dia >= 85) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
   const isPickingFileRef = useRef(false);
   const isMountedRef = useRef(true);
 
