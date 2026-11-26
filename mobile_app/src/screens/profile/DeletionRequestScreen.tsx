@@ -82,20 +82,14 @@ export default function DeletionRequestScreen({
   };
 
   return (
-    <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
-      <View style={[s.header, card]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          onPress={() => navigation.goBack()}
-          style={s.back}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
-        </Pressable>
-        <Text style={[s.title, text]}>Yêu cầu xóa hồ sơ thai kỳ</Text>
-      </View>
+    <SafeAreaView style={[s.container, { backgroundColor: theme.surface }]} edges={["top"]}>
+      <StatusBar style={preferences.darkMode ? "light" : "dark"} />
+      <ScreenHeader
+        title={isEn ? "Request pregnancy deletion" : "Yêu cầu xóa hồ sơ thai kỳ"}
+        onBack={() => navigation.goBack()}
+      />
       <KeyboardAvoidingView
-        style={s.container}
+        style={[s.container, { backgroundColor: theme.background }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
@@ -109,46 +103,58 @@ export default function DeletionRequestScreen({
                 size={44}
                 color={colors.primary}
               />
-              <Text style={[s.title, text]}>Đã gửi yêu cầu · Chờ duyệt</Text>
-              <Text style={[s.body, muted]}>
-                Yêu cầu đang chờ bác sĩ phụ trách chính hoặc quản trị viên xét
-                duyệt. Hồ sơ chưa bị xóa.
+              <Text style={[s.title, titleFont, text]}>
+                {isEn ? "Request submitted · Pending review" : "Đã gửi yêu cầu · Chờ duyệt"}
               </Text>
-              <Text selectable style={[s.body, muted]}>
-                Mã yêu cầu: {receipt}
+              <Text style={[s.body, bodyFont, muted]}>
+                {isEn
+                  ? "Your request is awaiting review from your primary doctor or administrator. Your profile has not been deleted yet."
+                  : "Yêu cầu đang chờ bác sĩ phụ trách chính hoặc quản trị viên xét duyệt. Hồ sơ chưa bị xóa."}
+              </Text>
+              <Text selectable style={[s.body, bodyFont, muted]}>
+                {isEn ? "Request ID:" : "Mã yêu cầu:"} {receipt}
               </Text>
               <Pressable
                 accessibilityRole="button"
                 style={s.button}
                 onPress={() => navigation.goBack()}
               >
-                <Text style={s.buttonText}>Hoàn tất</Text>
+                <Text style={[s.buttonText, btnFont]}>{isEn ? "Done" : "Hoàn tất"}</Text>
               </Pressable>
             </View>
           ) : (
             <>
-              <Text style={[s.body, muted]}>
-                Yêu cầu xóa hồ sơ cần được bác sĩ phụ trách chính hoặc quản trị
-                viên phê duyệt.
+              <Text style={[s.body, bodyFont, muted]}>
+                {isEn
+                  ? "Profile deletion requests must be approved by your primary doctor or an administrator."
+                  : "Yêu cầu xóa hồ sơ cần được bác sĩ phụ trách chính hoặc quản trị viên phê duyệt."}
               </Text>
-              <Text style={[s.label, text]}>Lý do yêu cầu xóa *</Text>
+              <Text style={[s.label, labelFont, text]}>
+                {isEn ? "Reason for deletion *" : "Lý do yêu cầu xóa *"}
+              </Text>
               <TextInput
-                accessibilityLabel="Lý do yêu cầu xóa"
+                accessibilityLabel={isEn ? "Reason for deletion" : "Lý do yêu cầu xóa"}
                 multiline
                 textAlignVertical="top"
                 value={reason}
                 onChangeText={setReason}
-                placeholder="Nhập lý do, tối thiểu 10 ký tự"
+                placeholder={isEn ? "Enter reason (minimum 10 characters)" : "Nhập lý do, tối thiểu 10 ký tự"}
                 placeholderTextColor={theme.muted}
-                style={[s.input, card, text]}
+                style={[s.input, inputFont, card, text]}
               />
               <View style={[s.card, card]}>
                 <View style={s.row}>
-                  <Text style={[s.label, text, s.container]}>
-                    Cho phép dùng dữ liệu ẩn danh cho nghiên cứu
+                  <Text style={[s.label, labelFont, text, s.container]}>
+                    {isEn
+                      ? "Allow anonymized data for clinical research"
+                      : "Cho phép dùng dữ liệu ẩn danh cho nghiên cứu"}
                   </Text>
                   <Switch
-                    accessibilityLabel="Cho phép dùng dữ liệu ẩn danh cho nghiên cứu"
+                    accessibilityLabel={
+                      isEn
+                        ? "Allow anonymized data for clinical research"
+                        : "Cho phép dùng dữ liệu ẩn danh cho nghiên cứu"
+                    }
                     value={allowResearch}
                     onValueChange={setAllowResearch}
                     trackColor={{
@@ -157,14 +163,16 @@ export default function DeletionRequestScreen({
                     }}
                   />
                 </View>
-                <Text style={[s.body, muted]}>
-                  Tùy chọn này không bắt buộc. Khi tắt, yêu cầu sẽ không cho
-                  phép giữ dữ liệu cho nghiên cứu.
+                <Text style={[s.body, bodyFont, muted]}>
+                  {isEn
+                    ? "This option is optional. When disabled, your data will not be retained for research."
+                    : "Tùy chọn này không bắt buộc. Khi tắt, yêu cầu sẽ không cho phép giữ dữ liệu cho nghiên cứu."}
                 </Text>
               </View>
-              <Text style={[s.body, muted]}>
-                Phạm vi: toàn bộ hồ sơ thai kỳ hiện tại của mẹ và các lần khám
-                liên quan. Gửi yêu cầu không xóa tài khoản đăng nhập của mẹ.
+              <Text style={[s.body, bodyFont, muted]}>
+                {isEn
+                  ? "Scope: your active pregnancy profile and related checkups. Submitting this request will not delete your login account."
+                  : "Phạm vi: toàn bộ hồ sơ thai kỳ hiện tại của mẹ và các lần khám liên quan. Gửi yêu cầu không xóa tài khoản đăng nhập của mẹ."}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -179,12 +187,14 @@ export default function DeletionRequestScreen({
                   setConfirming(true);
                 }}
               >
-                <Text style={s.buttonText}>Tiếp tục yêu cầu xóa</Text>
+                <Text style={[s.buttonText, btnFont]}>
+                  {isEn ? "Continue deletion request" : "Tiếp tục yêu cầu xóa"}
+                </Text>
               </Pressable>
               {!!error && (
                 <Text
                   accessibilityRole="alert"
-                  style={[s.body, { color: theme.danger }]}
+                  style={[s.body, bodyFont, { color: theme.danger }]}
                 >
                   {error}
                 </Text>
@@ -199,17 +209,28 @@ export default function DeletionRequestScreen({
         animationType="fade"
         onRequestClose={closeConfirmation}
       >
-        <View style={s.overlay}>
+        <View style={[s.overlay, { backgroundColor: theme.overlay }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isEn ? "Close" : "Đóng"}
+            style={StyleSheet.absoluteFill}
+            onPress={closeConfirmation}
+          />
           <View accessibilityViewIsModal style={[s.dialog, card]}>
-            <Ionicons name="trash-outline" size={32} color={theme.danger} />
-            <Text style={[s.title, text]}>Gửi yêu cầu xóa hồ sơ?</Text>
-            <Text style={[s.body, muted]}>
-              Yêu cầu xóa hồ sơ thai kỳ hiện tại của mẹ sẽ được gửi đến bác sĩ
-              hoặc quản trị viên để xét duyệt.
+            <Text style={[s.title, titleFont, text]}>
+              {isEn ? "Confirm request submission" : "Xác nhận gửi yêu cầu"}
             </Text>
-            <Text style={[s.body, muted]}>
-              Nghiên cứu ẩn danh:{" "}
-              {allowResearch ? "Cho phép" : "Không cho phép"}.
+            <Text style={[s.body, bodyFont, muted]}>
+              {isEn
+                ? "Are you sure you want to submit a pregnancy profile deletion request?"
+                : "Mẹ có chắc muốn gửi yêu cầu xóa hồ sơ thai kỳ hiện tại?"}
+            </Text>
+            <Text style={[s.body, bodyFont, muted]}>
+              {isEn ? "Anonymized research:" : "Nghiên cứu ẩn danh:"}{" "}
+              {allowResearch
+                ? (isEn ? "Allowed" : "Cho phép")
+                : (isEn ? "Not allowed" : "Không cho phép")}
+              .
             </Text>
             {sending && <ActivityIndicator color={colors.primary} />}
             <Pressable
@@ -222,8 +243,10 @@ export default function DeletionRequestScreen({
                 sending && s.disabled,
               ]}
             >
-              <Text style={s.buttonText}>
-                {sending ? "Đang gửi…" : "Xác nhận gửi yêu cầu"}
+              <Text style={[s.buttonText, btnFont]}>
+                {sending
+                  ? (isEn ? "Submitting…" : "Đang gửi…")
+                  : (isEn ? "Confirm and submit" : "Xác nhận gửi yêu cầu")}
               </Text>
             </Pressable>
             <Pressable
@@ -232,7 +255,7 @@ export default function DeletionRequestScreen({
               style={s.refresh}
               onPress={closeConfirmation}
             >
-              <Text style={muted}>Hủy</Text>
+              <Text style={[btnFont, muted]}>{isEn ? "Cancel" : "Hủy"}</Text>
             </Pressable>
           </View>
         </View>
@@ -293,7 +316,6 @@ const s = StyleSheet.create({
   refresh: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(15,23,42,0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
