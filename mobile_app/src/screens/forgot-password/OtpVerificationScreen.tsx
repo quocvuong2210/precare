@@ -163,61 +163,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
         Keyboard.dismiss();
       } else {
         inputRefs.current[nextOtp.length]?.focus();
-    if (!/^\d{6}$/.test(otp)) {
-      Alert.alert('Thông báo', 'Vui lòng nhập đủ 6 chữ số OTP.');
+      }
+
       return;
     }
 
-    navigation.navigate('ResetPassword', {
-      email,
-      otp_code: otp,
-    });
+    const currentOtp = otp.split('');
+    currentOtp[index] = digits;
+
+    const nextOtp = currentOtp.join('').slice(0, 6);
+    setOtp(nextOtp);
+
+    if (digits && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    if (nextOtp.length === 6) {
+      Keyboard.dismiss();
+    }
   };
 
-  const canResend =
-    resendCooldown === 0 &&
-    resendCount < MAX_RESEND_COUNT &&
-    !resending;
+  // Gửi OTP mới ngay tại màn hình hiện tại.
+  const handleResendOtp = async () => {
+    if (resending) {
+      return;
+    }
 
-  const isOtpExpired = otpExpiresIn === 0;
+    if (resendCount >= MAX_RESEND_COUNT) {
+      Alert.alert(copy.notice, copy.limitReached);
+      return;
+    }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.progressArea}>
-            <View style={styles.progressTrack}>
-              <View style={styles.progressDone} />
-              <View style={styles.progressActive} />
-              <View style={styles.progressInactive} />
-            </View>
+    if (resendCooldown > 0) {
+      Alert.alert(copy.pleaseWait, copy.waitMessage(formatTime(resendCooldown)));
+      return;
+    }
 
-            <Text style={styles.progressText}>
-              Bước 2/3 · Xác thực tài khoản
-            </Text>
-          </View>
+    try {
+      setResending(true);
 
-          <Text style={styles.title}>Nhập mã xác thực</Text>
+      // Sử dụng lại API gửi OTP hiện có.
+      await forgotPassword(email);
 
-          <Text style={styles.description}>
-            Nhập mã OTP 6 số được gửi đến email để tiếp tục
-            đặt lại mật khẩu.
-          </Text>
+      // Chỉ cập nhật thời gian khi API gửi mã thành công.
+      setOtp('');
+      setOtpExpiresIn(OTP_VALID_SECONDS);
+      setResendCooldown(RESEND_WAIT_SECONDS);
+      setResendCount((prev) => prev + 1);
 
-          <View style={styles.emailRow}>
-            <Text style={styles.emailText}>
-              {maskedEmail(email)}
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ForgotPassword')}
+      Alert.alert(copy.resendSuccessTitle, copy.resendSuccessBody);
+    } catch (error: any) {
+      Alert.alert(copy.resendErrorTitle, error?.message || copy.retryLater);
+    } finally {
+      setResending(false);
+    }
+  };
             >
               <Text style={styles.changeEmail}>Thay đổi</Text>
             </TouchableOpacity>
