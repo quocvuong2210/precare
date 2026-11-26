@@ -438,61 +438,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
               <Text
                 style={[
                   styles.buttonText,
-    gap: 7,
-  },
-  otpInput: {
+                  fontStyle(15.5, { min: 14.5, max: 18 }),
+                  (otp.length !== 6 || isOtpExpired) && {
+                    color: theme.muted,
+                  },
+                ]}
+              >
+                {copy.confirmButton}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.footer}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={[styles.footerText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                {copy.backToLogin}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
     flex: 1,
-    height: 54,
-    minWidth: 0,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: '#DCE5EF',
-    backgroundColor: '#FFFFFF',
-    color: '#172033',
-    fontSize: 21,
-    fontWeight: '800',
-    paddingHorizontal: 0,
   },
-  otpFilled: {
-    borderColor: '#438F87',
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F9FC',
   },
-  otpFocused: {
-    borderColor: '#258D83',
-    borderWidth: 1.5,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
-  otpExpired: {
-    borderColor: '#DC2626',
+  progressArea: {
+    marginBottom: 25,
   },
-  timerArea: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  timerRow: {
+  progressTrack: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+    height: 3,
+    gap: 4,
   },
-  timerText: {
-    color: '#64748B',
-    fontSize: 10,
+  progressDone: {
+    flex: 1,
+    backgroundColor: '#438F87',
+    borderRadius: 3,
   },
-  expiredText: {
-    color: '#DC2626',
-  },
-  resendButton: {
-    paddingVertical: 10,
-  },
-  resendText: {
-    color: '#438F87',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  resendDisabled: {
-    color: '#94A3B8',
-  },
-  statusText: {
-    color: '#39847E',
-    fontSize: 11,
+  progressActive: {
+    flex: 1,
+    backgroundColor: '#258D83',
     textAlign: 'center',
   },
   infoBox: {
