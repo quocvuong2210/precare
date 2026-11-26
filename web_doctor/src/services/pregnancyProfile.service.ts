@@ -76,185 +76,18 @@ const STORAGE_KEY = 'precare_pregnancy_records_v2';
 /**
  * Danh sách hồ sơ ban đầu khớp với bản thiết kế
  */
-export const INITIAL_PREGNANCY_RECORDS: PregnancyRecordItem[] = [
-  {
-    id: 'prof-104963',
-    stt: '06',
-    patientId: 'pat-010',
-    patientName: 'Bùi Kim Ngân',
-    phoneNumber: '0945 888 999',
-    email: 'kimngan.bui@gmail.com',
-    birthDate: '1996-05-15',
-    doctorName: 'BS. Nguyễn Thu Hương',
-    doctorId: 'doc-004',
-    lmp: '2026-11-05',
-    q1UltrasoundDate: '2026-11-05',
-    q1GestationalWeeks: 7,
-    q1GestationalDays: 0,
-    crlMm: 10.0,
-    edd: '2027-06-24',
-    displayEdd: '24/06/2027',
-    gestationalAgeDisplay: '7 tuần 1 ngày',
-    gestationalAgeFormatted: '7w1d',
-    gestationalAgeDays: 50,
-    daysUntilEdd: 230,
-    trimesterDisplay: 'Quý 1 (50 ngày)',
-    primaryMethod: 'crl',
-    status: 'active',
-    statusLabel: 'Đang hoạt động',
-    createdAt: '2026-10-18T09:30:00Z',
-  },
-  {
-    id: 'prof-001',
-    stt: '01',
-    patientId: 'pat-004',
-    patientName: 'Trần Hồng Nhung',
-    phoneNumber: '0933445566',
-    email: 'hongnhung.tran@gmail.com',
-    birthDate: '1994-02-18',
-    doctorName: 'BS. Lê Minh',
-    doctorId: 'doc-001',
-    edd: '2026-11-14',
-    displayEdd: '14/11/2026',
-    gestationalAgeDisplay: '36 tuần 3 ngày',
-    gestationalAgeFormatted: '36w3d',
-    gestationalAgeDays: 255,
-    daysUntilEdd: 25,
-    trimesterDisplay: 'Quý 3 (255 ngày)',
-    primaryMethod: 'q1_ultrasound',
-    status: 'completed',
-    statusLabel: 'Đã sinh (Completed)',
-    createdAt: '2026-03-01T08:00:00Z',
-  },
-  {
-    id: 'prof-002',
-    stt: '02',
-    patientId: 'pat-mai',
-    patientName: 'Lê Hoàng Mai',
-    phoneNumber: '0977889900',
-    email: 'hoangmai.le@example.com',
-    doctorName: 'BS. Nguyễn Thu Hương',
-    doctorId: 'doc-004',
-    edd: '2027-01-15',
-    displayEdd: '15/01/2027',
-    gestationalAgeDisplay: '27 tuần 4 ngày',
-    gestationalAgeFormatted: '27w4d',
-    gestationalAgeDays: 193,
-    daysUntilEdd: 87,
-    trimesterDisplay: 'Quý 2 (193 ngày)',
-    primaryMethod: 'lmp',
-    status: 'terminated',
-    statusLabel: 'Đình chỉ',
-    createdAt: '2026-04-10T09:30:00Z',
-  },
-  {
-    id: 'prof-003',
-    stt: '03',
-    patientId: 'pat-001',
-    patientName: 'Lê Hoàng Hải Yến',
-    phoneNumber: '0912 345 678',
-    email: 'haiyen.le@gmail.com',
-    birthDate: '1995-04-12',
-    doctorName: 'BS. Lê Minh',
-    doctorId: 'doc-001',
-    lmp: '2026-01-01',
-    edd: '2026-10-08',
-    displayEdd: '08/10/2026',
-    gestationalAgeDisplay: '32 tuần 4 ngày',
-    gestationalAgeFormatted: '32w4d',
-    gestationalAgeDays: 228,
-    daysUntilEdd: 52,
-    trimesterDisplay: 'Quý 3 (228 ngày)',
-    primaryMethod: 'q1_ultrasound',
-    status: 'active',
-    statusLabel: 'Đang hoạt động',
-    createdAt: '2026-01-15T08:30:00Z',
-  },
-  {
-    id: 'prof-004',
-    stt: '04',
-    patientId: 'pat-002',
-    patientName: 'Nguyễn Thảo Chi',
-    phoneNumber: '0987 654 321',
-    email: 'thaochi.nguyen@gmail.com',
-    birthDate: '1997-08-20',
-    doctorName: 'BS. Lê Minh',
-    doctorId: 'doc-001',
-    edd: '2027-08-10',
-    displayEdd: '10/08/2027',
-    gestationalAgeDisplay: '0 tuần 3 ngày',
-    gestationalAgeFormatted: '0w3d',
-    gestationalAgeDays: 3,
-    daysUntilEdd: 277,
-    trimesterDisplay: 'Quý 1 (3 ngày)',
-    primaryMethod: 'lmp',
-    status: 'active',
-    statusLabel: 'Đang hoạt động',
-    createdAt: '2026-01-20T09:00:00Z',
-  },
-  {
-    id: 'prof-005',
-    stt: '05',
-    patientId: 'pat-003',
-    patientName: 'Phạm Minh Thư',
-    phoneNumber: '0905 123 456',
-    email: 'minhthu.pham@gmail.com',
-    birthDate: '1999-11-03',
-    doctorName: 'BS. Trần Văn B',
-    doctorId: 'doc-003',
-    lmp: '2026-04-18',
-    edd: '2026-11-25',
-    displayEdd: '25/11/2026',
-    gestationalAgeDisplay: '18 tuần 0 ngày',
-    gestationalAgeFormatted: '18w0d',
-    gestationalAgeDays: 126,
-    daysUntilEdd: 154,
-    trimesterDisplay: 'Quý 2 (126 ngày)',
-    primaryMethod: 'lmp',
-    status: 'active',
-    statusLabel: 'Đang hoạt động',
-    createdAt: '2026-04-25T10:15:00Z',
-  },
-];
-
 /**
  * Đọc danh sách hồ sơ thai kỳ từ LocalStorage (hoặc nạp mặc định nếu lần đầu)
  */
 export function getStoredPregnancyRecords(): PregnancyRecordItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PREGNANCY_RECORDS));
-      return INITIAL_PREGNANCY_RECORDS;
-    }
-    const parsed: PregnancyRecordItem[] = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Đảm bảo hồ sơ prof-104963 tồn tại và cập nhật chỉ số chuẩn 7w1d / EDD 2027-06-24
-      const idx = parsed.findIndex((r) => r.id === 'prof-104963' || r.patientName === 'Bùi Kim Ngân');
-      if (idx === -1) {
-        parsed.unshift(INITIAL_PREGNANCY_RECORDS[0]);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      } else if (parsed[idx].gestationalAgeFormatted !== '7w1d' || parsed[idx].edd !== '2027-06-24') {
-        parsed[idx] = { ...parsed[idx], ...INITIAL_PREGNANCY_RECORDS[0] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-      }
-      return parsed;
-    }
-    return INITIAL_PREGNANCY_RECORDS;
-  } catch {
-    return INITIAL_PREGNANCY_RECORDS;
-  }
+  return [];
 }
 
 /**
  * Lưu danh sách hồ sơ vào LocalStorage
  */
 export function savePregnancyRecordsToStorage(records: PregnancyRecordItem[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch (e) {
-    console.error('Không thể lưu hồ sơ thai kỳ vào LocalStorage', e);
-  }
+  void records;
 }
 
 export interface CreatePregnancyRecordInput {
@@ -340,7 +173,7 @@ export function createNewPregnancyRecord(
     email: input.email?.trim(),
     birthDate: input.birthDate,
     doctorId: input.doctorId,
-    doctorName: input.doctorName || 'BS. Lê Minh',
+    doctorName: input.doctorName || '',
     
     lmp: input.lmp,
     q1UltrasoundDate: input.q1UltrasoundDate,
@@ -765,41 +598,19 @@ export function removeVietnameseAccents(str: string): string {
 /**
  * Danh sách bác sĩ hệ thống có role 'doctor' từ CSDL PreCare
  */
-export const SYSTEM_DOCTORS: { id: string; name: string }[] = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'BS. Lê Minh' },
-  { id: '60ad56ea-437e-47bd-839a-d97333790da0', name: 'BS. Nguyễn Na' },
-  { id: '77777777-7777-7777-7777-777777777777', name: 'BS. Chung Duy' },
-  { id: 'ebe0d1ff-abdb-4528-97ba-f23c7c478674', name: 'BS. Nguyễn Anh Thư' },
-  { id: 'cebf0255-886c-41c8-a6aa-78f8df38cc9d', name: 'BS. Nguyễn Nhi' },
-];
-
 /**
- * Trích xuất danh sách bác sĩ duy nhất từ dữ liệu thực tế của các hồ sơ thai kỳ & hệ thống
+ * Trích xuất danh sách bác sĩ duy nhất từ dữ liệu hồ sơ đã tải từ CSDL
  */
 export function getUniqueDoctorsFromRecords(
   records: PregnancyRecordItem[]
 ): { id: string; name: string }[] {
   const map = new Map<string, { id: string; name: string }>();
-
-  // 1. Nạp danh sách bác sĩ chuẩn hệ thống
-  SYSTEM_DOCTORS.forEach((doc) => {
-    map.set(doc.name.toLowerCase().trim(), doc);
-    map.set(doc.id, doc);
-  });
-
-  // 2. Bổ sung các bác sĩ xuất hiện trong các bản ghi hồ sơ
   records.forEach((r) => {
     const rawName = r.doctorName?.trim();
     if (rawName) {
       const formattedName = rawName.startsWith('BS.') ? rawName : `BS. ${rawName}`;
-      const matched = SYSTEM_DOCTORS.find(
-        (sd) =>
-          (r.doctorId && sd.id === r.doctorId) ||
-          sd.name.toLowerCase() === rawName.toLowerCase() ||
-          sd.name.toLowerCase() === formattedName.toLowerCase()
-      );
-      const id = r.doctorId || matched?.id || rawName;
-      const name = matched?.name || formattedName;
+      const id = r.doctorId || rawName;
+      const name = formattedName;
       if (!map.has(id)) {
         map.set(id, { id, name });
       }

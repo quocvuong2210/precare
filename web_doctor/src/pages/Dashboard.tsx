@@ -10,32 +10,7 @@ interface PatientAppointment {
   ocr_status: 'confirmed' | 'pending';
 }
 
-const APPOINTMENTS: PatientAppointment[] = [
-  {
-    id: 'prof-001',
-    name: 'Nguyễn Thảo Chi',
-    gestational_age: '32 tuần',
-    time: '08:30 AM',
-    reason: 'Khám định kỳ + Siêu âm',
-    ocr_status: 'confirmed',
-  },
-  {
-    id: 'prof-002',
-    name: 'Phạm Minh Thư',
-    gestational_age: '18 tuần',
-    time: '09:15 AM',
-    reason: 'Xét nghiệm sinh hóa',
-    ocr_status: 'pending',
-  },
-  {
-    id: 'prof-003',
-    name: 'Trần Hồng Nhung',
-    gestational_age: '36 tuần',
-    time: '10:00 AM',
-    reason: 'Theo dõi huyết áp cao',
-    ocr_status: 'confirmed',
-  },
-];
+const APPOINTMENTS: PatientAppointment[] = [];
 
 interface DashboardProps {
   onSelectPatient: (id: string) => void;
@@ -55,8 +30,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">248</div>
-            <p className="text-xs font-medium text-teal-600 mt-2">Tăng 8 thai kỳ mới tuần này</p>
+            <div className="text-3xl font-bold text-slate-800 tracking-tight">0</div>
+            <p className="text-xs font-medium text-teal-600 mt-2">Chưa có dữ liệu</p>
           </div>
         </div>
 
@@ -69,8 +44,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">18</div>
-            <p className="text-xs text-slate-500 mt-2">Đã hoàn thành 12 ca</p>
+            <div className="text-3xl font-bold text-slate-800 tracking-tight">0</div>
+            <p className="text-xs text-slate-500 mt-2">Chưa có dữ liệu</p>
           </div>
         </div>
 
@@ -83,8 +58,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             </div>  
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-rose-500 tracking-tight">04</div>
-            <p className="text-xs font-normal text-rose-500/90 mt-2">2 ca nguy cơ cao (Tiền sản giật / Nhau tiền đạo)</p>
+            <div className="text-3xl font-bold text-rose-500 tracking-tight">0</div>
+            <p className="text-xs font-normal text-rose-500/90 mt-2">Chưa có dữ liệu</p>
           </div>
         </div>
 
@@ -97,8 +72,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-slate-800 tracking-tight">07</div>
-            <p className="text-xs text-slate-500 mt-2">Độ chính xác trung bình 96%</p>
+            <div className="text-3xl font-bold text-slate-800 tracking-tight">0</div>
+            <p className="text-xs text-slate-500 mt-2">Chưa có dữ liệu</p>
           </div>
         </div>
       </div>
@@ -108,7 +83,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
         {/* Left Column: Lịch khám hôm nay (Width ~ 68%) */}
         <div className="lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
           <div className="flex items-center justify-between pb-5 border-b border-slate-100">
-            <h2 className="text-base font-bold text-slate-800">Lịch khám hôm nay (18 thai phụ)</h2>
+            <h2 className="text-base font-bold text-slate-800">Lịch khám hôm nay</h2>
             <button className="text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline">
               Xem tất cả
             </button>
@@ -181,7 +156,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                02 trường hợp nghi ngờ tiền sản giật, huyết áp đo được &gt; 140/90 mmHg.
+                Chưa có dữ liệu cảnh báo từ CSDL.
               </p>
             </div>
 
@@ -194,7 +169,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                05 thai kỳ chậm phát triển trong tử cung (bách phân vị &lt; bách phân vị thứ 10).
+                Chưa có dữ liệu theo dõi từ CSDL.
               </p>
             </div>
 
@@ -207,7 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
-                241 thai phụ ghi nhận thể trạng và chỉ số thai nhi phát triển đồng đều.
+                Chưa có dữ liệu đánh giá từ CSDL.
               </p>
             </div>
           </div>

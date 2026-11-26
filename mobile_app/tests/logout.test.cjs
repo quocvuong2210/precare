@@ -10,22 +10,42 @@ const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/s
 }).outputText;
 
 function setup({ offline = false, failStorage = false, refresh = true } = {}) {
-  const stored = new Map([
-    ['precare_access_token', 'access'], ['precare_current_user', JSON.stringify({ email: 'test@example.com' })],
-    ['precare_settings', 'keep-settings'], ['precare_records_test', 'keep-records'],
+  const asyncStored = new Map([
+    ['precare_current_user', JSON.stringify({ email: 'test@example.com' })],
+    ['precare_pregnancy_profile_id', 'profile-123'],
+    ['precare_settings', 'keep-settings'],
+    ['precare_records_test', 'keep-records'],
   ]);
-  if (refresh) stored.set('precare_refresh_token', 'refresh');
+  const secureStored = new Map([
+    ['precare_access_token', 'access'],
+    ['precare_remembered_email', 'test@example.com'],
+    ['precare_remember_me', 'true'],
+  ]);
+  if (refresh) secureStored.set('precare_refresh_token', 'refresh');
   const requests = [];
   const storage = {
-    getItem: async (key) => stored.get(key) || null,
+    getItem: async (key) => asyncStored.get(key) || null,
     multiRemove: async (keys) => {
       if (failStorage) throw new Error('storage unavailable');
-      keys.forEach((key) => stored.delete(key));
+      keys.forEach((key) => asyncStored.delete(key));
+    },
+  };
+  const secureStore = {
+    getItemAsync: async (key) => secureStored.get(key) || null,
+    setItemAsync: async (key, value) => {
+      secureStored.set(key, value);
+    },
+    deleteItemAsync: async (key) => {
+      secureStored.delete(key);
     },
   };
   const context = {
     exports: {}, AbortController, setTimeout, clearTimeout, console,
-    require: (name) => name === 'react-native' ? { Platform: { OS: 'android' } } : storage,
+    require: (name) => {
+      if (name === 'react-native') return { Platform: { OS: 'android' } };
+      if (name === 'expo-secure-store') return secureStore;
+      return storage;
+    },
     fetch: async (url, options) => {
       requests.push({ url, options });
       if (offline) throw new Error('offline');
@@ -33,18 +53,21 @@ function setup({ offline = false, failStorage = false, refresh = true } = {}) {
     },
   };
   vm.runInNewContext(source, context);
-  return { api: context.exports, stored, requests, storage };
+  return { api: context.exports, stored: asyncStored, secureStored, requests, storage };
 }
 
-test('logout clears credentials, revokes refresh token and preserves records and settings', async () => {
-  const { api, stored, requests } = setup();
+test('logout clears session credentials, revokes refresh token and preserves remembered email, records and settings', async () => {
+  const { api, stored, secureStored, requests } = setup();
   await api.restoreSession();
   await api.logout();
   assert.equal(api.currentAccessToken, '');
   assert.equal(api.currentUserProfile, null);
-  assert.equal(stored.has('precare_access_token'), false);
+  assert.equal(secureStored.has('precare_access_token'), false);
+  assert.equal(secureStored.has('precare_refresh_token'), false);
+  assert.equal(secureStored.has('precare_remember_me'), false);
+  assert.equal(secureStored.get('precare_remembered_email'), 'test@example.com');
   assert.equal(stored.has('precare_current_user'), false);
-  assert.equal(stored.has('precare_refresh_token'), false);
+  assert.equal(stored.has('precare_pregnancy_profile_id'), false);
   assert.equal(stored.get('precare_settings'), 'keep-settings');
   assert.equal(stored.get('precare_records_test'), 'keep-records');
   assert.equal(requests[0].options.headers.Authorization, 'Bearer access');
@@ -54,12 +77,13 @@ test('logout clears credentials, revokes refresh token and preserves records and
 });
 
 test('offline logout still clears the local session', async () => {
-  const { api, stored } = setup({ offline: true });
+  const { api, secureStored } = setup({ offline: true });
   await api.restoreSession();
   await api.logout();
   assert.equal(api.currentAccessToken, '');
   assert.equal(await api.restoreSession(), null);
-  assert.equal(stored.has('precare_refresh_token'), false);
+  assert.equal(secureStored.has('precare_refresh_token'), false);
+  assert.equal(secureStored.has('precare_remember_me'), false);
 });
 
 test('legacy sessions without refresh tokens can log out', async () => {

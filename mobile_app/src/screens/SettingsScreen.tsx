@@ -328,13 +328,16 @@ export default function SettingsScreen({
   const handleLogout = async () => {
     if (logoutInProgress.current) return;
     const root = rootNavigation();
-    if (!root) return;
+    if (!root) {
+      setLogoutError(true);
+      return;
+    }
     logoutInProgress.current = true;
     setLoggingOut(true);
     setLogoutError(false);
     try {
       await logout();
-      root.reset({ index: 0, routes: [{ name: "Login" }] });
+      root.reset({ index: 0, routes: [{ name: "Login", params: { skipAutoLogin: true } }] });
     } catch {
       setLogoutError(true);
     } finally {

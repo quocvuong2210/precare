@@ -563,37 +563,37 @@ class PdfFastPathExtractor:
                             if val is not None and 12.0 <= val <= 55.0:
                                 vitals["bmi"] = round(val, 1)
 
-                    # Labs
-                    if labs["hgb"] is None and re.search(
-                        r"(?i)huyết\s*sắc\s*tố|\bhgb\b|\bhb\b", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None:
-                            labs["hgb"] = str(round(val, 2))
+                        # Labs
+                        if labs["hgb"] is None and re.search(
+                            r"(?i)huyết\s*sắc\s*tố|\bhgb\b|\bhb\b", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None:
+                                labs["hgb"] = str(round(val, 2))
 
-                    if labs["glucose"] is None and re.search(
-                        r"(?i)đường\s*huyết|\bglucose\b", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None:
-                            labs["glucose"] = str(round(val, 2))
+                        if labs["glucose"] is None and re.search(
+                            r"(?i)đường\s*huyết|\bglucose\b", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None:
+                                labs["glucose"] = str(round(val, 2))
 
-                    if labs["urine_protein"] is None and re.search(
-                        r"(?i)protein\s*niệu|đạm\s*nước\s*tiểu", label_cell
-                    ):
-                        labs["urine_protein"] = value_cell
+                        if labs["urine_protein"] is None and re.search(
+                            r"(?i)protein\s*niệu|đạm\s*nước\s*tiểu", label_cell
+                        ):
+                            labs["urine_protein"] = value_cell
 
-                    if labs["urine_ph"] is None and re.search(
-                        r"(?i)\bph\b\s*(?:nước\s*tiểu)?", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 4.0 <= val <= 9.5:
-                            labs["urine_ph"] = str(round(val, 1))
+                        if labs["urine_ph"] is None and re.search(
+                            r"(?i)\bph\b\s*(?:nước\s*tiểu)?", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None and 4.0 <= val <= 9.5:
+                                labs["urine_ph"] = str(round(val, 1))
 
-                    if labs["urine_leukocyte"] is None and re.search(
-                        r"(?i)bạch\s*cầu\s*niệu|leukocyte", label_cell
-                    ):
-                        labs["urine_leukocyte"] = value_cell
+                        if labs["urine_leukocyte"] is None and re.search(
+                            r"(?i)bạch\s*cầu\s*niệu|leukocyte", label_cell
+                        ):
+                            labs["urine_leukocyte"] = value_cell
 
         if not raw_text:
             return {
@@ -693,7 +693,6 @@ class PdfFastPathExtractor:
             leu_m = re.search(r"(?i)(?:Bạch\s*cầu|Leukocyte)\s*(?:niệu)?\s*[:=]?\s*(\(\s*[+-]+\s*\)|Âm\s*tính|Dương\s*tính|[0-9]+)", raw_text)
             if leu_m:
                 labs["urine_leukocyte"] = "Âm tính" if "-" in leu_m.group(1) else leu_m.group(1)
-
         # Kết luận chuyên môn & Dặn dò
         conc_m = re.search(
             r"(?im)^(?:\s*)(?:K[EẾ]T\s*LU[AẬ]N|CH[AẨ]N\s*[ĐD]O[AÁ]N)\s*[:\-]?\s*(.+?)(?=(?:\n\s*(?:[ĐD][EỀ]\s*NGH[IỊ]|D[AẶ]N\s*D[OÒ]|L[OỜ]I\s*KHUY[EÊ]N|H[EẸ]N\s*T[AÁ]I\s*KH[AÁ]M|B[AÁ]C\s*S[IĨ]|$)))",

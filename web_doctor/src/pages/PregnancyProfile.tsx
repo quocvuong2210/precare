@@ -93,7 +93,6 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [eligiblePatients, setEligiblePatients] = useState<EligiblePatient[]>([]);
   const [isLoadingEligible, setIsLoadingEligible] = useState(false);
-
   const loadEligiblePatients = async () => {
     setIsLoadingEligible(true);
     try {
@@ -180,11 +179,10 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
     }
   }, []);
 
-  // Trích xuất danh sách Bác sĩ thực tế từ CSDL qua các bản ghi
   const doctorsList = useMemo(() => {
     const list = getUniqueDoctorsFromRecords(records);
     if (currentUser?.id && (currentUser?.role === 'doctor' || currentUser?.role === 'admin')) {
-      const exists = list.some((d) => d.id === currentUser.id);
+      const exists = list.some((doctor) => doctor.id === currentUser.id);
       if (!exists) {
         return [
           {
@@ -197,6 +195,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
     }
     return list;
   }, [records, currentUser]);
+
 
   // Danh sách thai phụ chưa có hồ sơ thai kỳ (nạp động từ bảng users qua API)
   const unregisteredPatients = useMemo(() => {
