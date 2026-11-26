@@ -273,61 +273,61 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                     >
                       <Text style={[styles.otpDigit, fontStyle(23, { min: 20, max: 26 }), { color: theme.text }]}>
                         {otp[index] || ""}
-              <Text style={styles.resendHint}>Chưa nhận được mã?</Text>
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
 
-              <Pressable
-                disabled={
-                  countdown > 0 || verifying || resending || !!verificationToken
+              <TextInput
+                ref={inputRef}
+                style={styles.otpInput}
+                value={otp}
+                onChangeText={handleChangeOtp}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete={
+                  Platform.OS === "android" ? "sms-otp" : "one-time-code"
                 }
-                onPress={handleResend}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityState={{
-                  disabled:
-                    countdown > 0 ||
-                    verifying ||
-                    resending ||
-                    !!verificationToken,
-                }}
-              >
-                <Text
-                  style={[
-                    styles.resendLink,
-                    (countdown > 0 ||
-                      verifying ||
-                      resending ||
-                      !!verificationToken) &&
-                      styles.resendDisabled,
-                  ]}
-                >
-                  {verificationToken
-                    ? "Đã xác nhận"
-                    : resending
-                      ? "Đang gửi lại..."
-                      : countdown > 0
-                        ? `Gửi lại (${countdown}s)`
-                        : "Gửi lại mã"}
-                </Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.note}>
-              <Ionicons
-                name="information-circle-outline"
-                size={19}
-                color="#64748B"
+                autoCorrect={false}
+                autoCapitalize="none"
+                editable={!verifying && !resending && !verificationToken}
+                maxLength={OTP_LENGTH}
+                caretHidden
+                selectionColor="transparent"
+                accessibilityLabel={copy.otpAccessibility}
               />
-
-              <Text style={styles.noteText}>
-                Nếu chưa nhận được email, bạn hãy kiểm tra thư mục Spam hoặc Thư
-                rác.
-              </Text>
             </View>
-          </View>
 
-          <View style={styles.footer}>
-            <Ionicons
-              name="shield-checkmark-outline"
+            {!!message && (
+              <Text
+                style={[
+                  styles.message,
+                  fontStyle(14, { lineHeight: 20, min: 13 }),
+                  messageType === "success" && [
+                    styles.messageSuccess,
+                    { color: theme.tealText },
+                  ],
+                  messageType === "error" && [
+                    styles.messageError,
+                    { color: theme.danger },
+                  ],
+                ]}
+                accessibilityLiveRegion="polite"
+              >
+                {message}
+              </Text>
+            )}
+
+            <Pressable
+              disabled={
+                !isComplete || verifying || resending || !!verificationToken
+              }
+              onPress={handleVerify}
+              accessibilityRole="button"
+              accessibilityState={{
               size={15}
               color="#94A3B8"
             />
