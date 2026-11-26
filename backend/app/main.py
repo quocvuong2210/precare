@@ -12,6 +12,7 @@ from app.api.checkup import router as checkup_router
 from app.api.deletion_request import router as deletion_request_router
 
 from app.models.uploaded_file import UploadedFile
+from app.models.growth_reference import GrowthReference
 from app.api.ingest import router as ingest_router
   
 

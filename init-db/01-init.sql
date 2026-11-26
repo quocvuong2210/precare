@@ -278,6 +278,39 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token_hash);
 
 -- ============================================================================
+-- 15. Bảng Tham chiếu Tăng trưởng Thai nhi LMS (INTERGROWTH-21st & Hadlock)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS growth_references (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    standard VARCHAR(50) NOT NULL,
+    metric VARCHAR(20) NOT NULL,
+    ga_days INTEGER NOT NULL,
+    unit VARCHAR(10) NOT NULL,
+    l_value NUMERIC(10, 6) NOT NULL,
+    m_value NUMERIC(12, 4) NOT NULL,
+    s_value NUMERIC(10, 6) NOT NULL,
+    p3 NUMERIC(12, 4) NOT NULL,
+    p10 NUMERIC(12, 4) NOT NULL,
+    p50 NUMERIC(12, 4) NOT NULL,
+    p90 NUMERIC(12, 4) NOT NULL,
+    p97 NUMERIC(12, 4) NOT NULL,
+    version VARCHAR(50) NOT NULL DEFAULT 'v1.0',
+    is_deleted BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_growth_ref_std_metric_ga_ver UNIQUE (standard, metric, ga_days, version),
+    CONSTRAINT chk_growth_ref_standard CHECK (standard IN ('intergrowth_21st', 'hadlock')),
+    CONSTRAINT chk_growth_ref_metric CHECK (metric IN ('crl', 'bpd', 'hc', 'ac', 'fl', 'efw')),
+    CONSTRAINT chk_growth_ref_unit CHECK (unit IN ('mm', 'g')),
+    CONSTRAINT chk_growth_ref_ga_days CHECK (ga_days >= 14 AND ga_days <= 310),
+    CONSTRAINT chk_growth_ref_ms_positive CHECK (m_value > 0 AND s_value > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_growth_references_lookup
+    ON growth_references(standard, metric, ga_days)
+    WHERE is_deleted = FALSE;
+
+-- ============================================================================
 -- DỮ LIỆU SEED MẪU KHỞI TẠO HỆ THỐNG (INITIAL SYSTEM SEED DATA)
 -- Toàn bộ mật khẩu mặc định của các tài khoản demo là: password123
 -- Được băm an toàn theo chuẩn bcrypt thông qua extension pgcrypto:
