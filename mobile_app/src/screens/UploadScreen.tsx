@@ -548,61 +548,61 @@ export async function resolveAccountStorageKey(): Promise<string> {
     return `precare_uploaded_records_${restored.email.trim().toLowerCase()}`;
   }
   return 'precare_uploaded_records_guest_account';
-  const lower = fileName.toLowerCase();
-  const match =
-    lower.match(/(?:tuan|tuần|week|w)[_\-\s]*(\d{2})/i) ||
-    lower.match(/(\d{2})[_\-\s]*(?:tuan|tuần|week|w)/i);
-  if (match) {
-    const w = parseInt(match[1], 10);
-    if (w >= 12 && w <= 41) return w;
-  }
-  return 24;
 }
 
-function parseBackendIngestResult(
-  payload: any,
-  fileName: string,
-  fallbackWeek: number = 24
-): MedicalAnalysisResult | null {
-  if (!payload || typeof payload !== 'object') return null;
-  const rawAnalysis =
-    payload.analysis ||
-    payload.extracted_data ||
-    payload.biometric_data ||
-    payload.result ||
-    payload.data ||
-    payload;
+export function evaluateMetricByWeek(
+  key: string,
+  rawValue: string,
+  gestationalWeek: number = 24,
+  lang: AppLang = 'vi'
+): {
+  severity: SeverityLevel;
+  clinicalNote: string;
+  refRange?: string;
+} {
+  const clean = rawValue.trim();
+  const lower = clean.toLowerCase();
+  const isEn = lang === 'en';
+  const { clampedWeek, month, trimester } = getPregnancyStageInfo(gestationalWeek, lang);
 
-  const weekFromDays = rawAnalysis?.gestational_age_days
-    ? Math.floor(Number(rawAnalysis.gestational_age_days) / 7)
-    : 0;
+  if (key === 'bpd' || key === 'hc' || key === 'ac' || key === 'fl' || key === 'efw') {
+    const unit = key === 'efw' ? 'g' : 'mm';
+    const bounds = getFetalMetricBoundsByWeek(key, clampedWeek, unit, lang);
+    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
+    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
 
-  const week =
-    weekFromDays ||
-    Number(
-      rawAnalysis?.gestational_week ||
-        rawAnalysis?.gestationalWeek ||
-        payload?.gestational_week ||
-        fallbackWeek
-    ) ||
-    detectWeekFromFileName(fileName);
-  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week);
+    if (isNaN(num) || num <= 0) {
+      return {
+        severity: 'danger',
+        clinicalNote: isEn ? 'Invalid value' : 'Giá trị không hợp lệ',
+        refRange: bounds.refRange,
+      };
+    }
 
-  if (Array.isArray(rawAnalysis?.metrics) && rawAnalysis.metrics.length > 0) {
-    const metrics: MedicalMetric[] = rawAnalysis.metrics.map((m: any) =>
-      buildMetricByWeek(
-        String(m.key || m.code || 'metric').toLowerCase(),
-        String(m.label || m.name || m.key || 'Chỉ số'),
-        String(m.value ?? ''),
-        String(m.unit ?? ''),
-        String(m.refRange || m.ref_range || ''),
-        clampedWeek
-      )
-    );
-    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
-    return {
-      recordType:
-        rawAnalysis.recordType ||
+    if (num < bounds.dangerLow) {
+      return {
+        severity: 'danger',
+        clinicalNote: isEn
+          ? `Red (< 3rd): Significantly below Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please consult your doctor for a closer check.`
+          : `Mức Đỏ (< 3rd): Thấp hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên đi khám để bác sĩ kiểm tra kỹ hơn cho bé nhé.`,
+        refRange: bounds.refRange,
+      };
+    }
+
+    if (num > bounds.dangerHigh) {
+      return {
+        severity: 'danger',
+        clinicalNote: isEn
+          ? `Red (> 97th): Significantly above Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please discuss directly with your doctor.`
+          : `Mức Đỏ (> 97th): Cao hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên trao đổi trực tiếp với bác sĩ nhé.`,
+        refRange: bounds.refRange,
+      };
+    }
+
+    if (num < bounds.minNormal) {
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
         rawAnalysis.record_type ||
         'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
       gestationalWeek: clampedWeek,
