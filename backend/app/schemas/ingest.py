@@ -13,6 +13,8 @@ class UploadedFileSummary(BaseModel):
     file_size_bytes: Optional[int] = None
     status: str
     uploaded_by_name: Optional[str] = None
+    verified_by_name: Optional[str] = None
+    verified_at: Optional[datetime] = None
     created_at: datetime
 
 
@@ -149,3 +151,38 @@ class CommonMessageResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Any] = None
+
+
+class WorklistQueueItem(BaseModel):
+    id: uuid.UUID
+    pregnancy_profile_id: uuid.UUID
+    checkup_id: Optional[uuid.UUID] = None
+    primary_doctor_id: Optional[uuid.UUID] = None
+    primary_doctor_name: Optional[str] = None
+    patient_name: str
+    patient_phone: Optional[str] = None
+    gestational_age_formatted: Optional[str] = None
+    document_type: str
+    file_name: Optional[str] = None
+    file_type: str
+    file_size_bytes: Optional[int] = None
+    status: str
+    ocr_confidence: Optional[float] = None
+    uploaded_by_name: Optional[str] = None
+    verified_by_name: Optional[str] = None
+    verified_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class WorklistQueueResponseData(BaseModel):
+    items: List[WorklistQueueItem]
+    pagination: PaginationMetadata
+
+
+class WorklistQueueResponse(BaseModel):
+    success: bool = True
+    data: WorklistQueueResponseData
+
+
+class VerifyFileRequest(BaseModel):
+    checkup_id: Optional[uuid.UUID] = None

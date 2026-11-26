@@ -15,6 +15,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { UploadFileItem, formatFileSize } from './mockOcrData';
+import { fetchPregnancyProfilesApi } from '../../services/pregnancyProfile.service';
+import { isValidUuid } from '../../services/ingest.service';
 
 const PATIENT_OPTIONS = [
   { id: 'prof-001', name: 'Nguyễn Thảo Chi', gestationalAge: '32 tuần 4 ngày' },
@@ -44,7 +46,32 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [patientOptions, setPatientOptions] = useState(PATIENT_OPTIONS);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Nạp danh sách hồ sơ thai kỳ thật từ API để có UUID thật khi gọi Fast Path
+  useEffect(() => {
+    let isMounted = true;
+    fetchPregnancyProfilesApi({ page: 1, page_size: 50, status: 'active' })
+      .then((res) => {
+        if (!isMounted || !res?.items?.length) return;
+        const apiOptions = res.items.map((item) => ({
+          id: item.id,
+          name: item.patientName,
+          gestationalAge: item.gestationalAgeDisplay || 'Đang theo dõi',
+        }));
+        setPatientOptions(apiOptions);
+        if (onSelectPatient && !isValidUuid(selectedPatientId)) {
+          onSelectPatient(apiOptions[0].id, apiOptions[0].name);
+        }
+      })
+      .catch(() => {
+        // Fallback giữ nguyên PATIENT_OPTIONS khi chưa bật backend
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Validate and add files with simulated realistic progress
   const processAddedFiles = (incomingFiles: FileList | File[]) => {
@@ -246,17 +273,17 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
             <div className="min-w-[240px]">
               <select
                 aria-label="Chọn thai phụ gắn hồ sơ"
-                value={selectedPatientId || 'prof-001'}
+                value={selectedPatientId || patientOptions[0]?.id || 'prof-001'}
                 onChange={(e) => {
                   const selId = e.target.value;
-                  const found = PATIENT_OPTIONS.find((item) => item.id === selId);
+                  const found = patientOptions.find((item) => item.id === selId);
                   if (onSelectPatient && found) {
                     onSelectPatient(found.id, found.name);
                   }
                 }}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-[#275248] cursor-pointer"
               >
-                {PATIENT_OPTIONS.map((p) => (
+                {patientOptions.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.gestationalAge})
                   </option>

@@ -147,6 +147,29 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
       {/* Main Canvas Scroll Area */}
       <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-200/70">
+        {data?.presignedViewUrl ? (
+          (data.fileType === 'application/pdf' ||
+            data.fileName.toLowerCase().endsWith('.pdf')) ? (
+            <iframe
+              src={data.presignedViewUrl}
+              title={data.fileName}
+              className="w-full h-[760px] rounded-xl border border-slate-300 bg-white shadow-xl"
+            />
+          ) : (
+            <div className="flex items-center justify-center p-2">
+              <img
+                src={data.presignedViewUrl}
+                alt={data.fileName}
+                style={{
+                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.15s ease-out',
+                }}
+                className="max-w-[580px] max-h-[760px] object-contain rounded-xl shadow-xl border border-slate-300 bg-white"
+              />
+            </div>
+          )
+        ) : (
         <div
           style={{
             transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
@@ -482,6 +505,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             </span>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

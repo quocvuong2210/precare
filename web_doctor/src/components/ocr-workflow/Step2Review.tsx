@@ -47,6 +47,23 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
   const [openSection, setOpenSection] = useState<'vitals' | 'biometrics' | 'labs' | 'conclusions'>('biometrics');
   const [hasModified, setHasModified] = useState(false);
 
+  const formattedVisitDate = (() => {
+    if (!extractionData.visitDate) return 'Chưa rõ ngày';
+    const m = extractionData.visitDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : extractionData.visitDate;
+  })();
+
+  const vitalsFilledCount = [
+    extractionData.vitals.bloodPressureSystolic > 0 && extractionData.vitals.bloodPressureDiastolic > 0,
+    extractionData.vitals.weightKg > 0,
+    extractionData.vitals.heartRateBpm > 0,
+    extractionData.vitals.temperatureC > 0,
+    extractionData.vitals.bmi > 0,
+  ].filter(Boolean).length;
+
+  const bioFilledCount = extractionData.biometrics.filter((b) => b.value > 0).length;
+  const labsFilledCount = extractionData.labs.filter((l) => Boolean(l.value && l.value.trim())).length;
+
   // Field change handlers
   const handleVitalChange = (field: keyof DocumentExtractionData['vitals'], value: number) => {
     onUpdateExtractionData({
@@ -278,7 +295,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                 </h3>
               </div>
               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Khớp mốc ngày 24/11/2026
+                {extractionData.visitDate ? `Mốc ngày ${formattedVisitDate}` : 'Chưa xác định ngày khám'}
               </span>
             </div>
 
@@ -307,7 +324,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                     Ghép vào lần khám hiện tại
                   </div>
                   <div className="text-[10px] text-slate-500 font-normal mt-0.5">
-                    Ngày 24/11/2026 • Tuần 32 + 4 ngày (Khuyên dùng)
+                    {formattedVisitDate} • {extractionData.gestationalAgeFormatted || 'Chưa xác định tuổi thai'}
                   </div>
                 </div>
               </label>
@@ -349,7 +366,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <h3 className="text-xs font-bold text-amber-900 uppercase tracking-tight">
-                  LƯU Ý LÂM SÀNG (MỨC CAM)
+                  {extractionData.racaNetAlert.levelName || 'ĐÁNH GIÁ LÂM SÀNG'}
                 </h3>
               </div>
               <span className="text-[10px] font-black tracking-wider px-2 py-0.5 rounded bg-amber-200 text-amber-900">
@@ -405,7 +422,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                    5/5 chỉ số bình thường
+                    {vitalsFilledCount}/5 chỉ số đã có
                   </span>
                   {openSection === 'vitals' ? (
                     <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -563,7 +580,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                    Bách phân vị bình thường (~50th)
+                    {bioFilledCount}/{extractionData.biometrics.length} chỉ số đã trích xuất
                   </span>
                   {openSection === 'biometrics' ? (
                     <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -659,7 +676,7 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                    1 chỉ số cần chú ý
+                    {labsFilledCount}/{extractionData.labs.length} chỉ số đã có
                   </span>
                   {openSection === 'labs' ? (
                     <ChevronUp className="w-4 h-4 text-slate-400" />

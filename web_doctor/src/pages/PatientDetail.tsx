@@ -543,6 +543,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           <div className="flex flex-1">
             {[
               { id: 'overview' as const, label: 'Tổng quan' },
+              { id: 'results' as const, label: 'Lịch sử khám' },
               { id: 'growth' as const, label: 'Biểu đồ tăng trưởng' },
             ].map((tab) => {
               const isSelected = activeDetailTab === tab.id;
@@ -788,6 +789,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
       {activeDetailTab === 'results' && currentRecord && (
         <VisitTimeline
           pregnancyProfileId={currentRecord.id}
+          patientName={patientInfo.fullName}
           onOpenUpload={() => setIsUploadWizardOpen(true)}
         />
       )}

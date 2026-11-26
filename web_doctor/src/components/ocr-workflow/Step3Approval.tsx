@@ -35,6 +35,16 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const vitalsFilledCount = [
+    extractionData.vitals.bloodPressureSystolic > 0 && extractionData.vitals.bloodPressureDiastolic > 0,
+    extractionData.vitals.weightKg > 0,
+    extractionData.vitals.heartRateBpm > 0,
+    extractionData.vitals.temperatureC > 0,
+    extractionData.vitals.bmi > 0,
+  ].filter(Boolean).length;
+
+  const bioFilledCount = extractionData.biometrics.filter((b) => b.value > 0).length;
+
   const handleSave = () => {
     setIsSaving(true);
     setTimeout(() => {
@@ -154,7 +164,7 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
                 I. THÔNG TIN THAI PHỤ &amp; CHỈ SỐ SINH HIỆU
               </h3>
               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
-                5/5 chỉ số bình thường
+                {vitalsFilledCount}/5 chỉ số đã có
               </span>
             </div>
 
@@ -232,10 +242,10 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-xs font-bold text-slate-900 tracking-wider uppercase">
-                II. SINH TRẮC HỌC THAI NHI (SIÊU ÂM 4D TUẦN 32)
+                II. SINH TRẮC HỌC THAI NHI (SIÊU ÂM)
               </h3>
               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
-                Bách phân vị bình thường (~50th)
+                {bioFilledCount}/{extractionData.biometrics.length} chỉ số đã có
               </span>
             </div>
 
@@ -246,7 +256,7 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
                   <tr className="border-b border-slate-100 text-slate-500 text-[11px] font-semibold">
                     <th className="py-2.5 px-2">CHỈ SỐ</th>
                     <th className="py-2.5 px-2 text-center">GIÁ TRỊ TRÍCH XUẤT</th>
-                    <th className="py-2.5 px-2 text-center">KHOẢNG CHUẨN (32W)</th>
+                    <th className="py-2.5 px-2 text-center">KHOẢNG CHUẨN THAM CHIẾU</th>
                     <th className="py-2.5 px-2 text-center">BÁCH PHÂN VỊ (GA)</th>
                     <th className="py-2.5 px-2 text-right">ĐÁNH GIÁ</th>
                   </tr>

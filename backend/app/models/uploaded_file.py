@@ -48,6 +48,12 @@ class UploadedFile(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
+    verified_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+    verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -55,6 +61,7 @@ class UploadedFile(Base):
     pregnancy_profile = relationship("PregnancyProfile", back_populates="uploaded_files")
     checkup = relationship("Checkup", back_populates="uploaded_files")
     uploader = relationship("User", foreign_keys=[uploaded_by])
+    verifier = relationship("User", foreign_keys=[verified_by])
 
     __table_args__ = (
         CheckConstraint(

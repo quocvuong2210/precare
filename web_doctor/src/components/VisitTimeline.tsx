@@ -21,6 +21,13 @@ import {
   fetchCheckupHistory,
 } from '../services/checkup.service';
 import { CheckupDetailModal } from './CheckupDetailModal';
+import {
+  ingestService,
+  isValidUuid,
+  mapFileDetailToExtractionData,
+} from '../services/ingest.service';
+import { UploadedFileSummary } from '../types/ingest.types';
+import { DocumentViewer, DocumentExtractionData, formatFileSize } from './ocr-workflow';
 
 type BloodPressureStatus = 'normal' | 'elevated' | 'stage1_hypertension' | 'crisis';
 
@@ -75,6 +82,10 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
 }) => {
   const [visits, setVisits] = useState<CheckupTimelineRecord[]>([]);
   const [selectedVisitForDetail, setSelectedVisitForDetail] = useState<CheckupTimelineRecord | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileSummary[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [previewDocData, setPreviewDocData] = useState<DocumentExtractionData | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -99,9 +110,45 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
     }
   };
 
+  const loadUploadedFiles = async () => {
+    if (!isValidUuid(pregnancyProfileId)) {
+      setUploadedFiles([]);
+      return;
+    }
+    setIsLoadingFiles(true);
+    try {
+      const res = await ingestService.listProfileFiles(pregnancyProfileId, {
+        page: 1,
+        page_size: 50,
+      });
+      setUploadedFiles(res.items || []);
+    } catch {
+      setUploadedFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
   useEffect(() => {
     loadVisits();
+    loadUploadedFiles();
   }, [pregnancyProfileId]);
+
+  const handlePreviewUploadedFile = async (fileId: string) => {
+    setIsLoadingPreview(true);
+    try {
+      const detail = await ingestService.getFileDetail(fileId);
+      const mapped = mapFileDetailToExtractionData(
+        detail,
+        patientName || 'Thai phụ'
+      );
+      setPreviewDocData(mapped);
+    } catch (err) {
+      console.error('[VisitTimeline] Không thể tải file gốc:', err);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   // Gộp bản ghi vừa tải lên (nếu có) và sắp xếp mốc tuổi thai/ngày khám mới nhất lên đầu
   const allVisits = useMemo(() => {
@@ -357,6 +404,135 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
           onClose={() => setSelectedVisitForDetail(null)}
           patientName={patientName}
         />
+      )}
+
+      {/* Danh sách Hồ sơ & Tài liệu đã đẩy lên của thai phụ */}
+      <div className="border-t border-slate-200 bg-slate-50/40 px-5 py-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-emerald-700" />
+              Hồ sơ &amp; Tài liệu cận lâm sàng đã đẩy lên ({uploadedFiles.length})
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Toàn bộ phiếu siêu âm và xét nghiệm đã tải lên lưu trữ bảo mật cho thai phụ này.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadUploadedFiles}
+            disabled={isLoadingFiles}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoadingFiles ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        </div>
+
+        {isLoadingFiles ? (
+          <div className="flex items-center justify-center py-6 text-xs text-slate-500 gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
+            <span>Đang tải danh sách tài liệu đã đẩy lên...</span>
+          </div>
+        ) : uploadedFiles.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
+            Chưa có tài liệu cận lâm sàng nào được đẩy lên cho hồ sơ này.
+          </div>
+        ) : (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {uploadedFiles.map((file) => {
+              const statusBadge =
+                file.status === 'verified'
+                  ? { text: 'Đã xác nhận', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                  : file.status === 'extracted'
+                  ? { text: 'Chờ bác sĩ duyệt', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
+                  : file.status === 'failed'
+                  ? { text: 'Lỗi xử lý', cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+                  : { text: 'Đang xử lý OCR', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
+
+              return (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800 truncate">
+                        {file.file_name || 'Tai_lieu_kham.pdf'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${statusBadge.cls}`}>
+                        {statusBadge.text}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-2">
+                      <span>{file.file_size_bytes ? formatFileSize(file.file_size_bytes) : '—'}</span>
+                      <span>•</span>
+                      <span>{formatDateTime(file.created_at)}</span>
+                      {file.uploaded_by_name && (
+                        <>
+                          <span>•</span>
+                          <span>Tải lên: {file.uploaded_by_name}</span>
+                        </>
+                      )}
+                      {file.verified_by_name && (
+                        <>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-semibold">
+                            Đã duyệt: {file.verified_by_name}
+                            {file.verified_at && ` (${formatDateTime(file.verified_at)})`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePreviewUploadedFile(file.id)}
+                    disabled={isLoadingPreview}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Xem file</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal xem trực tiếp File gốc từ MinIO */}
+      {previewDocData && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-4xl h-[88vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Xem tài liệu gốc: {previewDocData.fileName}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Thai phụ: {patientName || '—'} • Độ tin cậy trích xuất: {previewDocData.ocrConfidence}%
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDocData(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 p-3 bg-slate-100">
+              <DocumentViewer
+                data={previewDocData}
+                patientName={patientName}
+                isModal
+                onClose={() => setPreviewDocData(null)}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

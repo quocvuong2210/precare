@@ -41,6 +41,10 @@ export interface DocumentExtractionData {
   fileId: string;
   fileName: string;
   fileSizeFormatted: string;
+  presignedViewUrl?: string;
+  fileType?: string;
+  extractionMethod?: string;
+  rawText?: string;
   ocrConfidence: number;
   doctorPerformer: string;
   doctorApprover: string;

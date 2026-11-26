@@ -23,7 +23,9 @@ import {
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupDetailModal } from '../components/CheckupDetailModal';
 import { CheckupTimelineRecord } from '../services/checkup.service';
-import { DocumentExtractionData, createDefaultExtractionData } from '../components/ocr-workflow/mockOcrData';
+import { DocumentExtractionData, formatFileSize } from '../components/ocr-workflow/mockOcrData';
+import { ingestService } from '../services/ingest.service';
+import { apiClient } from '../services/auth.service';
 
 export interface ParaclinicalWorklistItem {
   id: string;
@@ -39,6 +41,10 @@ export interface ParaclinicalWorklistItem {
   doctorPerformer: string;
   ocrConfidence: number;
   status: 'pending_review' | 'verified';
+  primaryDoctorId?: string | null;
+  primaryDoctorName?: string | null;
+  verifiedByName?: string | null;
+  verifiedAt?: string | null;
   hasWarning?: boolean;
   warningSummary?: string;
   verifiedData?: DocumentExtractionData;
@@ -133,10 +139,107 @@ export const TestResults: React.FC<TestResultsProps> = ({
   initialPatientId,
   onNavigateToProfile,
 }) => {
-  const [worklist, setWorklist] = useState<ParaclinicalWorklistItem[]>(INITIAL_WORKLIST);
+  const [worklist, setWorklist] = useState<ParaclinicalWorklistItem[]>([]);
+  const [isLoadingQueue, setIsLoadingQueue] = useState<boolean>(true);
+
+  const loadWorklistQueue = async () => {
+    setIsLoadingQueue(true);
+    try {
+      const res = await ingestService.listWorklistQueue({ page: 1, page_size: 50 });
+      const mapped: ParaclinicalWorklistItem[] = (res.items || []).map((item) => {
+        const docType =
+          item.document_type === 'blood_test'
+            ? 'blood_test'
+            : item.document_type === 'urinalysis'
+            ? 'urinalysis'
+            : item.document_type === 'comprehensive'
+            ? 'comprehensive'
+            : 'ultrasound_4d';
+
+        const docTypeName =
+          docType === 'blood_test'
+            ? 'Xét nghiệm huyết học'
+            : docType === 'urinalysis'
+            ? 'Tổng phân tích nước tiểu'
+            : docType === 'comprehensive'
+            ? 'Phiếu khám thai tổng quát'
+            : 'Phiếu siêu âm & cận lâm sàng';
+
+        return {
+          id: item.id,
+          patientId: item.pregnancy_profile_id,
+          patientName: item.patient_name,
+          patientPhone: item.patient_phone || '—',
+          gestationalAge: item.gestational_age_formatted || 'Đang theo dõi',
+          documentType: docType,
+          documentTypeName: docTypeName,
+          fileName: item.file_name || 'Tai_lieu_kham.pdf',
+          fileSize: item.file_size_bytes ? formatFileSize(item.file_size_bytes) : '—',
+          receivedAt: new Date(item.created_at).toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          primaryDoctorId: item.primary_doctor_id,
+          primaryDoctorName: item.primary_doctor_name,
+          doctorPerformer: item.uploaded_by_name || 'Hệ thống tiếp nhận',
+          verifiedByName: item.verified_by_name,
+          verifiedAt: item.verified_at,
+          ocrConfidence: item.ocr_confidence ?? 98.0,
+          status: item.status === 'verified' ? 'verified' : 'pending_review',
+        };
+      });
+      setWorklist(mapped);
+    } catch (err) {
+      console.warn('[Worklist] Không thể tải hàng đợi từ Backend:', err);
+      setWorklist([]);
+    } finally {
+      setIsLoadingQueue(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWorklistQueue();
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_review' | 'verified'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [doctorScope, setDoctorScope] = useState<'all' | 'mine'>('all');
+
+  const [currentDoctorId, setCurrentDoctorId] = useState<string | undefined>(() => {
+    try {
+      const raw = localStorage.getItem('precare_user');
+      return raw ? (JSON.parse(raw)?.id as string | undefined) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .get('/auth/me')
+      .then((res) => {
+        if (!isMounted) return;
+        const me = res.data?.data || res.data;
+        if (me?.id) {
+          setCurrentDoctorId(me.id);
+          try {
+            localStorage.setItem('precare_user', JSON.stringify(me));
+          } catch {
+            // ignore storage errors
+          }
+        }
+      })
+      .catch(() => {
+        // Giữ nguyên giá trị từ localStorage nếu offline
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Modal & Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -159,6 +262,11 @@ export const TestResults: React.FC<TestResultsProps> = ({
       setIsWizardOpen(true);
     }
   }, [initialPatientId]);
+
+  const myPatientsCount = useMemo(() => {
+    if (!currentDoctorId) return 0;
+    return worklist.filter((i) => i.primaryDoctorId === currentDoctorId).length;
+  }, [worklist, currentDoctorId]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -188,9 +296,13 @@ export const TestResults: React.FC<TestResultsProps> = ({
       const matchType =
         typeFilter === 'all' || item.documentType === typeFilter;
 
-      return matchSearch && matchStatus && matchType;
+      const matchDoctor =
+        doctorScope === 'all' ||
+        (Boolean(currentDoctorId) && item.primaryDoctorId === currentDoctorId);
+
+      return matchSearch && matchStatus && matchType && matchDoctor;
     });
-  }, [worklist, searchQuery, statusFilter, typeFilter]);
+  }, [worklist, searchQuery, statusFilter, typeFilter, doctorScope, currentDoctorId]);
 
   // Action: Open new upload
   const handleOpenNewUpload = (patientId?: string) => {
@@ -245,46 +357,12 @@ export const TestResults: React.FC<TestResultsProps> = ({
   const handleSaveVerifiedDoc = (savedData?: DocumentExtractionData) => {
     setIsWizardOpen(false);
 
-    let savedPatientId = wizardTargetPatientId;
-    let savedPatientName = 'Nguyễn Thảo Chi';
+    const foundInList = worklist.find((p) => p.patientId === wizardTargetPatientId);
+    const savedPatientId = reviewingItem?.patientId || wizardTargetPatientId;
+    const savedPatientName = reviewingItem?.patientName || foundInList?.patientName || 'Thai phụ';
 
-    if (reviewingItem) {
-      savedPatientId = reviewingItem.patientId;
-      savedPatientName = reviewingItem.patientName;
-      // Update existing item status to verified
-      setWorklist((prev) =>
-        prev.map((i) =>
-          i.id === reviewingItem.id
-            ? { ...i, status: 'verified', verifiedData: savedData }
-            : i
-        )
-      );
-    } else if (savedData) {
-      const targetP =
-        INITIAL_WORKLIST.find((p) => p.patientId === wizardTargetPatientId) ||
-        INITIAL_WORKLIST[0];
-      savedPatientId = targetP.patientId;
-      savedPatientName = targetP.patientName;
-
-      // Add new item to worklist
-      const newItem: ParaclinicalWorklistItem = {
-        id: `doc-${Date.now()}`,
-        patientId: wizardTargetPatientId,
-        patientName: savedPatientName,
-        patientPhone: targetP.patientPhone || '0912 345 678',
-        gestationalAge: savedData.gestationalAgeFormatted || targetP.gestationalAge || '32 tuần 4 ngày',
-        documentType: 'ultrasound_4d',
-        documentTypeName: 'Phiếu siêu âm 4D mới tải lên',
-        fileName: savedData.fileName,
-        fileSize: savedData.fileSizeFormatted,
-        receivedAt: `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
-        doctorPerformer: savedData.doctorPerformer || 'BS. Lê Minh',
-        ocrConfidence: savedData.ocrConfidence,
-        status: 'verified',
-        verifiedData: savedData,
-      };
-      setWorklist((prev) => [newItem, ...prev]);
-    }
+    setReviewingItem(null);
+    loadWorklistQueue();
 
     setToastMessage('Đã đối chiếu và lưu hồ sơ điện tử thành công!');
     setTimeout(() => setToastMessage(null), 3500);
@@ -300,14 +378,14 @@ export const TestResults: React.FC<TestResultsProps> = ({
   // If Upload Wizard is active
   if (isWizardOpen) {
     const targetPatient =
-      INITIAL_WORKLIST.find((p) => p.patientId === wizardTargetPatientId) ||
-      INITIAL_WORKLIST[0];
+      reviewingItem ||
+      worklist.find((p) => p.patientId === wizardTargetPatientId);
 
     return (
       <UploadVerificationWizard
         pregnancyProfileId={wizardTargetPatientId}
-        patientName={targetPatient.patientName}
-        gestationalAge={targetPatient.gestationalAge}
+        patientName={targetPatient?.patientName || ''}
+        gestationalAge={targetPatient?.gestationalAge || ''}
         initialStep={reviewingItem ? 2 : 1}
         initialReviewFile={
           reviewingItem
@@ -423,8 +501,35 @@ export const TestResults: React.FC<TestResultsProps> = ({
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Status Tabs */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Doctor Scope Toggle: Của tôi phụ trách | Tất cả toàn khoa */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+            <button
+              type="button"
+              onClick={() => setDoctorScope('mine')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                doctorScope === 'mine'
+                  ? 'bg-white text-[#275248] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Của tôi phụ trách ({myPatientsCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDoctorScope('all')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                doctorScope === 'all'
+                  ? 'bg-white text-[#275248] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tất cả toàn khoa ({worklist.length})
+            </button>
+          </div>
+
+          {/* Status Tabs */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold">
           <button
             type="button"
@@ -468,6 +573,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
           >
             Đã xác nhận ({stats.verified})
           </button>
+        </div>
         </div>
 
         {/* Search & Document Type Dropdown */}
@@ -540,6 +646,11 @@ export const TestResults: React.FC<TestResultsProps> = ({
                           <div className="text-[10px] text-slate-400">
                             Tuổi thai: <strong>{item.gestationalAge}</strong> • {item.patientPhone}
                           </div>
+                          {item.primaryDoctorName && item.primaryDoctorId !== currentDoctorId && (
+                            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-600">
+                              BS phụ trách: {item.primaryDoctorName}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -587,10 +698,20 @@ export const TestResults: React.FC<TestResultsProps> = ({
                           Chờ duyệt OCR
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          Đã xác nhận
-                        </span>
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Đã xác nhận
+                          </span>
+                          {item.verifiedByName && (
+                            <div className="text-[10px] text-slate-500">
+                              Duyệt: <strong className="text-slate-700">{item.verifiedByName}</strong>
+                              {item.verifiedAt && (
+                                <> ({new Date(item.verifiedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})</>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
 
@@ -641,7 +762,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
           onClose={() => setSelectedVisitDetail(null)}
           patientName={
             worklist.find((i) => i.patientId === selectedVisitDetail.pregnancy_profile_id)
-              ?.patientName || 'Nguyễn Thảo Chi'
+              ?.patientName || 'Thai phụ'
           }
         />
       )}
