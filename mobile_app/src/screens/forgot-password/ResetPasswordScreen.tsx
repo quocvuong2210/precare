@@ -108,61 +108,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
   const hasMinLength = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
-      />
-      <Text
-        style={[
-          styles.requirementText,
-          valid && styles.requirementValid,
-        ]}
-      >
-        {text}
-      </Text>
-    </View>
-  );
+  const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.progressArea}>
-            <View style={styles.progressTrack}>
-              <View style={styles.progressDone} />
-              <View style={styles.progressDone} />
-              <View style={styles.progressActive} />
-            </View>
+  const strengthCount = [
+    hasMinLength,
+    hasUppercase,
+    hasNumber,
+    hasSpecial,
+  ].filter(Boolean).length;
 
-            <Text style={styles.progressText}>
-              Bước 3/3 · Mật khẩu mới
-            </Text>
-          </View>
+  const strengthLabel =
+    !newPassword
+      ? copy.strengthNone
+      : strengthCount <= 1
+        ? copy.strengthWeak
+        : strengthCount <= 2
+          ? copy.strengthMedium
+          : strengthCount === 3
+            ? copy.strengthStrong
+            : copy.strengthVeryStrong;
 
-          <Text style={styles.title}>Đặt mật khẩu mới</Text>
+  const passwordsMismatch =
+    submitted &&
+    confirmPassword.length > 0 &&
+    newPassword !== confirmPassword;
 
-          <Text style={styles.description}>
-            Tạo mật khẩu mới để bảo vệ tài khoản và hồ sơ thai kỳ
-            của mẹ.
-          </Text>
+  const handleResetPassword = async () => {
+    setSubmitted(true);
 
-          <View style={styles.form}>
-            <Text style={styles.label}>
-              Mật khẩu mới
-              <Text style={styles.required}> *</Text>
-            </Text>
+    if (loading) return;
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Nhập mật khẩu mới"
-                placeholderTextColor="#94A3B8"
-                value={newPassword}
-                onChangeText={(value) => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert(copy.notice, copy.fillBothPasswords);
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      Alert.alert(copy.notice, copy.minLengthError);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert(copy.notice, copy.mismatchError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const result = await resetPassword(email, otp_code, newPassword);
+
+      Alert.alert(
+        copy.successTitle,
+        result.message || copy.defaultSuccessMsg,
+        [
+          {
                   setNewPassword(value);
                   setSubmitted(false);
                 }}
