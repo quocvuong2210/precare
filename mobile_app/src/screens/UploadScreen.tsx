@@ -2308,61 +2308,61 @@ export default function UploadScreen({ navigation }: Props) {
               >
                 <View style={styles.itemHeaderRow}>
                   <View
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  batchBannerText: {
-    flex: 1,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#0F766E',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#334155',
-    marginTop: 18,
-    marginBottom: 10,
-  },
-  emptyBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  emptyText: { fontSize: 12.5, color: '#64748B', marginTop: 8, textAlign: 'center' },
-  itemCard: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 12,
-    marginBottom: 14,
-  },
-  itemHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  fileIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemInfo: { flex: 1, marginLeft: 12, marginRight: 8 },
-  itemName: { fontSize: 13.5, fontWeight: '700', color: colors.navy },
-  itemTime: { fontSize: 11, color: colors.textLight, marginTop: 3 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  badgeText: { fontSize: 10.5, fontWeight: '700' },
-  deleteButton: { marginLeft: 8, padding: 6, borderRadius: 8, backgroundColor: '#FEF2F2' },
-  processingBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
+                    style={[
+                      styles.fileIcon,
+                      {
+                        backgroundColor: isPdf
+                          ? theme.dangerBackground
+                          : theme.surfaceAlt,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        hasImagePreview
+                          ? 'image-outline'
+                          : isPdf
+                          ? 'document-attach-outline'
+                          : 'document-text-outline'
+                      }
+                      size={18}
+                      color={isPdf ? theme.danger : theme.tealText}
+                    />
+                  </View>
+
+                  <View style={styles.itemInfo}>
+                    <Text style={[styles.itemName, fontStyle(15, { min: 14 }), { color: theme.text }]} numberOfLines={1}>
+                      {decodeFileName(item.name, lang)}
+                    </Text>
+                    <Text style={[styles.itemTime, fontStyle(12.5, { min: 11.5 }), { color: theme.textSecondary }]}>
+                      {localizeUploadTime(item.time, lang)}
+                      {item.taskId ? ` • ${copy.taskPrefix}: #${item.taskId.slice(-6)}` : ''}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.badge, { backgroundColor: s.bg }]}>
+                    <Text style={[styles.badgeText, fontStyle(11.5, { min: 10.5, max: 13.5 }), { color: s.color }]}>
+                      {s.label}
+                    </Text>
+                  </View>
+
+                  {deletingFileId === item.id ? (
+                    <ActivityIndicator size="small" color={theme.danger} style={{ marginLeft: 8 }} />
+                  ) : (
+                    <Pressable
+                      onPress={() => deleteItem(item)}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.deleteButton,
+                        { backgroundColor: theme.dangerBackground },
+                        pressed && { opacity: 0.6 },
+                      ]}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={theme.danger} />
+                    </Pressable>
+                  )}
+                </View>
+
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
