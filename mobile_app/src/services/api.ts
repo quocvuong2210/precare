@@ -713,61 +713,61 @@ async function medicalRequest(path: string, body?: object): Promise<any> {
   if (!currentAccessToken) {
     throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: body ? 'POST' : 'GET',
+      headers: {
+        Authorization: `Bearer ${currentAccessToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: controller.signal,
+    });
+    return await handleResponse(response);
+  } finally {
+    clearTimeout(timer);
   }
-
-  const result = await medicalRequest('/deletion-requests', {
-    pregnancy_profile_id: profileId,
-    checkup_id: null,
-    target_type: 'full_profile',
-    reason: reason.trim(),
-    allow_anonymized_research: allowResearch,
-  });
-
-  if (!result?.success || result?.data?.status !== 'pending' || !result?.data?.request_id) {
-    throw new Error(
-      'Chưa xác nhận được yêu cầu. Vui lòng kiểm tra với bộ phận hỗ trợ trước khi gửi lại.'
-    );
-  }
-  return result.data.request_id;
 }
 
-export interface PregnancyCalculateRequest {
-  target_date?: string;
-  lmp?: string;
-  q1_ultrasound_date?: string;
-  q1_gestational_weeks?: number;
-  q1_gestational_days?: number;
-  crl_mm?: number;
-  override_edd?: string;
-}
-
-export type PregnancyCalculationMethod = 'lmp' | 'q1_ultrasound' | 'crl' | 'direct_edd';
-
-export async function calculatePregnancyProfile(
-  payload: PregnancyCalculateRequest,
+export async function fetchCurrentUserFromDB(
   token?: string
-): Promise<any> {
-  const authToken = token || currentAccessToken;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
+): Promise<UserAccountInfo | null> {
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) return currentUserProfile;
 
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        Accept: 'application/json',
+      },
+    });
+    if (!res.ok) return currentUserProfile;
+
+    const json = await safeParseJson(res);
+    const userObj = json?.user || json?.data || json;
+    if (!userObj || typeof userObj !== 'object') return currentUserProfile;
+
+    const nextUser = await mergeLocalAccountOverride({
+      id: userObj.id || userObj.user_id || currentUserProfile?.id || '',
+      full_name: userObj.full_name || userObj.name || '',
+      email: String(userObj.email || currentUserProfile?.email || '').trim().toLowerCase(),
+      phone_number: userObj.phone_number || userObj.phone || '',
+    });
+    currentUserProfile = nextUser;
+    await AsyncStorage.setItem('precare_current_user', JSON.stringify(nextUser)).catch(() => {});
+    return nextUser;
+  } catch {
+    return currentUserProfile;
   }
-
-  const response = await fetch(`${API_BASE_URL}/pregnancy-profiles/calculate`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(response);
 }
 
-// Hàm phụ trợ bóc tách đúng đối tượng và UUID của hồ sơ thai kỳ từ Backend
-function extractProfileObject(raw: any): any {
+export interface UpdateUserAccountPayload {
   if (!raw || typeof raw !== 'object') return null;
   const d = raw.data !== undefined ? raw.data : raw;
   if (!d) return null;
