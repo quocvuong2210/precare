@@ -13,7 +13,6 @@ export interface UserAccountInfo {
   full_name: string;
   email: string;
   phone_number: string;
-  birthday?: string;
 }
 
 // Lưu thông tin tài khoản hiện tại trong phiên
@@ -25,6 +24,42 @@ const ACCESS_TOKEN_KEY = 'precare_access_token';
 const REFRESH_TOKEN_KEY = 'precare_refresh_token';
 export const REMEMBERED_EMAIL_KEY = 'precare_remembered_email';
 export const REMEMBER_ME_KEY = 'precare_remember_me';
+const ACCOUNT_OVERRIDE_KEY_PREFIX = 'precare_account_override_';
+
+function getAccountOverrideKey(user?: Pick<UserAccountInfo, 'id' | 'email'> | null): string | null {
+  const idPart = user?.id ? String(user.id).trim() : '';
+  const emailPart = user?.email ? String(user.email).trim().toLowerCase() : '';
+  const key = idPart || emailPart;
+  return key ? `${ACCOUNT_OVERRIDE_KEY_PREFIX}${key}` : null;
+}
+
+export async function mergeLocalAccountOverride(user: UserAccountInfo): Promise<UserAccountInfo> {
+  const overrideKey = getAccountOverrideKey(user);
+  if (!overrideKey) return user;
+  try {
+    const raw = await AsyncStorage.getItem(overrideKey);
+    if (!raw) return user;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return user;
+    return {
+      id: user.id || '',
+      full_name:
+        typeof parsed.full_name === 'string' && parsed.full_name.trim()
+          ? parsed.full_name.trim()
+          : user.full_name,
+      email:
+        typeof parsed.email === 'string' && parsed.email.trim()
+          ? parsed.email.trim().toLowerCase()
+          : user.email,
+      phone_number:
+        parsed.phone_number !== undefined && parsed.phone_number !== null
+          ? String(parsed.phone_number).trim()
+          : user.phone_number,
+    };
+  } catch {
+    return user;
+  }
+}
 
 export type PostAuthDestination = 'Main' | 'PregnancySetup';
 
@@ -447,13 +482,13 @@ export async function verifySessionWithBackend(
       return { status: 'unauthenticated', reason: 'no_token', rememberedEmail };
     }
 
-    const resolvedUser: UserAccountInfo = {
+    const baseUser: UserAccountInfo = {
       id: userObj?.id || userObj?.user_id || '',
       full_name: userObj?.full_name || userObj?.name || '',
       email: (userObj?.email || rememberedEmail || '').trim().toLowerCase(),
       phone_number: userObj?.phone_number || userObj?.phone || '',
-      birthday: userObj?.birthday || '',
     };
+    const resolvedUser = await mergeLocalAccountOverride(baseUser);
 
     currentAccessToken = activeToken;
     sessionRevision += 1;
@@ -544,17 +579,17 @@ export async function login(email: string, password: string) {
 
   currentAccessToken = token;
   sessionRevision += 1;
-  currentUserProfile = {
+  currentUserProfile = await mergeLocalAccountOverride({
     id: userObj.id || userObj.user_id || '',
     full_name: userObj.full_name || userObj.name || '',
     email: (userObj.email || normalizedEmail).trim().toLowerCase(),
     phone_number: userObj.phone_number || userObj.phone || '',
-    birthday: userObj.birthday || '',
-  };
+  });
 
   // Lưu token trong SecureStore và thông tin hồ sơ phiên trong AsyncStorage (không lưu Password)
   let tokenStorageFailed = false;
   try {
+    await AsyncStorage.removeItem('precare_pregnancy_profile_id');
     await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
     if (refreshToken) {
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
@@ -697,6 +732,116 @@ async function medicalRequest(path: string, body?: object): Promise<any> {
   }
 }
 
+export async function fetchCurrentUserFromDB(
+  token?: string
+): Promise<UserAccountInfo | null> {
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) return currentUserProfile;
+
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/auth/me`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        Accept: 'application/json',
+      },
+    });
+    if (!res.ok) return currentUserProfile;
+
+    const json = await safeParseJson(res);
+    const userObj = json?.user || json?.data || json;
+    if (!userObj || typeof userObj !== 'object') return currentUserProfile;
+
+    const nextUser = await mergeLocalAccountOverride({
+      id: userObj.id || userObj.user_id || currentUserProfile?.id || '',
+      full_name: userObj.full_name || userObj.name || '',
+      email: String(userObj.email || currentUserProfile?.email || '').trim().toLowerCase(),
+      phone_number: userObj.phone_number || userObj.phone || '',
+    });
+    currentUserProfile = nextUser;
+    await AsyncStorage.setItem('precare_current_user', JSON.stringify(nextUser)).catch(() => {});
+    return nextUser;
+  } catch {
+    return currentUserProfile;
+  }
+}
+
+export interface UpdateUserAccountPayload {
+  full_name: string;
+  phone_number?: string | null;
+  email?: string;
+}
+
+const ACCOUNT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ACCOUNT_PHONE_REGEX = /^[0-9+()\s-]{9,20}$/;
+
+/**
+ * Lưu thông tin tài khoản đã chỉnh sửa trên thiết bị cho phiên người dùng hiện tại
+ * (do Backend hiện chưa cung cấp API cập nhật bảng users).
+ */
+export async function updateLocalUserAccount(
+  payload: UpdateUserAccountPayload
+): Promise<UserAccountInfo> {
+  if (!currentAccessToken && !currentUserProfile) {
+    await restoreSession();
+  }
+  const baseUser = currentUserProfile;
+  if (!currentAccessToken && !baseUser) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
+
+  const trimmedName = payload.full_name.trim();
+  if (!trimmedName) {
+    throw new Error('Họ và tên không được để trống.');
+  }
+
+  const trimmedPhone =
+    payload.phone_number !== undefined
+      ? String(payload.phone_number || '').trim()
+      : baseUser?.phone_number || '';
+  if (trimmedPhone && !ACCOUNT_PHONE_REGEX.test(trimmedPhone)) {
+    throw new Error('Số điện thoại không hợp lệ (từ 9 đến 20 ký tự số).');
+  }
+
+  const normalizedEmail =
+    payload.email !== undefined
+      ? payload.email.trim().toLowerCase()
+      : (baseUser?.email || '').trim().toLowerCase();
+  if (!normalizedEmail || !ACCOUNT_EMAIL_REGEX.test(normalizedEmail)) {
+    throw new Error('Email không hợp lệ. Vui lòng kiểm tra lại.');
+  }
+
+  const nextUser: UserAccountInfo = {
+    id: baseUser?.id || '',
+    full_name: trimmedName,
+    email: normalizedEmail,
+    phone_number: trimmedPhone,
+  };
+
+  currentUserProfile = nextUser;
+  await AsyncStorage.setItem('precare_current_user', JSON.stringify(nextUser));
+
+  const overrideKey = getAccountOverrideKey(baseUser || nextUser);
+  if (overrideKey) {
+    await AsyncStorage.setItem(
+      overrideKey,
+      JSON.stringify({
+        full_name: nextUser.full_name,
+        phone_number: nextUser.phone_number,
+        email: nextUser.email,
+      })
+    );
+  }
+
+  const rememberedEmail = await SecureStore.getItemAsync(REMEMBERED_EMAIL_KEY).catch(() => null);
+  if (rememberedEmail && nextUser.email) {
+    await SecureStore.setItemAsync(REMEMBERED_EMAIL_KEY, nextUser.email).catch(() => {});
+  }
+
+  return nextUser;
+}
+
 export async function requestPregnancyDeletion(
   reason: string,
   allowResearch: boolean
@@ -788,11 +933,13 @@ function extractProfileUuid(raw: any): string | null {
   return null;
 }
 
-// Lưu hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
+// Lưu hoặc cập nhật hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
 export async function savePregnancyProfileToDB(
   payload: PregnancyCalculateRequest & {
     edd?: string;
     calculation_method?: PregnancyCalculationMethod;
+    profileId?: string | null;
+    recalculate_edd?: boolean;
   },
   token?: string
 ): Promise<any> {
@@ -806,51 +953,82 @@ export async function savePregnancyProfileToDB(
     Authorization: `Bearer ${authToken}`,
   };
 
-  const requestBody: Record<string, any> = {};
-  if (payload.calculation_method) {
-    requestBody.calculation_method = payload.calculation_method;
-  } else if (payload.lmp) {
-    requestBody.calculation_method = 'lmp';
-  } else if (payload.q1_ultrasound_date) {
-    requestBody.calculation_method = 'q1_ultrasound';
-  } else if (payload.crl_mm !== undefined) {
-    requestBody.calculation_method = 'crl';
-  } else if (payload.override_edd || payload.edd) {
-    requestBody.calculation_method = 'direct_edd';
-  }
-
-  if (payload.lmp) requestBody.lmp = payload.lmp;
-  if (payload.q1_ultrasound_date) requestBody.q1_ultrasound_date = payload.q1_ultrasound_date;
+  const baseFields: Record<string, any> = {};
+  if (payload.lmp) baseFields.lmp = payload.lmp;
+  if (payload.q1_ultrasound_date) baseFields.q1_ultrasound_date = payload.q1_ultrasound_date;
   if (payload.q1_gestational_weeks !== undefined) {
-    requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
+    baseFields.q1_gestational_weeks = payload.q1_gestational_weeks;
   }
   if (payload.q1_gestational_days !== undefined) {
-    requestBody.q1_gestational_days = payload.q1_gestational_days;
+    baseFields.q1_gestational_days = payload.q1_gestational_days;
   }
-  if (payload.crl_mm !== undefined) requestBody.crl_mm = payload.crl_mm;
-  if (payload.override_edd) {
-    requestBody.override_edd = payload.override_edd;
-  } else if (!payload.lmp && !payload.q1_ultrasound_date && payload.edd) {
-    requestBody.override_edd = payload.edd;
-  }
+  if (payload.crl_mm !== undefined) baseFields.crl_mm = payload.crl_mm;
 
-  let res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody),
-  });
+  const resolvedOverrideEdd =
+    payload.override_edd ||
+    (!payload.lmp && !payload.q1_ultrasound_date && payload.edd ? payload.edd : undefined);
 
-  if (!res.ok && (res.status === 400 || res.status === 409)) {
-    const existingProfile = await fetchPregnancyProfileFromDB(authToken);
-    const existingId =
-      existingProfile?.id || (await AsyncStorage.getItem('precare_pregnancy_profile_id'));
-    if (existingId) {
-      const { calculation_method: _method, ...updateBody } = requestBody;
-      res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${existingId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ ...updateBody, recalculate_edd: true }),
-      });
+  const buildUpdatePayload = (): Record<string, any> => {
+    const updateBody: Record<string, any> = { ...baseFields };
+    if (payload.override_edd) {
+      updateBody.override_edd = payload.override_edd;
+      updateBody.recalculate_edd = false;
+    } else if (payload.edd && payload.recalculate_edd === false) {
+      updateBody.override_edd = payload.edd;
+      updateBody.recalculate_edd = false;
+    } else if (payload.edd && Object.keys(baseFields).length > 0) {
+      // Đồng bộ chính xác EDD đã tính theo các chỉ số vừa chỉnh sửa trên form
+      updateBody.override_edd = payload.edd;
+      updateBody.recalculate_edd = false;
+    } else {
+      updateBody.recalculate_edd = true;
+    }
+    return updateBody;
+  };
+
+  let res: Response;
+  const knownProfileId = payload.profileId && isUuid(payload.profileId) ? payload.profileId : null;
+
+  if (knownProfileId) {
+    res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${encodeURIComponent(knownProfileId)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(buildUpdatePayload()),
+    });
+  } else {
+    const createBody: Record<string, any> = { ...baseFields };
+    if (payload.calculation_method) {
+      createBody.calculation_method = payload.calculation_method;
+    } else if (payload.lmp) {
+      createBody.calculation_method = 'lmp';
+    } else if (payload.q1_ultrasound_date && payload.q1_gestational_weeks !== undefined) {
+      createBody.calculation_method = 'q1_ultrasound';
+    } else if (payload.q1_ultrasound_date && payload.crl_mm !== undefined) {
+      createBody.calculation_method = 'crl';
+    } else if (resolvedOverrideEdd) {
+      createBody.calculation_method = 'direct_edd';
+    }
+    if (resolvedOverrideEdd) {
+      createBody.override_edd = resolvedOverrideEdd;
+    }
+
+    res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(createBody),
+    });
+
+    if (!res.ok && (res.status === 400 || res.status === 409)) {
+      const existingProfile = await fetchPregnancyProfileFromDB(authToken);
+      const existingId =
+        existingProfile?.id || (await AsyncStorage.getItem('precare_pregnancy_profile_id'));
+      if (existingId && isUuid(existingId)) {
+        res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${encodeURIComponent(existingId)}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(buildUpdatePayload()),
+        });
+      }
     }
   }
 
@@ -880,7 +1058,7 @@ export async function fetchPregnancyProfileFromDB(
   };
 
   try {
-    const res = await fetch(`${API_BASE_URL}/pregnancy-profiles/active`, {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/pregnancy-profiles/active`, {
       method: 'GET',
       headers,
     });
@@ -888,6 +1066,12 @@ export async function fetchPregnancyProfileFromDB(
     if (res.ok) {
       const json: any = await safeParseJson(res);
       const profileObj = extractProfileObject(json);
+      const profileOwnerId = profileObj?.patient?.id ? String(profileObj.patient.id).trim() : '';
+      const activeUserId = currentUserProfile?.id ? String(currentUserProfile.id).trim() : '';
+      if (profileOwnerId && activeUserId && profileOwnerId !== activeUserId) {
+        await AsyncStorage.removeItem('precare_pregnancy_profile_id').catch(() => {});
+        return null;
+      }
       const pid = extractProfileUuid(json);
       if (pid) {
         await AsyncStorage.setItem('precare_pregnancy_profile_id', pid);
@@ -896,15 +1080,84 @@ export async function fetchPregnancyProfileFromDB(
       return profileObj;
     }
 
-    // Nếu tài khoản chưa tạo hồ sơ (404) hoặc endpoint active gặp lỗi 500, không chặn luồng Login
-    if (res.status === 404 || res.status >= 500) {
+    if (res.status === 404) {
+      await AsyncStorage.removeItem('precare_pregnancy_profile_id').catch(() => {});
       return null;
     }
-    if (options.throwOnError) await handleResponse(res);
+    if (options.throwOnError) {
+      await handleResponse(res);
+    }
+    if (res.status >= 500) {
+      return null;
+    }
   } catch (e) {
     console.log('Tải DB pregnancy_profiles:', e);
+    if (options.throwOnError) {
+      throw e;
+    }
   }
   return null;
+}
+
+export interface CheckupRecordFromDB {
+  id: string;
+  pregnancy_profile_id: string;
+  doctor: {
+    id: string;
+    full_name: string;
+  };
+  checkup_date: string;
+  gestational_age: {
+    days: number;
+    weeks: number;
+    remaining_days: number;
+    formatted: string;
+    trimester: number;
+  };
+  vitals: {
+    weight_kg: number | null;
+    blood_pressure_systolic: number | null;
+    blood_pressure_diastolic: number | null;
+    blood_pressure_status: string;
+  };
+  notes: string | null;
+  biometric_data: {
+    id: string;
+    bpd: number | null;
+    hc: number | null;
+    ac: number | null;
+    fl: number | null;
+    efw: number | null;
+    status: string;
+  } | null;
+  created_at: string;
+}
+
+// Lấy danh sách lần khám & chỉ số sinh trắc thật từ bảng checkups & biometric_data
+export async function fetchCheckupHistoryFromDB(
+  pregnancyProfileId: string,
+  token?: string
+): Promise<CheckupRecordFromDB[]> {
+  if (!isUuid(pregnancyProfileId)) return [];
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
+
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/checkups/pregnancy-profile/${encodeURIComponent(pregnancyProfileId.trim())}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+    }
+  );
+
+  const json = await handleResponse(res);
+  return Array.isArray(json?.data) ? json.data : [];
 }
 
 // Đảm bảo luôn lấy hoặc khởi tạo UUID thật trong bảng public.pregnancy_profiles trước khi Upload/Lưu DB

@@ -23,6 +23,7 @@ import {
 } from '../types/ingest.types';
 import {
   DocumentExtractionData,
+  createBlankManualExtractionData,
   createDefaultExtractionData,
   formatFileSize,
 } from '../components/ocr-workflow/mockOcrData';
@@ -196,10 +197,12 @@ export const ingestService = {
    */
   async verifyUploadedFile(
     fileId: string,
-    checkupId?: string
+    checkupId?: string,
+    correctedPayload?: Record<string, unknown>
   ): Promise<void> {
     await apiClient.post(`/ingest/files/${fileId}/verify`, {
       checkup_id: checkupId || null,
+      corrected_payload: correctedPayload || null,
     });
   },
 
@@ -211,7 +214,7 @@ export const ingestService = {
     taskId: string,
     onProgress?: (status: TaskStatusResponseData) => void,
     intervalMs: number = 1200,
-    timeoutMs: number = 60000
+    timeoutMs: number = 240000
   ): Promise<TaskStatusResponseData> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
@@ -238,7 +241,7 @@ export const ingestService = {
     batchId: string,
     onProgress?: (status: BatchStatusResponseData) => void,
     intervalMs: number = 1500,
-    timeoutMs: number = 90000
+    timeoutMs: number = 420000
   ): Promise<BatchStatusResponseData> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
@@ -275,11 +278,18 @@ export function mapFileDetailToExtractionData(
   );
 
   const payload = detail.ocr_raw_payload;
-  if (!payload) {
+  if (!payload || detail.status === 'failed') {
+    const manualBase = createBlankManualExtractionData(
+      detail.id,
+      fileName,
+      fileSizeFormatted,
+      patientName
+    );
     return {
-      ...base,
+      ...manualBase,
       presignedViewUrl: detail.presigned_view_url,
       fileType: detail.file_type,
+      isManualEntry: detail.status === 'failed' || !payload,
     };
   }
 

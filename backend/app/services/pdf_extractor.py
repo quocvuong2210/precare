@@ -9,6 +9,7 @@ import io
 import logging
 import re
 import time
+import unicodedata
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -432,6 +433,9 @@ class PdfFastPathExtractor:
                     pass
 
         # 10. Tuổi thai GA trên phiếu (14 - 310 ngày)
+        # Bước 3: Line-level Table-Aware Fallback cho văn bản OCR (Slow Path)
+        self._parse_ocr_line_biometrics(raw_text, extracted, confidence)
+
         if extracted["gestational_age_days"] is None:
             ga_pattern = re.compile(
                 r"(?i)(?:Tu[^\s:]*\s*thai|GA|Thai\s*kho[^\s:]*|Thai\s*t[^\s:]*)\s*(?:(?:theo\s*)?siêu\s*âm)?\s*(?:\([^)]{1,20}\))?[\)\]]?\s*[:=~]?\s*([0-9]{1,2})\s*(?:tu[^\s0-9]+|w|weeks?)\s*(?:([0-9])\s*(?:ng[^\s0-9]+|d|days?))?",
@@ -440,7 +444,7 @@ class PdfFastPathExtractor:
             match = ga_pattern.search(raw_text)
             if not match:
                 match = re.search(
-                    r"(?i)\b([0-9]{1,2})\s*tu[aầ]n\s*([0-6])\s*ng[aà]y\b",
+                    r"(?i)\b([0-9]{1,2})\s*tu[a-zà-ỹ]{0,2}n\s*([0-6])\s*ng[a-zà-ỹ]{0,2}y\b",
                     raw_text,
                     re.UNICODE,
                 )
@@ -456,6 +460,92 @@ class PdfFastPathExtractor:
                     pass
 
         return extracted, confidence
+
+    @staticmethod
+    def _strip_accents(text: str) -> str:
+        """Chuẩn hóa bỏ dấu tiếng Việt (hỗ trợ OCR bị mất/nhầm dấu)."""
+        normalized = unicodedata.normalize("NFD", text)
+        no_marks = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return no_marks.replace("đ", "d").replace("Đ", "D")
+
+    def _parse_ocr_line_biometrics(
+        self,
+        raw_text: str,
+        extracted: Dict[str, Optional[Any]],
+        confidence: Dict[str, float],
+    ) -> None:
+        """
+        Bóc tách bổ sung theo từng dòng cho văn bản tái cấu trúc từ OCR (Slow Path).
+        Tránh bắt nhầm cột 'Khoảng tham chiếu' (a - b) bằng cách loại bỏ dải tham chiếu trước khi đọc số.
+        """
+        specs = [
+            ("bpd_mm", "bpd", r"\b(?:BPD|DKLD)\b|d[uo]{0,2}ng\s*kinh\s*l[uo]{0,2}ng\s*dinh", 10.0, 120.0, r"(mm)", False),
+            ("hc_mm", "hc", r"\bHC\b|chu\s*vi\s*vong\s*d[au]{0,2}", 50.0, 400.0, r"(mm)", False),
+            ("ac_mm", "ac", r"\bAC\b|chu\s*vi\s*vong\s*b[u]?ng", 50.0, 450.0, r"(mm)", False),
+            ("fl_mm", "fl", r"\b(?:FL|CDXD)\b|chieu\s*dai\s*xuong\s*dui", 5.0, 95.0, r"(mm)", False),
+            ("efw_g", "efw", r"\bEFW\b|u[o]?c\s*l[uo]{0,2}ng\s*can\s*n[a]?ng|can\s*n[a]?ng\s*thai", 50.0, 6000.0, r"(g|gram|gr|kg)", False),
+            ("crl_mm", "crl", r"\bCRL\b|chieu\s*dai\s*dau\s*mong", 5.0, 120.0, r"(mm)", False),
+            ("nt_mm", "nt", r"\b(?:NT|DMDG)\b|do\s*mo\s*da\s*gay", 0.5, 10.0, r"(mm)", False),
+            ("afi_cm", "afi", r"\bAFI\b|chi\s*so\s*(?:nuoc\s*)?oi", 2.0, 35.0, r"(cm|mm)", False),
+            ("fhr_bpm", "fhr", r"\bFHR\b|tim\s*thai", 80.0, 220.0, r"(bpm|l/p|lan/phut)", True),
+        ]
+
+        ref_range_re = re.compile(
+            r"[~≈]?\s*[0-9]+(?:[.,][0-9]+)?\s*[-–—]\s*[0-9]+(?:[.,][0-9]+)?\s*(?:mm|cm|g|bpm)?",
+            re.IGNORECASE,
+        )
+
+        for raw_line in raw_text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            ascii_line = self._strip_accents(line)
+
+            for field_key, conf_key, code_pat, min_v, max_v, unit_pat, is_int in specs:
+                if extracted[field_key] is not None:
+                    continue
+                code_match = re.search(code_pat, ascii_line, re.IGNORECASE)
+                if not code_match:
+                    continue
+
+                tail = ascii_line[code_match.end():]
+                cleaned_tail = ref_range_re.sub(" ", tail)
+                val_match = re.search(
+                    rf"([0-9]+(?:[.,][0-9]+)?)\s*{unit_pat}\b",
+                    cleaned_tail,
+                    re.IGNORECASE,
+                )
+                if not val_match:
+                    continue
+
+                val = self._normalize_float(val_match.group(1))
+                unit = (val_match.group(2) or "").lower()
+                if val is None:
+                    continue
+
+                if field_key == "efw_g" and unit == "kg":
+                    val *= 1000.0
+                elif field_key == "afi_cm" and (unit == "mm" or val > 40.0):
+                    val /= 10.0
+
+                if min_v <= val <= max_v:
+                    extracted[field_key] = int(round(val)) if is_int else round(val, 2)
+                    confidence[conf_key] = 0.94
+
+        if extracted["gestational_age_days"] is None:
+            ascii_full = self._strip_accents(raw_text)
+            ga_m = re.search(
+                r"\b([0-9]{1,2})\s*tu[a-z]{0,2}n\s*(?:([0-6])\s*ng[a-z]{0,2}y)?",
+                ascii_full,
+                re.IGNORECASE,
+            )
+            if ga_m:
+                weeks = int(ga_m.group(1))
+                days = int(ga_m.group(2)) if ga_m.group(2) else 0
+                total_days = weeks * 7 + days
+                if 14 <= total_days <= 310:
+                    extracted["gestational_age_days"] = total_days
+                    confidence["ga"] = 0.94
 
     def parse_clinical_sections(
         self,

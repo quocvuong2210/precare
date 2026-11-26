@@ -57,17 +57,26 @@ class OcrPipelineExtractor:
                     self._engine = paddle_ocr_class(
                         lang=settings.OCR_LANG,
                         enable_mkldnn=False,
+                        use_doc_orientation_classify=False,
+                        use_doc_unwarping=False,
+                        use_textline_orientation=False,
                     )
                 except Exception:
                     try:
                         self._engine = paddle_ocr_class(
-                            use_angle_cls=settings.OCR_USE_ANGLE_CLS,
                             lang=settings.OCR_LANG,
-                            use_gpu=settings.OCR_USE_GPU,
-                            show_log=False,
+                            enable_mkldnn=False,
                         )
                     except Exception:
-                        self._engine = paddle_ocr_class(lang=settings.OCR_LANG)
+                        try:
+                            self._engine = paddle_ocr_class(
+                                use_angle_cls=settings.OCR_USE_ANGLE_CLS,
+                                lang=settings.OCR_LANG,
+                                use_gpu=settings.OCR_USE_GPU,
+                                show_log=False,
+                            )
+                        except Exception:
+                            self._engine = paddle_ocr_class(lang=settings.OCR_LANG)
                 logger.info("[OCR Engine] Khởi tạo PaddleOCR thành công.")
             except (ImportError, ModuleNotFoundError) as err:
                 logger.warning(
@@ -127,7 +136,7 @@ class OcrPipelineExtractor:
 
     def extract_images_from_scanned_pdf(self, pdf_bytes: bytes) -> List[Image.Image]:
         """
-        Render toàn bộ các trang của tài liệu PDF scan thành ảnh RGB sắc nét (200 DPI) bằng PyMuPDF (fitz).
+        Render toàn bộ các trang của tài liệu PDF scan thành ảnh RGB sắc nét (180 DPI) bằng PyMuPDF (fitz).
         Tránh bỏ sót ảnh ghép nhiều mảnh hoặc chữ vector, không phụ thuộc poppler/pdftoppm.
         """
         extracted_images: List[Image.Image] = []
@@ -139,7 +148,7 @@ class OcrPipelineExtractor:
             try:
                 for page_idx, page in enumerate(doc):
                     try:
-                        pix = page.get_pixmap(dpi=200, alpha=False)
+                        pix = page.get_pixmap(dpi=180, alpha=False)
                         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                         extracted_images.append(img)
                     except Exception as err:
@@ -154,7 +163,7 @@ class OcrPipelineExtractor:
         return extracted_images
 
     def sort_and_reconstruct_text(
-        self, ocr_results: List[Any], line_grouping_tol: float = 15.0
+        self, ocr_results: List[Any], line_grouping_tol: float = 18.0
     ) -> Tuple[str, float]:
         """
         Sắp xếp các bounding boxes theo trật tự đọc tự nhiên (từ trên xuống dưới, từ trái sang phải)
@@ -180,9 +189,10 @@ class OcrPipelineExtractor:
             if not text:
                 continue
 
-            # Tính tọa độ đại diện của hộp chữ
+            # Tính tọa độ đại diện của hộp chữ (dùng tâm dọc để ghép chuẩn các ô cùng hàng bảng)
             try:
-                y_top = min(pt[1] for pt in box)
+                ys = [pt[1] for pt in box]
+                y_top = (min(ys) + max(ys)) / 2.0
                 x_left = min(pt[0] for pt in box)
             except Exception:
                 y_top = 0.0
@@ -337,10 +347,11 @@ class OcrPipelineExtractor:
             round(sum(page_confs) / len(page_confs), 2) if page_confs else 0.90
         )
 
-        # Bóc tách các chỉ số sinh trắc học sản khoa
+        # Bóc tách các chỉ số sinh trắc học sản khoa & mục lâm sàng (Sub-task 4.2.3)
         extracted_fields, confidence_scores = pdf_extractor.parse_ultrasound_biometrics(
             combined_raw_text
         )
+        clinical_sections = pdf_extractor.parse_clinical_sections(combined_raw_text)
 
         # Kết hợp điểm tin cậy quang học với điểm tin cậy Regex
         for k, v in confidence_scores.items():
@@ -354,6 +365,7 @@ class OcrPipelineExtractor:
             "extraction_method": "ocr_pipeline_slow_path",
             "is_digital_pdf": False,
             "extracted_fields": extracted_fields,
+            "clinical_sections": clinical_sections,
             "raw_text": combined_raw_text,
             "confidence_scores": confidence_scores,
             "metadata": {

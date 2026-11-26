@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -19,152 +20,194 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import type { MainTabParamList } from '../../navigation/MainTabs';
 import { colors } from '../../theme/colors';
-import EmergencyContacts, { type EmergencyContact } from '../../components/EmergencyContacts';
 import {
-  calculatePregnancyProfile,
   currentUserProfile,
+  fetchCurrentUserFromDB,
   fetchPregnancyProfileFromDB,
+  mergeLocalAccountOverride,
   restoreSession,
-  savePregnancyProfileToDB,
-  type PregnancyCalculateRequest,
+  updateLocalUserAccount,
+  type UserAccountInfo,
 } from '../../services/api';
+import { formatIsoToDmy, parseStrictDmyToIso } from '../../utils/date';
 
-type Editor = 'personal' | 'medical' | null;
-type Profile = {
-  name: string;
-  birthday: string;
-  phone: string;
+type AccountFields = {
+  full_name: string;
+  phone_number: string;
   email: string;
-  blood: string;
-  allergies: string;
-  conditions: string;
-  obstetricHistory: string;
-  target_date: string;
+};
+
+type PregnancyFields = {
   lmp: string;
   q1_ultrasound_date: string;
   q1_gestational_weeks: string;
   q1_gestational_days: string;
   crl_mm: string;
-  override_edd: string;
+  edd: string;
 };
-type Field = { key: keyof Profile; label: string; placeholder?: string };
 
-type SavedAccountRecord = {
-  profile: Profile;
+type CachedAccountSummary = {
+  profile: {
+    lmp: string;
+    q1_ultrasound_date: string;
+    q1_gestational_weeks: string;
+    q1_gestational_days: string;
+    crl_mm: string;
+    override_edd: string;
+  };
   trimester: string;
   gestationalAge: string;
   dueDate: string;
-  contacts: EmergencyContact[];
 };
 
-function getTodayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function normalizeIsoDate(raw: string): string {
-  const s = String(raw || '')
-    .replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '')
-    .replace(/[–—−/]/g, '-');
-
-  const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (dmy) {
-    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-  }
-
-  const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (ymd) {
-    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
-  }
-
-  return s;
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^[0-9+()\s-]{9,20}$/;
 
 function getStorageKey(email?: string, id?: string): string {
   const identifier = (email || id || 'guest').trim().toLowerCase();
   return `precare_account_record_${identifier}`;
 }
 
-const fields: Record<'personal' | 'medical', Field[]> = {
-  personal: [
-    { key: 'name', label: 'Họ và tên' },
-    { key: 'birthday', label: 'Ngày sinh', placeholder: 'DD/MM/YYYY' },
-    { key: 'phone', label: 'Số điện thoại' },
-    { key: 'email', label: 'Email' },
-    { key: 'target_date', label: 'Ngày tính toán (Target Date)', placeholder: 'Tự động lấy ngày hiện tại' },
-    { key: 'lmp', label: 'Ngày kinh cuối (LMP)', placeholder: 'YYYY-MM-DD (VD: 2026-01-20)' },
-    { key: 'q1_ultrasound_date', label: 'Ngày siêu âm Quý 1', placeholder: 'YYYY-MM-DD' },
-    { key: 'q1_gestational_weeks', label: 'Tuần thai siêu âm Q1', placeholder: 'VD: 6' },
-    { key: 'q1_gestational_days', label: 'Ngày lẻ thai siêu âm Q1', placeholder: 'VD: 0' },
-    { key: 'crl_mm', label: 'Chiều dài đầu mông CRL (mm)', placeholder: 'VD: 10' },
-    { key: 'override_edd', label: 'Ngày dự sinh ấn định (Override EDD)', placeholder: 'YYYY-MM-DD' },
-  ],
-  medical: [
-    { key: 'blood', label: 'Nhóm máu', placeholder: 'Ví dụ: O+' },
-    { key: 'allergies', label: 'Dị ứng' },
-    { key: 'conditions', label: 'Bệnh nền' },
-    { key: 'obstetricHistory', label: 'Tiền sử sản khoa' },
-  ],
-};
-
-function createEmptyProfile(account?: { full_name?: string; email?: string; phone_number?: string; birthday?: string } | null): Profile {
+function emptyPregnancyFields(): PregnancyFields {
   return {
-    name: account?.full_name || '',
-    birthday: account?.birthday || '',
-    phone: account?.phone_number || '',
-    email: account?.email || '',
-    blood: '',
-    allergies: '',
-    conditions: '',
-    obstetricHistory: '',
-    target_date: getTodayISO(),
     lmp: '',
     q1_ultrasound_date: '',
     q1_gestational_weeks: '',
     q1_gestational_days: '',
     crl_mm: '',
-    override_edd: '',
+    edd: '',
   };
 }
 
-function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+function emptyAccountFields(user?: UserAccountInfo | null): AccountFields {
+  return {
+    full_name: user?.full_name || '',
+    phone_number: user?.phone_number || '',
+    email: user?.email || '',
+  };
+}
+
+function mapDbRecordToFields(dbRecord: any): PregnancyFields {
+  return {
+    lmp: formatIsoToDmy(dbRecord?.lmp),
+    q1_ultrasound_date: formatIsoToDmy(dbRecord?.q1_ultrasound_date),
+    q1_gestational_weeks:
+      dbRecord?.q1_gestational_weeks !== undefined && dbRecord?.q1_gestational_weeks !== null
+        ? String(dbRecord.q1_gestational_weeks)
+        : '',
+    q1_gestational_days:
+      dbRecord?.q1_gestational_days !== undefined && dbRecord?.q1_gestational_days !== null
+        ? String(dbRecord.q1_gestational_days)
+        : '',
+    crl_mm:
+      dbRecord?.crl_mm !== undefined && dbRecord?.crl_mm !== null
+        ? String(dbRecord.crl_mm)
+        : '',
+    edd: formatIsoToDmy(dbRecord?.edd),
+  };
+}
+
+function formatTrimester(trimesterNum: number | null, rawName: string, isEn: boolean): string {
+  if (!trimesterNum && !rawName) return isEn ? 'Not updated' : 'Chưa cập nhật';
+  if (isEn) {
+    if (trimesterNum === 1) return '1st Trimester (First 3 months)';
+    if (trimesterNum === 2) return '2nd Trimester (Second 3 months)';
+    if (trimesterNum === 3) return '3rd Trimester (Last 3 months)';
+    return 'Not updated';
+  }
+  return rawName || (trimesterNum ? `Tam cá nguyệt ${trimesterNum}` : 'Chưa cập nhật');
+}
+
+function formatStatus(status: string, isEn: boolean): string {
+  if (!status) return isEn ? 'No profile yet' : 'Chưa tạo hồ sơ';
+  if (status === 'active') return isEn ? 'Active' : 'Đang theo dõi';
+  if (status === 'completed') return isEn ? 'Completed' : 'Đã hoàn thành';
+  if (status === 'terminated') return isEn ? 'Terminated' : 'Đã kết thúc';
+  return status;
+}
+
+function InfoRow({
+  label,
+  value,
+  emptyText,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  emptyText: string;
+  last?: boolean;
+}) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <View style={[styles.infoRow, !last && styles.rowBorder]}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={[styles.value, !value && styles.missing]}>{value || 'Chưa cập nhật'}</Text>
+    <View style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}>
+      <Text style={[styles.label, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.muted }]}>
+        {label}
+      </Text>
+      <Text style={[styles.value, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: value ? theme.text : theme.muted }]}>
+        {value || emptyText}
+      </Text>
     </View>
   );
 }
 
-function OutlineButton({ title, icon, onPress }: {
-  title: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void;
+function OutlineButton({
+  title,
+  icon,
+  onPress,
+  disabled = false,
+}: {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  disabled?: boolean;
 }) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <Pressable accessibilityRole="button" onPress={onPress}
-      style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-      <Ionicons name={icon} size={17} color={colors.primary} />
-      <Text style={styles.buttonText}>{title}</Text>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.outlineButton,
+        { backgroundColor: theme.surface, borderColor: theme.tealBorder },
+        (pressed || disabled) && styles.pressed,
+      ]}
+    >
+      <Ionicons name={icon} size={17} color={theme.tealText} />
+      <Text style={[styles.buttonText, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]} numberOfLines={1}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
 
 export default function RecordsScreen({ navigation, route }: BottomTabScreenProps<MainTabParamList, 'Records'>) {
-  const [profile, setProfile] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
-  const [draft, setDraft] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
-  const [editor, setEditor] = useState<Editor>(null);
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+
+  const [account, setAccount] = useState<UserAccountInfo | null>(() => currentUserProfile);
+  const [accountDraft, setAccountDraft] = useState<AccountFields>(() =>
+    emptyAccountFields(currentUserProfile),
+  );
+  const [pregnancy, setPregnancy] = useState<PregnancyFields>(() => emptyPregnancyFields());
+  const [accountEditorOpen, setAccountEditorOpen] = useState(false);
+
+  const [loadingData, setLoadingData] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [contactsVisible, setContactsVisible] = useState(false);
 
-  const mainContact = contacts.find((contact) => contact.primary) || contacts[0];
+  const [trimesterNum, setTrimesterNum] = useState<number | null>(null);
+  const [trimesterVi, setTrimesterVi] = useState('');
+  const [gaWeeks, setGaWeeks] = useState<number | null>(null);
+  const [gaDays, setGaDays] = useState<number>(0);
+  const [doctorName, setDoctorName] = useState('');
+  const [rawStatus, setRawStatus] = useState('');
 
-  const [trimester, setTrimester] = useState('Chưa cập nhật');
-  const [gestationalAge, setGestationalAge] = useState('--');
-  const [dueDate, setDueDate] = useState('Chưa cập nhật');
-
-  // Hàm mở trang riêng HistoryResultsScreen trên RootStack
   const goToHistoryScreen = useCallback(() => {
     const rootNav = navigation.getParent() as any;
     if (rootNav) {
@@ -174,429 +217,516 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
     }
   }, [navigation]);
 
-  const persistAccountData = async (
-    nextProfile: Profile,
-    nextTrimester: string,
-    nextGestationalAge: string,
-    nextDueDate: string,
-    nextContacts: EmergencyContact[],
-  ) => {
-    try {
-      const account = currentUserProfile || (await restoreSession());
-      const storageKey = getStorageKey(account?.email || nextProfile.email, account?.id);
-      const payload: SavedAccountRecord = {
-        profile: nextProfile,
-        trimester: nextTrimester,
-        gestationalAge: nextGestationalAge,
-        dueDate: nextDueDate,
-        contacts: nextContacts,
+  const applyDbRecordToState = useCallback(
+    async (dbRecord: any, resolvedAccount: UserAccountInfo | null) => {
+      const storageKey = getStorageKey(resolvedAccount?.email, resolvedAccount?.id);
+
+      if (!dbRecord || typeof dbRecord !== 'object') {
+        setPregnancy(emptyPregnancyFields());
+        setTrimesterNum(null);
+        setTrimesterVi('');
+        setGaWeeks(null);
+        setGaDays(0);
+        setDoctorName('');
+        setRawStatus('');
+        await AsyncStorage.removeItem(storageKey).catch(() => {});
+        return;
+      }
+
+      const nextFields = mapDbRecordToFields(dbRecord);
+      const ga = dbRecord.current_gestational_age;
+      const nextWeeks = ga?.weeks !== undefined && ga?.weeks !== null ? Number(ga.weeks) : null;
+      const nextDays = ga?.remaining_days ?? 0;
+      const nextTrimesterNum =
+        ga?.trimester ??
+        (nextWeeks !== null
+          ? nextWeeks < 14
+            ? 1
+            : nextWeeks < 28
+              ? 2
+              : 3
+          : null);
+      const nextTrimesterVi =
+        ga?.trimester_name || (nextTrimesterNum ? `Tam cá nguyệt ${nextTrimesterNum}` : '');
+      const nextDoctorName = String(
+        dbRecord.primary_doctor?.full_name || dbRecord.primary_doctor_name || '',
+      ).trim();
+
+      setPregnancy(nextFields);
+      setGaWeeks(nextWeeks);
+      setGaDays(nextDays);
+      setTrimesterNum(nextTrimesterNum);
+      setTrimesterVi(nextTrimesterVi);
+      setDoctorName(nextDoctorName);
+      setRawStatus(dbRecord.status || '');
+
+      const cachePayload: CachedAccountSummary = {
+        profile: {
+          lmp: parseStrictDmyToIso(nextFields.lmp) || '',
+          q1_ultrasound_date: parseStrictDmyToIso(nextFields.q1_ultrasound_date) || '',
+          q1_gestational_weeks: nextFields.q1_gestational_weeks,
+          q1_gestational_days: nextFields.q1_gestational_days,
+          crl_mm: nextFields.crl_mm,
+          override_edd: parseStrictDmyToIso(nextFields.edd) || '',
+        },
+        trimester: nextTrimesterVi,
+        gestationalAge: nextWeeks !== null ? `${nextWeeks} tuần ${nextDays} ngày` : '--',
+        dueDate: nextFields.edd || 'Chưa cập nhật',
       };
-      await AsyncStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch (e) {
-      console.log('Lỗi lưu dữ liệu tài khoản:', e);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(cachePayload)).catch(() => {});
+    },
+    [],
+  );
+
+  const loadFromDatabase = useCallback(async (): Promise<UserAccountInfo | null> => {
+    setLoadingData(true);
+    setLoadError('');
+    try {
+      const restored = currentUserProfile || (await restoreSession());
+      const freshUser = (await fetchCurrentUserFromDB()) || restored;
+      setAccount(freshUser);
+
+      const dbRecord = await fetchPregnancyProfileFromDB(undefined, { throwOnError: true });
+      if (dbRecord?.patient && typeof dbRecord.patient === 'object') {
+        const syncedUser = await mergeLocalAccountOverride({
+          id: dbRecord.patient.id || freshUser?.id || '',
+          full_name: dbRecord.patient.full_name || freshUser?.full_name || '',
+          email: String(dbRecord.patient.email || freshUser?.email || '').trim().toLowerCase(),
+          phone_number: dbRecord.patient.phone_number || freshUser?.phone_number || '',
+        });
+        setAccount(syncedUser);
+        await applyDbRecordToState(dbRecord, syncedUser);
+        return syncedUser;
+      }
+      await applyDbRecordToState(dbRecord, freshUser);
+      return freshUser;
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Không thể tải dữ liệu hồ sơ từ máy chủ.';
+      setLoadError(msg);
+      return currentUserProfile;
+    } finally {
+      setLoadingData(false);
     }
-  };
+  }, [applyDbRecordToState]);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function loadCurrentAccountData() {
-        const today = getTodayISO();
-        const account = currentUserProfile || (await restoreSession());
-        const storageKey = getStorageKey(account?.email, account?.id);
-
-        let loadedProfile = createEmptyProfile(account);
-        let loadedTrimester = 'Chưa cập nhật';
-        let loadedAge = '--';
-        let loadedDue = 'Chưa cập nhật';
-        let loadedContacts: EmergencyContact[] = [];
-
-        try {
-          const raw = await AsyncStorage.getItem(storageKey);
-          if (raw) {
-            const parsed: SavedAccountRecord = JSON.parse(raw);
-            if (parsed.profile) {
-              loadedProfile = {
-                ...loadedProfile,
-                ...parsed.profile,
-                name: parsed.profile.name || account?.full_name || '',
-                email: parsed.profile.email || account?.email || '',
-                phone: parsed.profile.phone || account?.phone_number || '',
-                birthday: parsed.profile.birthday || account?.birthday || '',
-                target_date: today,
-              };
-            }
-            if (parsed.trimester) loadedTrimester = parsed.trimester;
-            if (parsed.gestationalAge) loadedAge = parsed.gestationalAge;
-            if (parsed.dueDate) loadedDue = parsed.dueDate;
-            if (Array.isArray(parsed.contacts)) loadedContacts = parsed.contacts;
-          }
-        } catch (e) {
-          console.log('Lỗi đọc dữ liệu tài khoản:', e);
-        }
-
-        const dbRecord = await fetchPregnancyProfileFromDB();
-        if (dbRecord && typeof dbRecord === 'object') {
-          if (dbRecord.lmp) loadedProfile.lmp = String(dbRecord.lmp).slice(0, 10);
-          if (dbRecord.q1_ultrasound_date) {
-            loadedProfile.q1_ultrasound_date = String(dbRecord.q1_ultrasound_date).slice(0, 10);
-          }
-          if (dbRecord.q1_gestational_weeks !== undefined && dbRecord.q1_gestational_weeks !== null) {
-            loadedProfile.q1_gestational_weeks = String(dbRecord.q1_gestational_weeks);
-          }
-          if (dbRecord.q1_gestational_days !== undefined && dbRecord.q1_gestational_days !== null) {
-            loadedProfile.q1_gestational_days = String(dbRecord.q1_gestational_days);
-          }
-          if (dbRecord.crl_mm !== undefined && dbRecord.crl_mm !== null) {
-            loadedProfile.crl_mm = String(dbRecord.crl_mm);
-          }
-          if (dbRecord.edd && loadedDue === 'Chưa cập nhật') {
-            loadedDue = String(dbRecord.edd).slice(0, 10).split('-').reverse().join('/');
-          }
-        }
-
-        const hasPregnancyInput =
-          loadedProfile.lmp ||
-          loadedProfile.q1_ultrasound_date ||
-          loadedProfile.crl_mm ||
-          loadedProfile.override_edd;
-
-        if (hasPregnancyInput) {
-          try {
-            const body: PregnancyCalculateRequest = { target_date: today };
-            if (loadedProfile.lmp) body.lmp = loadedProfile.lmp;
-            if (loadedProfile.q1_ultrasound_date) body.q1_ultrasound_date = loadedProfile.q1_ultrasound_date;
-            if (loadedProfile.q1_gestational_weeks !== '') {
-              body.q1_gestational_weeks = Number(loadedProfile.q1_gestational_weeks);
-            }
-            if (loadedProfile.q1_gestational_days !== '') {
-              body.q1_gestational_days = Number(loadedProfile.q1_gestational_days);
-            }
-            if (loadedProfile.crl_mm !== '') {
-              body.crl_mm = Number(loadedProfile.crl_mm);
-            }
-            if (loadedProfile.override_edd) {
-              body.override_edd = loadedProfile.override_edd;
-            }
-
-            const res = await calculatePregnancyProfile(body);
-            const responseData = res?.data || res;
-            const w = responseData.gestational_age?.weeks;
-            const days = responseData.gestational_age?.remaining_days ?? 0;
-            const edd = responseData.calculated_edd || responseData.override_edd;
-            const trimesterName = responseData.gestational_age?.trimester_name;
-
-            if (w !== undefined) {
-              loadedAge = `${w} tuần ${days} ngày`;
-              loadedTrimester =
-                trimesterName ||
-                (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-            }
-            if (edd) {
-              loadedDue = String(edd).slice(0, 10).split('-').reverse().join('/');
-            }
-          } catch {
-            // Giữ nguyên kết quả
-          }
-        }
-
+      async function runFocusLoad() {
+        const loadedUser = await loadFromDatabase();
         if (!isActive) return;
 
-        setProfile(loadedProfile);
-        setDraft(loadedProfile);
-        setTrimester(loadedTrimester);
-        setGestationalAge(loadedAge);
-        setDueDate(loadedDue);
-        setContacts(loadedContacts);
-
-        const section = route.params?.section;
-        if (section === 'personal') {
+        if (route.params?.section === 'personal') {
+          setAccountDraft(emptyAccountFields(loadedUser));
           setError('');
-          setEditor('personal');
-          navigation.setParams({ section: undefined });
-        } else if (section === 'contacts') {
-          setContactsVisible(true);
+          setAccountEditorOpen(true);
           navigation.setParams({ section: undefined });
         }
       }
 
-      loadCurrentAccountData();
+      void runFocusLoad();
 
       return () => {
         isActive = false;
       };
-    }, [navigation, route.params?.section]),
+    }, [loadFromDatabase, navigation, route.params?.section]),
   );
 
-  const openEditor = (section: Editor) => {
-    setDraft({
-      ...profile,
-      target_date: getTodayISO(),
-    });
+  const openAccountEditor = () => {
+    setAccountDraft(emptyAccountFields(account));
     setError('');
-    setEditor(section);
+    setAccountEditorOpen(true);
   };
 
-  const handleContactsChange = (nextContacts: EmergencyContact[]) => {
-    setContacts(nextContacts);
-    persistAccountData(profile, trimester, gestationalAge, dueDate, nextContacts);
-    Alert.alert('Thành công', 'Đã cập nhật danh sách liên hệ khẩn cấp.');
-  };
+  const saveAccount = async () => {
+    if (saving) return;
 
-  const save = async () => {
-    const today = getTodayISO();
-    const next = Object.fromEntries(
-      Object.entries(draft).map(([key, value]) => [
-        key,
-        String(value || '').replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim(),
-      ]),
-    ) as Profile;
+    const fullName = accountDraft.full_name.trim();
+    const phone = accountDraft.phone_number.trim();
+    const email = accountDraft.email.trim().toLowerCase();
 
-    next.target_date = today;
-
-    let nextTrimester = trimester;
-    let nextGestationalAge = gestationalAge;
-    let nextDueDate = dueDate;
-
-    if (editor === 'personal') {
-      const isoDate = /^\d{4}-\d{2}-\d{2}$/;
-      for (const k of ['lmp', 'q1_ultrasound_date', 'override_edd'] as const) {
-        if (next[k]) {
-          next[k] = normalizeIsoDate(next[k]);
-          if (!isoDate.test(next[k])) {
-            setError('Ngày thai kỳ phải theo định dạng YYYY-MM-DD (VD: 2026-05-01).');
-            return;
-          }
-        }
-      }
-
-      for (const k of ['q1_gestational_weeks', 'q1_gestational_days', 'crl_mm'] as const) {
-        if (next[k] !== '' && Number.isNaN(Number(next[k]))) {
-          setError('Tuần thai, ngày lẻ và CRL phải là số.');
-          return;
-        }
-      }
-
-      if (next.phone) {
-        const cleanedPhone = next.phone.replace(/[\s.-]/g, '');
-        if (!/^\+?\d{9,15}$/.test(cleanedPhone)) {
-          setError('Số điện thoại không hợp lệ.');
-          return;
-        }
-      }
-
-      const hasInput = next.lmp || next.q1_ultrasound_date || next.crl_mm || next.override_edd;
-      if (hasInput) {
-        try {
-          const body: PregnancyCalculateRequest = {
-            target_date: today,
-          };
-          if (next.lmp) body.lmp = next.lmp;
-          if (next.q1_ultrasound_date) body.q1_ultrasound_date = next.q1_ultrasound_date;
-          if (next.q1_gestational_weeks !== '') body.q1_gestational_weeks = Number(next.q1_gestational_weeks);
-          if (next.q1_gestational_days !== '') body.q1_gestational_days = Number(next.q1_gestational_days);
-          if (next.crl_mm !== '') body.crl_mm = Number(next.crl_mm);
-          if (next.override_edd) body.override_edd = next.override_edd;
-
-          const res = await calculatePregnancyProfile(body);
-          const responseData = res?.data || res;
-
-          const w = responseData.gestational_age?.weeks;
-          const days = responseData.gestational_age?.remaining_days ?? 0;
-          const edd = responseData.calculated_edd || responseData.override_edd;
-          const trimesterName = responseData.gestational_age?.trimester_name;
-
-          if (w !== undefined) {
-            nextGestationalAge = `${w} tuần ${days} ngày`;
-            nextTrimester =
-              trimesterName ||
-              (w < 14 ? 'Tam cá nguyệt 1' : w < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-            setGestationalAge(nextGestationalAge);
-            setTrimester(nextTrimester);
-          }
-
-          if (edd) {
-            nextDueDate = String(edd).slice(0, 10).split('-').reverse().join('/');
-            setDueDate(nextDueDate);
-          }
-
-          await savePregnancyProfileToDB({
-            ...body,
-            edd: edd ? String(edd).slice(0, 10) : undefined,
-            calculation_method: body.lmp
-              ? 'lmp'
-              : body.q1_ultrasound_date && body.crl_mm !== undefined
-                ? 'crl'
-                : body.q1_ultrasound_date
-                  ? 'q1_ultrasound'
-                  : 'direct_edd',
-          });
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Lỗi tính toán tuổi thai từ máy chủ.');
-          return;
-        }
-      } else {
-        nextGestationalAge = '--';
-        nextTrimester = 'Chưa cập nhật';
-        nextDueDate = 'Chưa cập nhật';
-        setGestationalAge(nextGestationalAge);
-        setTrimester(nextTrimester);
-        setDueDate(nextDueDate);
-      }
+    if (!fullName) {
+      setError(isEn ? 'Please enter your full name.' : 'Vui lòng nhập họ và tên.');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+      setError(isEn ? 'Invalid email address. Please check again.' : 'Email không hợp lệ. Vui lòng kiểm tra lại.');
+      return;
+    }
+    if (phone && !PHONE_PATTERN.test(phone)) {
+      setError(isEn ? 'Invalid phone number (9–20 characters).' : 'Số điện thoại không hợp lệ (từ 9 đến 20 ký tự số).');
+      return;
     }
 
-    if (currentUserProfile) {
-      if (next.name) currentUserProfile.full_name = next.name;
-      if (next.email) currentUserProfile.email = next.email;
-      if (next.phone) currentUserProfile.phone_number = next.phone;
-      if (next.birthday) currentUserProfile.birthday = next.birthday;
-      await AsyncStorage.setItem('precare_current_user', JSON.stringify(currentUserProfile));
+    const oldStorageKey = getStorageKey(account?.email, account?.id);
+    setSaving(true);
+    setError('');
+    try {
+      const updatedUser = await updateLocalUserAccount({
+        full_name: fullName,
+        phone_number: phone || null,
+        email,
+      });
+      setAccount(updatedUser);
+
+      const newStorageKey = getStorageKey(updatedUser.email, updatedUser.id);
+      if (oldStorageKey !== newStorageKey) {
+        const cached = await AsyncStorage.getItem(oldStorageKey).catch(() => null);
+        if (cached) {
+          await AsyncStorage.setItem(newStorageKey, cached).catch(() => {});
+          await AsyncStorage.removeItem(oldStorageKey).catch(() => {});
+        }
+      }
+
+      setAccountEditorOpen(false);
+      Alert.alert(
+        isEn ? 'Success' : 'Thành công',
+        isEn ? 'Account information has been updated.' : 'Đã cập nhật thông tin tài khoản.',
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : (isEn ? 'Unable to update account information.' : 'Không thể cập nhật thông tin tài khoản.'),
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setProfile(next);
-    await persistAccountData(next, nextTrimester, nextGestationalAge, nextDueDate, contacts);
-    setEditor(null);
-
-    Alert.alert('Thành công', 'Đã lưu thông tin hồ sơ và đồng bộ vào cơ sở dữ liệu.');
   };
 
-  const modalTitle = editor === 'personal' ? 'Chỉnh sửa hồ sơ' : 'Thông tin y tế';
+  const notUpdatedText = isEn ? 'Not updated' : 'Chưa cập nhật';
+  const gestationalAgeText =
+    gaWeeks !== null
+      ? isEn
+        ? `${gaWeeks} weeks ${gaDays} days`
+        : `${gaWeeks} tuần ${gaDays} ngày`
+      : '--';
+  const q1AgeText =
+    pregnancy.q1_gestational_weeks !== ''
+      ? isEn
+        ? `${pregnancy.q1_gestational_weeks}w ${pregnancy.q1_gestational_days || '0'}d`
+        : `${pregnancy.q1_gestational_weeks} tuần ${pregnancy.q1_gestational_days || '0'} ngày`
+      : '';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={styles.header}><Text style={styles.headerTitle}>Hồ sơ mẹ bầu</Text></View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Maternal Profile' : 'Hồ sơ mẹ bầu'}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+      />
+
+      <ScrollView style={{ backgroundColor: theme.background }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.identity}>
-          <Image source={require('../../assets/pregnant.jpg')} style={styles.avatar} accessibilityLabel="Ảnh đại diện mẹ bầu" />
+          <Image
+            source={require('../../assets/pregnant.jpg')}
+            style={[styles.avatar, { borderColor: theme.surface }]}
+            accessibilityLabel={isEn ? 'Maternal avatar' : 'Ảnh đại diện mẹ bầu'}
+          />
           <View style={styles.identityText}>
-            <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
-            <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
+            <Text style={[styles.name, fontStyle(20, { min: 18, max: 24 }), { color: theme.text }]}>
+              {account?.full_name || notUpdatedText}
+            </Text>
           </View>
         </View>
-        <OutlineButton title="Chỉnh sửa hồ sơ" icon="create-outline" onPress={() => openEditor('personal')} />
 
-        <View style={styles.pregnancyCard}>
+        {!!loadError && (
+          <View
+            style={[
+              styles.loadErrorBox,
+              { backgroundColor: theme.dangerBackground, borderColor: theme.dangerBorder },
+            ]}
+          >
+            <Ionicons name="alert-circle-outline" size={18} color={theme.danger} />
+            <Text style={[styles.loadErrorText, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.danger }]}>
+              {loadError}
+            </Text>
+            <Pressable onPress={() => void loadFromDatabase()} hitSlop={8}>
+              <Text style={[styles.retryLink, fontStyle(13.5, { min: 12.5 }), { color: theme.tealText }]}>
+                {isEn ? 'Retry' : 'Tải lại'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        <OutlineButton
+          title={isEn ? 'Edit account' : 'Chỉnh sửa tài khoản'}
+          icon="person-outline"
+          disabled={loadingData}
+          onPress={openAccountEditor}
+        />
+
+        <View
+          style={[
+            styles.pregnancyCard,
+            { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+          ]}
+        >
           <View style={styles.between}>
-            <Text style={styles.pregnancyLabel}>Thai kỳ hiện tại</Text>
-            <Text style={styles.trimester}>{trimester}</Text>
+            <Text style={[styles.pregnancyLabel, fontStyle(13.5, { min: 12.5 }), { color: theme.tealText }]}>
+              {isEn ? 'Current pregnancy' : 'Thai kỳ hiện tại'}
+            </Text>
+            {loadingData ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[styles.trimester, fontStyle(12.5, { min: 11.5, max: 15 }), { color: theme.tealText }]}>
+                {formatTrimester(trimesterNum, trimesterVi, isEn)}
+              </Text>
+            )}
           </View>
-          <Text style={styles.gestationalAge}>{gestationalAge}</Text>
-          <View style={styles.dueRow}>
-            <Text style={styles.label}>Ngày dự sinh</Text>
-            <Text style={styles.value}>{dueDate}</Text>
+          <Text style={[styles.gestationalAge, fontStyle(26, { lineHeight: 35, min: 23, max: 31 }), { color: theme.tealText }]}>
+            {gestationalAgeText}
+          </Text>
+          <View style={[styles.dueRow, { borderTopColor: theme.tealBorder }]}>
+            <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.muted }]}>
+              {isEn ? 'Estimated due date (EDD)' : 'Ngày dự sinh (EDD)'}
+            </Text>
+            <Text style={[styles.value, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+              {pregnancy.edd || notUpdatedText}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-        <View style={styles.card}>
-          <InfoRow label="Ngày sinh" value={profile.birthday} />
-          <InfoRow label="Số điện thoại" value={profile.phone ? `${profile.phone.slice(0, 4)} *** ${profile.phone.slice(-2)}` : ''} />
-          <InfoRow label="Email" value={profile.email} last />
+        <Text style={[styles.sectionTitle, styles.standaloneSectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Saved pregnancy metrics' : 'Chỉ số thai kỳ đã lưu'}
+        </Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <InfoRow
+            label={isEn ? 'Last menstrual period (LMP)' : 'Ngày kinh cuối (LMP)'}
+            value={pregnancy.lmp}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? '1st trimester ultrasound date' : 'Ngày siêu âm Quý 1'}
+            value={pregnancy.q1_ultrasound_date}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Gestational age at Q1 scan' : 'Tuổi thai siêu âm Q1'}
+            value={q1AgeText}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Crown-rump length (CRL)' : 'Chiều dài đầu mông (CRL)'}
+            value={pregnancy.crl_mm ? `${pregnancy.crl_mm} mm` : ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Estimated due date' : 'Ngày dự sinh'}
+            value={pregnancy.edd}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Primary doctor' : 'Bác sĩ phụ trách'}
+            value={doctorName || (isEn ? 'Unassigned' : 'Chưa phân công')}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Profile status' : 'Trạng thái hồ sơ'}
+            value={formatStatus(rawStatus, isEn)}
+            emptyText={notUpdatedText}
+            last
+          />
         </View>
 
-        <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Thông tin y tế</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cập nhật thông tin y tế" hitSlop={10} onPress={() => openEditor('medical')}>
-            <Text style={styles.actionText}>Cập nhật</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+            {isEn ? 'Account information' : 'Thông tin tài khoản'}
+          </Text>
+          <Pressable onPress={openAccountEditor} disabled={loadingData} hitSlop={8}>
+            <Text style={[styles.sectionEditLink, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]}>
+              {isEn ? 'Edit' : 'Chỉnh sửa'}
+            </Text>
           </Pressable>
         </View>
-        <View style={styles.card}>
-          {fields.medical.map((field, index) => (
-            <InfoRow key={field.key} label={field.label} value={profile[field.key]} last={index === fields.medical.length - 1} />
-          ))}
-        </View>
-        <Text style={styles.helper}>Bổ sung thông tin để bác sĩ hiểu rõ hơn về sức khỏe của mẹ.</Text>
-
-        <Text style={styles.sectionTitle}>Liên hệ khẩn cấp</Text>
-        <View style={[styles.card, styles.contactCard]}>
-          <View style={styles.contactInfo}>
-            <View style={styles.iconBox}><Ionicons name="call-outline" size={20} color={colors.primary} /></View>
-            <View style={styles.contactText}>
-              <Text style={styles.cardTitle}>{mainContact?.name || 'Chưa thêm người liên hệ'}</Text>
-              <Text style={styles.subtitle}>{mainContact
-                ? `${mainContact.relationship}\n${mainContact.phone}`
-                : 'Thêm người thân để dễ liên lạc khi mẹ cần hỗ trợ.'}</Text>
-            </View>
-          </View>
-          <OutlineButton title={contacts.length ? 'Quản lý người liên hệ' : 'Thêm người liên hệ'} icon="person-add-outline" onPress={() => setContactsVisible(true)} />
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <InfoRow
+            label={isEn ? 'Full name' : 'Họ và tên'}
+            value={account?.full_name || ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Phone number' : 'Số điện thoại'}
+            value={account?.phone_number || ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label="Email"
+            value={account?.email || ''}
+            emptyText={notUpdatedText}
+            last
+          />
         </View>
 
-        <Text style={styles.sectionTitle}>Hồ sơ khám & kết quả</Text>
+        <Text style={[styles.sectionTitle, styles.standaloneSectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Checkups & Results' : 'Hồ sơ khám & kết quả'}
+        </Text>
         <Pressable
           accessibilityRole="button"
           onPress={goToHistoryScreen}
           style={({ pressed }) => [
             styles.card,
             styles.historyCard,
+            { backgroundColor: theme.surface, borderColor: theme.border },
             pressed && styles.pressed,
           ]}
         >
-          <View style={styles.iconBox}>
-            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="document-text-outline" size={20} color={theme.tealText} />
           </View>
 
           <View style={styles.contactText}>
-            <Text style={styles.cardTitle}>Xem lịch sử kết quả</Text>
-            <Text style={styles.subtitle}>
-              Phiếu khám, xét nghiệm và siêu âm đã lưu
+            <Text style={[styles.cardTitle, fontStyle(15, { lineHeight: 21, min: 14 }), { color: theme.text }]}>
+              {isEn ? 'View result history' : 'Xem lịch sử kết quả'}
+            </Text>
+            <Text style={[styles.subtitle, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Checkup visits and biometric metrics linked to your account'
+                : 'Lần khám và chỉ số sinh trắc theo tài khoản Precare của bạn'}
             </Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+          <Ionicons name="chevron-forward" size={18} color={theme.muted} />
         </Pressable>
       </ScrollView>
 
-      <EmergencyContacts
-        visible={contactsVisible}
-        contacts={contacts}
-        onChange={handleContactsChange}
-        onClose={() => setContactsVisible(false)}
-      />
-
-      <Modal visible={editor !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditor(null)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Đóng" hitSlop={12} onPress={() => setEditor(null)}>
-                <Ionicons name="close" size={24} color={colors.navy} />
+      <Modal
+        visible={accountEditorOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => !saving && setAccountEditorOpen(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View
+              style={[
+                styles.modalHeader,
+                { backgroundColor: theme.surface, borderBottomColor: theme.divider },
+              ]}
+            >
+              <Text style={[styles.modalTitle, fontStyle(19, { max: 22 }), { color: theme.text }]}>
+                {isEn ? 'Edit account information' : 'Chỉnh sửa thông tin tài khoản'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Close' : 'Đóng'}
+                hitSlop={12}
+                disabled={saving}
+                onPress={() => setAccountEditorOpen(false)}
+              >
+                <Ionicons name="close" size={24} color={theme.text} />
               </Pressable>
             </View>
+
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-              {editor && (
-                <>
-                  <Text style={styles.formNote}>Thông tin được lưu theo tài khoản của mẹ.</Text>
-                  {fields[editor].map((field) => {
-                    const isTargetDate = field.key === 'target_date';
-                    return (
-                      <View key={field.key} style={styles.field}>
-                        <Text style={styles.inputLabel}>{field.label}</Text>
-                        <TextInput
-                          accessibilityLabel={field.label}
-                          style={styles.input}
-                          value={isTargetDate ? getTodayISO() : draft[field.key]}
-                          editable={!isTargetDate}
-                          placeholder={field.placeholder || field.label}
-                          placeholderTextColor={colors.textLight}
-                          keyboardType={field.key === 'email' ? 'email-address' : field.key.toLowerCase().includes('phone') ? 'phone-pad' : 'default'}
-                          autoCapitalize={field.key === 'email' ? 'none' : 'sentences'}
-                          onChangeText={(value) => {
-                            if (!isTargetDate) {
-                              setDraft((current) => ({ ...current, [field.key]: value }));
-                            }
-                          }}
-                        />
-                      </View>
-                    );
-                  })}
-                  {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-                  <Pressable accessibilityRole="button" style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]} onPress={save}>
-                    <Text style={styles.saveText}>Lưu thay đổi</Text>
-                  </Pressable>
-                </>
+              <Text style={[styles.formNote, fontStyle(14.5, { lineHeight: 22, min: 13.5 }), { color: theme.muted }]}>
+                {isEn
+                  ? 'Update your display name, phone number, and email on this device. Initial pregnancy metrics are locked here to keep clinical records consistent.'
+                  : 'Cập nhật họ tên, số điện thoại và email hiển thị cho tài khoản PreCare trên thiết bị này. Chỉ số thai kỳ ban đầu được khóa chỉnh sửa tại đây để đảm bảo nhất quán hồ sơ y tế.'}
+              </Text>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                  {isEn ? 'Full name' : 'Họ và tên'}
+                </Text>
+                <TextInput
+                  accessibilityLabel={isEn ? 'Full name' : 'Họ và tên'}
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.full_name}
+                  editable={!saving}
+                  placeholder={isEn ? 'Enter full name' : 'Nhập họ và tên'}
+                  placeholderTextColor={theme.muted}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, full_name: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                  {isEn ? 'Phone number' : 'Số điện thoại'}
+                </Text>
+                <TextInput
+                  accessibilityLabel={isEn ? 'Phone number' : 'Số điện thoại'}
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.phone_number}
+                  editable={!saving}
+                  placeholder={isEn ? 'e.g. 0912345678' : 'VD: 0912345678'}
+                  placeholderTextColor={theme.muted}
+                  keyboardType="phone-pad"
+                  maxLength={20}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, phone_number: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.inputLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>Email</Text>
+                <TextInput
+                  accessibilityLabel="Email"
+                  style={[
+                    styles.input,
+                    fontStyle(15.5, { min: 14.5 }),
+                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  ]}
+                  value={accountDraft.email}
+                  editable={!saving}
+                  placeholder="example@email.com"
+                  placeholderTextColor={theme.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={(value) => {
+                    setAccountDraft((cur) => ({ ...cur, email: value }));
+                    setError('');
+                  }}
+                />
+              </View>
+
+              {!!error && (
+                <Text
+                  accessibilityRole="alert"
+                  style={[styles.error, fontStyle(14, { lineHeight: 20, min: 13 }), { color: theme.danger }]}
+                >
+                  {error}
+                </Text>
               )}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.saveButton,
+                  (pressed || saving) && styles.pressed,
+                ]}
+                onPress={() => void saveAccount()}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={[styles.saveText, fontStyle(15.5, { min: 14.5 })]}>
+                    {isEn ? 'Save account changes' : 'Lưu thông tin tài khoản'}
+                  </Text>
+                )}
+              </Pressable>
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
@@ -607,49 +737,136 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#F7FAFC' },
-  header: { height: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: '#E7EEF5' },
-  headerTitle: { fontSize: 16, fontWeight: '600', color: colors.navy },
+  container: { flex: 1 },
+  header: {
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+  },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
   content: { paddingHorizontal: 18, paddingBottom: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  identity: { flexDirection: 'row', alignItems: 'center', paddingVertical: 24, gap: 14 },
-  avatar: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: colors.white, backgroundColor: '#E2E8F0' },
+  identity: { flexDirection: 'row', alignItems: 'center', paddingVertical: 22, gap: 14 },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    backgroundColor: '#E2E8F0',
+  },
   identityText: { flex: 1 },
-  name: { color: colors.navy, fontSize: 20, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 12, lineHeight: 19, marginTop: 3 },
-  outlineButton: { minHeight: 40, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#C9F0EC', borderRadius: 7, backgroundColor: colors.white, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: colors.primary, fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  name: { fontSize: 20, fontWeight: '700' },
+  subtitle: { fontSize: 13.5, lineHeight: 20, marginTop: 3 },
+  loadErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  loadErrorText: { flex: 1, fontSize: 13.5, lineHeight: 20 },
+  retryLink: { fontSize: 13.5, fontWeight: '700' },
+  outlineButton: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 9,
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: { fontSize: 14.5, fontWeight: '600', flexShrink: 1 },
   pressed: { opacity: 0.65 },
-  pregnancyCard: { marginTop: 20, backgroundColor: '#EFFDFA', borderColor: '#CCF5EF', borderWidth: 1, borderRadius: 15, padding: 15 },
-  between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  pregnancyLabel: { color: colors.primary, fontSize: 12, fontWeight: '600' },
-  trimester: { color: colors.primary, fontSize: 11 },
-  gestationalAge: { fontSize: 26, lineHeight: 36, fontWeight: '700', color: '#008579', marginVertical: 10 },
-  dueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#DFF7F2', paddingTop: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.navy, marginTop: 25, marginBottom: 12 },
-  sectionHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  actionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
-  card: { backgroundColor: colors.white, borderRadius: 15, borderWidth: 1, borderColor: '#E0E9F3', paddingHorizontal: 14, overflow: 'hidden' },
-  infoRow: { minHeight: 45, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, gap: 12 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F7' },
-  label: { fontSize: 13, color: colors.textMuted, flexShrink: 1 },
-  value: { fontSize: 13, color: colors.navy, textAlign: 'right', flexShrink: 1, maxWidth: '65%' },
-  missing: { color: '#8295B0' },
-  helper: { fontSize: 12, color: '#8295B0', lineHeight: 19, marginTop: 10 },
-  contactCard: { padding: 14 },
-  contactInfo: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 15 },
-  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#EFFDFA', alignItems: 'center', justifyContent: 'center' },
+  pregnancyCard: {
+    marginTop: 18,
+    borderWidth: 1,
+    borderRadius: 15,
+    padding: 15,
+  },
+  between: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  pregnancyLabel: { fontSize: 13.5, fontWeight: '600' },
+  trimester: { fontSize: 12.5 },
+  gestationalAge: { fontSize: 26, lineHeight: 35, fontWeight: '700', marginVertical: 10 },
+  dueRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    borderTopWidth: 1,
+    paddingTop: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  standaloneSectionTitle: { marginTop: 24, marginBottom: 10 },
+  sectionEditLink: { fontSize: 14.5, fontWeight: '600' },
+  card: {
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  label: { fontSize: 14.5, flexShrink: 1 },
+  value: { fontSize: 14.5, textAlign: 'right', flexShrink: 1, maxWidth: '62%' },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   contactText: { flex: 1 },
-  cardTitle: { fontSize: 13, fontWeight: '600', lineHeight: 19, color: colors.navy },
+  cardTitle: { fontSize: 15, fontWeight: '600', lineHeight: 21 },
   historyCard: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingVertical: 14 },
-  modalContainer: { flex: 1, backgroundColor: '#F7FAFC' },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, gap: 16, borderBottomWidth: 1, borderBottomColor: '#E7EEF5' },
-  modalTitle: { flex: 1, fontSize: 19, fontWeight: '700', color: colors.navy },
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    gap: 16,
+    borderBottomWidth: 1,
+  },
+  modalTitle: { flex: 1, fontSize: 19, fontWeight: '700' },
   modalContent: { padding: 20, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  formNote: { color: colors.textMuted, fontSize: 13, lineHeight: 20, marginBottom: 20 },
+  formNote: { fontSize: 14.5, lineHeight: 22, marginBottom: 20 },
   field: { marginBottom: 18 },
-  inputLabel: { fontSize: 14, fontWeight: '600', color: colors.navy, marginBottom: 8 },
-  input: { minHeight: 48, borderWidth: 1, borderColor: '#DFE8F0', borderRadius: 10, backgroundColor: colors.white, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.navy },
-  error: { color: '#B91C1C', marginBottom: 16, lineHeight: 21 },
-  saveButton: { backgroundColor: colors.primary, padding: 15, alignItems: 'center', borderRadius: 10 },
-  saveText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+  inputLabel: { fontSize: 14.5, fontWeight: '600', marginBottom: 8 },
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15.5,
+  },
+  error: { marginBottom: 16, lineHeight: 21 },
+  saveButton: {
+    minHeight: 50,
+    backgroundColor: colors.primary,
+    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    marginTop: 6,
+  },
+  saveText: { color: colors.white, fontSize: 15.5, fontWeight: '700' },
 });

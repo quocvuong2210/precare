@@ -7,24 +7,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import {
   calculatePregnancyProfile,
   currentAccessToken,
   currentUserProfile,
+  fetchCurrentUserFromDB,
   fetchPregnancyProfileFromDB,
   restoreSession,
 } from '../services/api';
+import { formatIsoToDmy, getTodayISO } from '../utils/date';
 
 type PregnancySummary = {
   weeks: number | null;
   days: number;
-  trimester: string;
+  trimesterNumber: number | null;
+  trimesterVi: string;
   dueDate: string;
 };
 
@@ -42,18 +47,6 @@ type SavedAccountRecord = {
   dueDate?: string;
 };
 
-function getTodayISO(): string {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-}
-
-function formatDueDate(value?: string): string {
-  if (!value) return '';
-  const normalized = value.slice(0, 10);
-  const iso = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : normalized;
-}
-
 function parseSavedWeeks(value?: string): { weeks: number | null; days: number } {
   const match = value?.match(/(\d+)\s*tuần(?:\s*(\d+)\s*ngày)?/i);
   return match
@@ -61,13 +54,49 @@ function parseSavedWeeks(value?: string): { weeks: number | null; days: number }
     : { weeks: null, days: 0 };
 }
 
+function inferTrimesterNumber(weeks: number | null, rawName?: string): number | null {
+  if (rawName) {
+    if (rawName.includes('1') || rawName.toLowerCase().includes('đầu')) return 1;
+    if (rawName.includes('2') || rawName.toLowerCase().includes('giữa')) return 2;
+    if (rawName.includes('3') || rawName.toLowerCase().includes('cuối')) return 3;
+  }
+  if (weeks === null || !Number.isFinite(weeks)) return null;
+  if (weeks < 14) return 1;
+  if (weeks < 28) return 2;
+  return 3;
+}
+
+function formatTrimesterLabel(
+  trimesterNumber: number | null,
+  trimesterVi: string,
+  lang: 'vi' | 'en',
+): string {
+  if (!trimesterNumber && !trimesterVi) return '';
+  if (lang === 'en') {
+    if (trimesterNumber === 1) return '1st Trimester (First 3 months)';
+    if (trimesterNumber === 2) return '2nd Trimester (Second 3 months)';
+    if (trimesterNumber === 3) return '3rd Trimester (Last 3 months)';
+    return '';
+  }
+  if (trimesterVi) return trimesterVi;
+  if (trimesterNumber === 1) return 'Tam cá nguyệt 1';
+  if (trimesterNumber === 2) return 'Tam cá nguyệt 2';
+  if (trimesterNumber === 3) return 'Tam cá nguyệt 3';
+  return '';
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const displayName = currentUserProfile?.full_name || 'Nguyễn Thị Lan';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+  const [displayName, setDisplayName] = useState(
+    () => currentUserProfile?.full_name || 'Mẹ bầu PreCare',
+  );
   const [pregnancy, setPregnancy] = useState<PregnancySummary>({
     weeks: null,
     days: 0,
-    trimester: '',
+    trimesterNumber: null,
+    trimesterVi: '',
     dueDate: '',
   });
   const [assignedDoctorName, setAssignedDoctorName] = useState('');
@@ -78,9 +107,14 @@ export default function HomeScreen() {
 
       async function loadPregnancySummary() {
         try {
-          const account = currentUserProfile || (await restoreSession());
+          const restored = currentUserProfile || (await restoreSession());
+          const account = (await fetchCurrentUserFromDB(currentAccessToken)) || restored;
+          if (isActive && account?.full_name) {
+            setDisplayName(account.full_name);
+          }
+          let dbProfile: any = null;
           try {
-            const dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
+            dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
             const doctor = dbProfile?.primary_doctor || dbProfile?.doctor || null;
             const doctorName =
               doctor?.full_name ||
@@ -93,20 +127,47 @@ export default function HomeScreen() {
             console.log('Không tải được bác sĩ phụ trách:', doctorError);
             if (isActive) setAssignedDoctorName('');
           }
+
+          if (dbProfile && typeof dbProfile === 'object') {
+            const ga = dbProfile.current_gestational_age;
+            const dbWeeks = ga?.weeks;
+            const dbDays = ga?.remaining_days ?? 0;
+            const tNum = ga?.trimester ?? inferTrimesterNumber(dbWeeks, ga?.trimester_name);
+            const dbTrimesterVi =
+              ga?.trimester_name ||
+              (tNum ? `Tam cá nguyệt ${tNum}` : '');
+            const dbDueDate = formatIsoToDmy(dbProfile.edd);
+
+            if (Number.isFinite(dbWeeks)) {
+              if (isActive) {
+                setPregnancy({
+                  weeks: dbWeeks,
+                  days: dbDays,
+                  trimesterNumber: tNum,
+                  trimesterVi: dbTrimesterVi,
+                  dueDate: dbDueDate,
+                });
+              }
+              return;
+            }
+          }
+
           const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
           const raw = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
           if (!raw) {
             if (isActive) {
-              setPregnancy({ weeks: null, days: 0, trimester: '', dueDate: '' });
+              setPregnancy({ weeks: null, days: 0, trimesterNumber: null, trimesterVi: '', dueDate: '' });
             }
             return;
           }
 
           const saved: SavedAccountRecord = JSON.parse(raw);
           const profile = saved.profile || {};
+          const parsedSaved = parseSavedWeeks(saved.gestationalAge);
           let next: PregnancySummary = {
-            ...parseSavedWeeks(saved.gestationalAge),
-            trimester: saved.trimester || '',
+            ...parsedSaved,
+            trimesterNumber: inferTrimesterNumber(parsedSaved.weeks, saved.trimester),
+            trimesterVi: saved.trimester || '',
             dueDate: saved.dueDate || '',
           };
 
@@ -143,15 +204,17 @@ export default function HomeScreen() {
               const data = response?.data || response;
               const weeks = data?.gestational_age?.weeks;
               const days = data?.gestational_age?.remaining_days ?? 0;
-              const trimester = data?.gestational_age?.trimester_name ||
-                (weeks < 14 ? 'Tam cá nguyệt 1' : weeks < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-              const dueDate = formatDueDate(data?.calculated_edd || data?.override_edd);
+              const tNum = data?.gestational_age?.trimester ?? inferTrimesterNumber(weeks, data?.gestational_age?.trimester_name);
+              const trimesterVi = data?.gestational_age?.trimester_name ||
+                (tNum ? `Tam cá nguyệt ${tNum}` : '');
+              const dueDate = formatIsoToDmy(data?.calculated_edd || data?.override_edd);
 
               if (Number.isFinite(weeks)) {
                 next = {
                   weeks,
                   days,
-                  trimester,
+                  trimesterNumber: tNum,
+                  trimesterVi,
                   dueDate: dueDate || next.dueDate,
                 };
               }
@@ -174,57 +237,76 @@ export default function HomeScreen() {
   );
 
   const ageText = pregnancy.weeks === null
-    ? 'Chưa cập nhật tuổi thai'
-    : `${pregnancy.weeks} tuần ${pregnancy.days} ngày`;
+    ? (isEn ? 'Gestational age not set' : 'Chưa cập nhật tuổi thai')
+    : isEn
+      ? `${pregnancy.weeks} weeks ${pregnancy.days} days`
+      : `${pregnancy.weeks} tuần ${pregnancy.days} ngày`;
+  const trimesterLabel = formatTrimesterLabel(
+    pregnancy.trimesterNumber,
+    pregnancy.trimesterVi,
+    preferences.language,
+  );
   const weekProgress = pregnancy.weeks === null
     ? 0
     : Math.min(100, Math.max(0, (pregnancy.weeks / 40) * 100));
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* ================= HEADER ================= */}
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+
+      <View style={[styles.header, { backgroundColor: theme.background }]}>
         <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={25} color={colors.primaryDark} />
+          <View style={[styles.avatar, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="person" size={25} color={theme.tealText} />
           </View>
 
-          <View>
-            <Text style={styles.hello}>Xin chào,</Text> 
-            <Text style={styles.userName}>{displayName}</Text>
+          <View style={styles.userTextCol}>
+            <Text style={[styles.hello, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+              {isEn ? 'Hello,' : 'Xin chào,'}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.userName, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}
+            >
+              {displayName}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.weekBadge}>
-          <Text style={styles.weekText}>
-            {pregnancy.weeks === null ? 'Chưa cập nhật' : `Tuần thứ ${pregnancy.weeks}`}
+        <View style={[styles.weekBadge, { backgroundColor: theme.tealSoft }]}>
+          <Text style={[styles.weekText, fontStyle(12.5, { min: 11.5, max: 15 }), { color: theme.tealText }]}>
+            {pregnancy.weeks === null
+              ? (isEn ? 'Not set' : 'Chưa cập nhật')
+              : (isEn ? `Week ${pregnancy.weeks}` : `Tuần thứ ${pregnancy.weeks}`)}
           </Text>
         </View>
       </View>
 
-      {/* ================= CONTENT ================= */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* ================= PREGNANCY CARD ================= */}
         <View style={styles.pregnancyCard}>
           <View style={styles.pregnancyInfo}>
-            <Text style={styles.smallWhite}>TUỔI THAI HIỆN TẠI</Text>
-            <Text style={styles.weekNumber}>{ageText}</Text>
-            <Text style={styles.dueDate}>
-              {pregnancy.dueDate ? `Dự sinh: ${pregnancy.dueDate}` : 'Ngày dự sinh: Chưa cập nhật'}
-              {pregnancy.trimester ? ` • ${pregnancy.trimester}` : ''}
+            <Text style={[styles.smallWhite, fontStyle(11.5, { min: 11, max: 13.5 })]}>
+              {isEn ? 'CURRENT GESTATIONAL AGE' : 'TUỔI THAI HIỆN TẠI'}
+            </Text>
+            <Text style={[styles.weekNumber, fontStyle(24, { min: 22, max: 28 })]}>{ageText}</Text>
+            <Text style={[styles.dueDate, fontStyle(12.5, { lineHeight: 18, min: 11.5 })]}>
+              {pregnancy.dueDate
+                ? `${isEn ? 'Due date' : 'Dự sinh'}: ${pregnancy.dueDate}`
+                : isEn ? 'Due date: Not set' : 'Ngày dự sinh: Chưa cập nhật'}
+              {trimesterLabel ? ` • ${trimesterLabel}` : ''}
             </Text>
 
             <View style={styles.progressBackground}>
               <View style={[styles.progress, { width: `${weekProgress}%` as `${number}%` }]} />
             </View>
 
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, fontStyle(12, { lineHeight: 17, min: 11 })]}>
               {pregnancy.weeks === null
-                ? 'Cập nhật thông tin trong Hồ sơ để theo dõi thai kỳ'
-                : `Tuần ${pregnancy.weeks} trên hành trình 40 tuần`}
+                ? (isEn ? 'Complete your pregnancy setup to track progress' : 'Cập nhật thông tin trong Hồ sơ để theo dõi thai kỳ')
+                : (isEn ? `Week ${pregnancy.weeks} of 40-week journey` : `Tuần ${pregnancy.weeks} trên hành trình 40 tuần`)}
             </Text>
           </View>
 
@@ -240,83 +322,100 @@ export default function HomeScreen() {
         <View
           style={[
             styles.doctorCard,
-            !assignedDoctorName && styles.doctorCardUnassigned,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            !assignedDoctorName && { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
           ]}
         >
           <View
             style={[
               styles.doctorIcon,
-              !assignedDoctorName && styles.doctorIconUnassigned,
+              !assignedDoctorName && { backgroundColor: theme.iconBackground, shadowOpacity: 0, elevation: 0 },
             ]}
           >
             <Ionicons
               name={assignedDoctorName ? 'medical' : 'person-add-outline'}
               size={21}
-              color={assignedDoctorName ? '#FFFFFF' : colors.textMuted}
+              color={assignedDoctorName ? '#FFFFFF' : theme.muted}
             />
           </View>
           <View style={styles.doctorInfo}>
-            <Text style={styles.doctorLabel}>BÁC SĨ PHỤ TRÁCH</Text>
+            <Text style={[styles.doctorLabel, fontStyle(11, { lineHeight: 15, min: 10.5, max: 13 }), { color: theme.muted }]}>
+              {isEn ? 'PRIMARY DOCTOR' : 'BÁC SĨ PHỤ TRÁCH'}
+            </Text>
             <View style={styles.doctorNameRow}>
               <Text
                 numberOfLines={1}
                 style={[
                   styles.assignedDoctorName,
-                  !assignedDoctorName && styles.assignedDoctorNameUnassigned,
+                  fontStyle(15.5, { lineHeight: 22, min: 14 }),
+                  { color: assignedDoctorName ? theme.text : theme.muted },
                 ]}
               >
-                {assignedDoctorName || 'Chưa phân công'}
+                {assignedDoctorName || (isEn ? 'Unassigned' : 'Chưa phân công')}
               </Text>
               {assignedDoctorName ? (
-                <View style={styles.assignedBadge}>
+                <View style={[styles.assignedBadge, { backgroundColor: theme.tealSoft }]}>
                   <View style={styles.assignedDot} />
-                  <Text style={styles.assignedBadgeText}>Đang phụ trách</Text>
+                  <Text style={[styles.assignedBadgeText, fontStyle(11.5, { min: 10.5, max: 13.5 }), { color: theme.tealText }]}>
+                    {isEn ? 'Assigned' : 'Đang phụ trách'}
+                  </Text>
                 </View>
               ) : null}
             </View>
           </View>
         </View>
 
-        {/* ================= QUICK ACCESS ================= */}
-        <Text style={styles.sectionTitle}>Lối tắt nhanh</Text>
+        <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Quick Actions' : 'Lối tắt nhanh'}
+        </Text>
 
         <View style={styles.quickGrid}>
           <QuickButton
             icon="add-circle-outline"
-            title="Tải phiếu khám"
+            title={isEn ? 'Upload scan' : 'Tải phiếu khám'}
             onPress={() => navigation.navigate('Upload')}
           />
 
           <QuickButton
             icon="analytics-outline"
-            title="Lịch sử kết quả"
+            title={isEn ? 'Result history' : 'Lịch sử kết quả'}
             onPress={() => navigation.navigate('HistoryResults')}
           />
 
           <QuickButton
             icon="pulse-outline"
-            title="Biểu đồ thai"
+            title={isEn ? 'Growth charts' : 'Biểu đồ thai'}
             onPress={() => navigation.navigate('Charts')}
           />
 
           <QuickButton
             icon="calendar-outline"
-            title="Lịch hẹn khám"
+            title={isEn ? 'Appointments' : 'Lịch hẹn khám'}
             onPress={() => navigation.navigate('Appointments')}
           />
         </View>
 
-        {/* ================= APPOINTMENT ================= */}
-        <Text style={styles.sectionTitle}>Lịch khám sắp tới</Text>
+        <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Upcoming Appointments' : 'Lịch khám sắp tới'}
+        </Text>
 
         <TouchableOpacity
-          style={styles.appointmentCard}
+          style={[
+            styles.appointmentCard,
+            { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+          ]}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('Appointments')}
         >
           <View style={styles.appointmentInfo}>
-            <Text style={styles.appointmentTitle}>Chưa có lịch khám nào</Text>
-            <Text style={styles.appointmentNote}>Lịch hẹn sẽ hiển thị tại đây sau khi được tạo.</Text>
+            <Text style={[styles.appointmentTitle, fontStyle(15, { min: 14 }), { color: theme.tealText }]}>
+              {isEn ? 'No upcoming appointments' : 'Chưa có lịch khám nào'}
+            </Text>
+            <Text style={[styles.appointmentNote, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Appointments will appear here once scheduled.'
+                : 'Lịch hẹn sẽ hiển thị tại đây sau khi được tạo.'}
+            </Text>
           </View>
         </TouchableOpacity>
       </ScrollView>
@@ -333,45 +432,52 @@ function QuickButton({
   title: string;
   onPress?: () => void;
 }) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <TouchableOpacity style={styles.quickButton} activeOpacity={0.8} onPress={onPress}>
-      <View style={styles.quickIcon}>
+    <TouchableOpacity
+      style={[styles.quickButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      activeOpacity={0.8}
+      onPress={onPress}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: theme.tealSoft }]}>
         <Ionicons name={icon} size={21} color={colors.primary} />
       </View>
-      <Text style={styles.quickTitle}>{title}</Text>
+      <Text style={[styles.quickTitle, fontStyle(14, { lineHeight: 19, min: 13, max: 16.5 }), { color: theme.text }]}>
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7FBFC' },
+  container: { flex: 1 },
   header: {
-    height: 75,
+    minHeight: 75,
     paddingHorizontal: 20,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F7FBFC',
+    gap: 10,
   },
-  userInfo: { flexDirection: 'row', alignItems: 'center' },
+  userInfo: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  userTextCol: { flex: 1 },
   avatar: {
     width: 43,
     height: 43,
     borderRadius: 22,
-    backgroundColor: '#DDEDEA',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
-  hello: { fontSize: 11, color: '#7C8B98' },
-  userName: { marginTop: 2, fontSize: 14, fontWeight: '800', color: colors.navy },
+  hello: { fontSize: 13 },
+  userName: { marginTop: 2, fontSize: 16, fontWeight: '800' },
   weekBadge: {
     paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#D9FAF4',
   },
-  weekText: { fontSize: 11, fontWeight: '700', color: colors.primaryDark },
+  weekText: { fontSize: 12.5, fontWeight: '700' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 20 },
   pregnancyCard: {
     minHeight: 113,
@@ -388,9 +494,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   pregnancyInfo: { flex: 1, paddingRight: 10 },
-  smallWhite: { fontSize: 9, color: '#D8F7F2', letterSpacing: 0.5 },
-  weekNumber: { marginTop: 3, fontSize: 22, fontWeight: '800', color: colors.white },
-  dueDate: { marginTop: 3, fontSize: 9, color: '#D8F7F2' },
+  smallWhite: { fontSize: 11.5, color: '#D8F7F2', letterSpacing: 0.5 },
+  weekNumber: { marginTop: 3, fontSize: 24, fontWeight: '800', color: colors.white },
+  dueDate: { marginTop: 3, fontSize: 12.5, color: '#D8F7F2' },
   progressBackground: {
     marginTop: 10,
     width: '100%',
@@ -400,7 +506,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progress: { width: '60%', height: '100%', backgroundColor: colors.white },
-  progressText: { marginTop: 5, fontSize: 8, color: '#D8F7F2' },
+  progressText: { marginTop: 5, fontSize: 12, color: '#D8F7F2' },
   pregnancyImageContainer: {
     width: 54,
     height: 72,
@@ -416,8 +522,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#DDE8E5',
-    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#0F172A',
@@ -425,10 +529,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
-  },
-  doctorCardUnassigned: {
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
   },
   doctorIcon: {
     width: 44,
@@ -443,33 +543,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  doctorIconUnassigned: {
-    backgroundColor: '#EEF2F5',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   doctorInfo: { flex: 1, marginLeft: 12 },
-  doctorLabel: { fontSize: 8.5, lineHeight: 12, color: '#748995', fontWeight: '800', letterSpacing: 0.7 },
-  doctorNameRow: { marginTop: 3, flexDirection: 'row', alignItems: 'center' },
-  assignedDoctorName: { flexShrink: 1, fontSize: 13.5, lineHeight: 19, color: colors.navy, fontWeight: '800' },
-  assignedDoctorNameUnassigned: { color: colors.textMuted },
+  doctorLabel: { fontSize: 11, lineHeight: 15, fontWeight: '800', letterSpacing: 0.7 },
+  doctorNameRow: { marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  assignedDoctorName: { flexShrink: 1, fontSize: 15.5, lineHeight: 22, fontWeight: '800' },
   assignedBadge: {
-    marginLeft: 8,
-    height: 24,
+    minHeight: 24,
     paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: '#EAF8F4',
     flexDirection: 'row',
     alignItems: 'center',
   },
   assignedDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5, backgroundColor: '#18A878' },
-  assignedBadgeText: { fontSize: 8.5, color: '#3C7668', fontWeight: '700' },
+  assignedBadgeText: { fontSize: 11.5, fontWeight: '700' },
   sectionTitle: {
     marginTop: 18,
     marginBottom: 10,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '800',
-    color: colors.navy,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -478,13 +570,12 @@ const styles = StyleSheet.create({
   },
   quickButton: {
     width: '48%',
-    height: 65,
+    minHeight: 65,
     marginBottom: 10,
     paddingHorizontal: 10,
+    paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#E1EAF0',
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#0F172A',
@@ -497,23 +588,20 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 9,
-    backgroundColor: '#E9FAF7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
-  quickTitle: { flex: 1, fontSize: 10.5, fontWeight: '600', color: colors.navy },
+  quickTitle: { flex: 1, fontSize: 14, fontWeight: '600' },
   appointmentCard: {
     minHeight: 66,
-    padding: 10,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#A8EEDF',
-    backgroundColor: '#F0FFFC',
     flexDirection: 'row',
     alignItems: 'center',
   },
   appointmentInfo: { flex: 1 },
-  appointmentTitle: { fontSize: 10.5, color: colors.primaryDark, fontWeight: '700' },
-  appointmentNote: { marginTop: 3, fontSize: 9, color: '#7B8C99' },
+  appointmentTitle: { fontSize: 15, fontWeight: '700' },
+  appointmentNote: { marginTop: 3, fontSize: 13 },
 });

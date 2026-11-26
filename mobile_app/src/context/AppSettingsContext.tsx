@@ -1,16 +1,27 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getFontScale,
+  scaledFontStyle,
+  scaleFont,
+  settingsThemes,
+  type AppTheme,
+  type ScaleFontOptions,
+  type TextSizeMode,
+} from '../theme/settings';
 
 export type SettingsPreferences = {
-  eventNotifications: boolean;
-  emailNotifications: boolean;
   darkMode: boolean;
   language: 'vi' | 'en';
-  textSize: 'small' | 'default' | 'large';
+  textSize: TextSizeMode;
 };
 
 type AppSettingsValue = {
   preferences: SettingsPreferences;
+  theme: AppTheme;
+  fontScale: number;
+  scaleText: (baseSize: number, options?: Pick<ScaleFontOptions, 'min' | 'max'>) => number;
+  fontStyle: (baseSize: number, options?: ScaleFontOptions) => { fontSize: number; lineHeight?: number };
   updatePreference: <K extends keyof SettingsPreferences>(key: K, value: SettingsPreferences[K]) => void;
   isLoaded: boolean;
   storageError: string | null;
@@ -18,8 +29,6 @@ type AppSettingsValue = {
 
 const STORAGE_KEY = '@precare/app-settings';
 const DEFAULT_PREFERENCES: SettingsPreferences = {
-  eventNotifications: true,
-  emailNotifications: false,
   darkMode: false,
   language: 'vi',
   textSize: 'default',
@@ -37,10 +46,6 @@ function parsePreferences(value: string | null): SettingsPreferences {
 
   const saved = parsed as Record<string, unknown>;
   return {
-    eventNotifications: typeof saved.eventNotifications === 'boolean'
-      ? saved.eventNotifications : DEFAULT_PREFERENCES.eventNotifications,
-    emailNotifications: typeof saved.emailNotifications === 'boolean'
-      ? saved.emailNotifications : DEFAULT_PREFERENCES.emailNotifications,
     darkMode: typeof saved.darkMode === 'boolean' ? saved.darkMode : DEFAULT_PREFERENCES.darkMode,
     language: saved.language === 'vi' || saved.language === 'en'
       ? saved.language : DEFAULT_PREFERENCES.language,
@@ -64,7 +69,6 @@ export function AppSettingsProvider({ children }: React.PropsWithChildren) {
     const version = ++writeVersionRef.current;
     const serialized = JSON.stringify(next);
 
-    // Keep rapid changes in order so an older save cannot replace newer settings.
     writeQueueRef.current = writeQueueRef.current
       .then(() => AsyncStorage.setItem(STORAGE_KEY, serialized))
       .then(() => {
@@ -72,7 +76,11 @@ export function AppSettingsProvider({ children }: React.PropsWithChildren) {
       })
       .catch(() => {
         if (mountedRef.current && version === writeVersionRef.current) {
-          setStorageError('Chưa thể lưu cài đặt. Vui lòng thử thay đổi lại.');
+          setStorageError(
+            preferencesRef.current.language === 'en'
+              ? 'Unable to save settings. Please try again.'
+              : 'Chưa thể lưu cài đặt. Vui lòng thử thay đổi lại.',
+          );
         }
       });
   }, []);
@@ -99,7 +107,6 @@ export function AppSettingsProvider({ children }: React.PropsWithChildren) {
       loadedRef.current = true;
       setIsLoaded(true);
 
-      // Preserve any choice made before the storage read finished.
       if (Object.keys(pendingChangesRef.current).length > 0) persistPreferences(next);
       pendingChangesRef.current = {};
     };
@@ -128,9 +135,22 @@ export function AppSettingsProvider({ children }: React.PropsWithChildren) {
     }
   }, [persistPreferences]);
 
+  const theme = settingsThemes[preferences.darkMode ? 'dark' : 'light'];
+  const fontScale = getFontScale(preferences.textSize);
+  const scaleText = useCallback(
+    (baseSize: number, options?: Pick<ScaleFontOptions, 'min' | 'max'>) =>
+      scaleFont(baseSize, fontScale, options),
+    [fontScale],
+  );
+  const fontStyle = useCallback(
+    (baseSize: number, options?: ScaleFontOptions) =>
+      scaledFontStyle(baseSize, fontScale, options),
+    [fontScale],
+  );
+
   const contextValue = useMemo(() => ({
-    preferences, updatePreference, isLoaded, storageError,
-  }), [preferences, updatePreference, isLoaded, storageError]);
+    preferences, theme, fontScale, scaleText, fontStyle, updatePreference, isLoaded, storageError,
+  }), [preferences, theme, fontScale, scaleText, fontStyle, updatePreference, isLoaded, storageError]);
 
   return <AppSettingsContext.Provider value={contextValue}>{children}</AppSettingsContext.Provider>;
 }

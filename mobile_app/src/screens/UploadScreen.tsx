@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ScreenHeader from '../components/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -24,6 +25,8 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { useAppSettings } from '../context/AppSettingsContext';
+import type { AppTheme } from '../theme/settings';
 import { colors } from '../theme/colors';
 import type { MainTabParamList } from '../navigation/MainTabs';
 import type { UploadStackParamList } from '../navigation/UploadNavigator';
@@ -131,16 +134,68 @@ export type UploadItem = {
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 25;
+const MAX_POLL_ATTEMPTS = 90;
 
-const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
-  processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
-  pending:    { label: 'Chờ đối chiếu',     bg: '#DBEAFE', color: '#1D4ED8' },
-  done:       { label: 'Đã lưu Database',   bg: '#CCFBF1', color: colors.primaryDark },
-  failed:     { label: 'Trích xuất lỗi',    bg: '#FEE2E2', color: '#DC2626' },
-};
+type AppLang = 'vi' | 'en';
 
-const SEVERITY_THEME: Record<
+function getStatusStyle(
+  lang: AppLang,
+  isDark: boolean
+): Record<Status, { label: string; bg: string; color: string }> {
+  if (lang === 'en') {
+    return {
+      processing: {
+        label: 'Analyzing...',
+        bg: isDark ? '#422006' : '#FEF9C3',
+        color: isDark ? '#FDE047' : '#A16207',
+      },
+      pending: {
+        label: 'Pending review',
+        bg: isDark ? '#1E3A5F' : '#DBEAFE',
+        color: isDark ? '#93C5FD' : '#1D4ED8',
+      },
+      done: {
+        label: 'Saved to DB',
+        bg: isDark ? '#134E4A' : '#CCFBF1',
+        color: isDark ? '#5EEAD4' : colors.primaryDark,
+      },
+      failed: {
+        label: 'Extraction failed',
+        bg: isDark ? '#7F1D1D' : '#FEE2E2',
+        color: isDark ? '#FCA5A5' : '#DC2626',
+      },
+    };
+  }
+
+  return {
+    processing: {
+      label: 'Đang phân tích...',
+      bg: isDark ? '#422006' : '#FEF9C3',
+      color: isDark ? '#FDE047' : '#A16207',
+    },
+    pending: {
+      label: 'Chờ đối chiếu',
+      bg: isDark ? '#1E3A5F' : '#DBEAFE',
+      color: isDark ? '#93C5FD' : '#1D4ED8',
+    },
+    done: {
+      label: 'Đã lưu Database',
+      bg: isDark ? '#134E4A' : '#CCFBF1',
+      color: isDark ? '#5EEAD4' : colors.primaryDark,
+    },
+    failed: {
+      label: 'Trích xuất lỗi',
+      bg: isDark ? '#7F1D1D' : '#FEE2E2',
+      color: isDark ? '#FCA5A5' : '#DC2626',
+    },
+  };
+}
+
+function getSeverityTheme(
+  theme: AppTheme,
+  isDark: boolean,
+  lang: AppLang
+): Record<
   SeverityLevel,
   {
     cardBg: string;
@@ -151,35 +206,254 @@ const SEVERITY_THEME: Record<
     badgeLabel: string;
     icon: keyof typeof Ionicons.glyphMap;
   }
-> = {
-  normal: {
-    cardBg: '#FFFFFF',
-    border: '#E2E8F0',
-    valueColor: '#0F172A',
-    badgeBg: '#DCFCE7',
-    badgeColor: '#15803D',
-    badgeLabel: 'Mức Xanh (10th–90th)',
-    icon: 'checkmark-circle',
-  },
-  warning: {
-    cardBg: '#FEFCE8',
-    border: '#FACC15',
-    valueColor: '#A16207',
-    badgeBg: '#FEF08A',
-    badgeColor: '#854D0E',
-    badgeLabel: 'Mức Vàng (Cần theo dõi)',
-    icon: 'warning',
-  },
-  danger: {
-    cardBg: '#FEF2F2',
-    border: '#EF4444',
-    valueColor: '#DC2626',
-    badgeBg: '#FEE2E2',
-    badgeColor: '#991B1B',
-    badgeLabel: 'Mức Đỏ (<3rd / >97th)',
-    icon: 'alert-circle',
-  },
+> {
+  return {
+    normal: {
+      cardBg: theme.surface,
+      border: theme.border,
+      valueColor: theme.text,
+      badgeBg: theme.badgeGreenBg,
+      badgeColor: theme.badgeGreenText,
+      badgeLabel: lang === 'en' ? 'Green (10th–90th)' : 'Mức Xanh (10th–90th)',
+      icon: 'checkmark-circle',
+    },
+    warning: {
+      cardBg: isDark ? '#332908' : '#FEFCE8',
+      border: isDark ? '#CA8A04' : '#FACC15',
+      valueColor: isDark ? '#FDE047' : '#A16207',
+      badgeBg: theme.badgeWarnBg,
+      badgeColor: theme.badgeWarnText,
+      badgeLabel: lang === 'en' ? 'Yellow (Monitor)' : 'Mức Vàng (Cần theo dõi)',
+      icon: 'warning',
+    },
+    danger: {
+      cardBg: theme.dangerBackground,
+      border: theme.dangerBorder,
+      valueColor: theme.danger,
+      badgeBg: isDark ? '#7F1D1D' : '#FEE2E2',
+      badgeColor: isDark ? '#FCA5A5' : '#991B1B',
+      badgeLabel: lang === 'en' ? 'Red (<3rd / >97th)' : 'Mức Đỏ (<3rd / >97th)',
+      icon: 'alert-circle',
+    },
+  };
+}
+
+const METRIC_LABELS_BY_LANG: Record<string, { vi: string; en: string }> = {
+  bp: { vi: 'Huyết áp mẹ (BP)', en: 'Maternal Blood Pressure (BP)' },
+  weight: { vi: 'Cân nặng mẹ', en: 'Maternal Weight' },
+  fhr: { vi: 'Nhịp tim thai (FHR)', en: 'Fetal Heart Rate (FHR)' },
+  bpd: { vi: 'Đường kính lưỡng đỉnh (BPD)', en: 'Biparietal Diameter (BPD)' },
+  hc: { vi: 'Chu vi đầu (HC)', en: 'Head Circumference (HC)' },
+  fl: { vi: 'Chiều dài xương đùi (FL)', en: 'Femur Length (FL)' },
+  ac: { vi: 'Chu vi vòng bụng (AC)', en: 'Abdominal Circumference (AC)' },
+  efw: { vi: 'Cân nặng thai ước tính (EFW)', en: 'Estimated Fetal Weight (EFW)' },
+  afi: { vi: 'Chỉ số nước ối (AFI)', en: 'Amniotic Fluid Index (AFI)' },
+  hgb: { vi: 'Hemoglobin máu (HGB)', en: 'Blood Hemoglobin (HGB)' },
+  wbc: { vi: 'Bạch cầu máu (WBC)', en: 'White Blood Cells (WBC)' },
+  glu: { vi: 'Đường huyết lúc đói (Fasting Glucose)', en: 'Fasting Glucose' },
+  pro: { vi: 'Protein niệu (Urine Protein)', en: 'Urine Protein' },
+  ph: { vi: 'Độ pH nước tiểu', en: 'Urine pH' },
+  leu: { vi: 'Bạch cầu niệu (Leukocytes)', en: 'Urine Leukocytes' },
 };
+
+function localizeMetricLabel(key: string, fallbackLabel: string, lang: AppLang): string {
+  const entry = METRIC_LABELS_BY_LANG[key.toLowerCase()];
+  if (entry) return entry[lang];
+  return fallbackLabel;
+}
+
+function localizeUploadTime(rawTime: string, lang: AppLang): string {
+  if (!rawTime) return rawTime;
+  if (lang === 'en') {
+    return rawTime
+      .replace(/^Hôm nay,/, 'Today,')
+      .replace(/^Ngày khám:/, 'Exam date:');
+  }
+  return rawTime
+    .replace(/^Today,/, 'Hôm nay,')
+    .replace(/^Exam date:/, 'Ngày khám:');
+}
+
+const UPLOAD_COPY = {
+  vi: {
+    defaultFileName: 'Tài liệu phiếu khám',
+    todayPrefix: 'Hôm nay',
+    screenTitle: 'Tải lên & Đối chiếu phiếu khám',
+    dropTitle: 'Chụp ảnh hoặc tải lên phiếu khám (PDF/Ảnh)',
+    uploadSingle: 'Tải lên đơn lẻ',
+    uploadBatch: 'Tải hàng loạt (Batch)',
+    savedSectionTitle: (count: number) => `Tài liệu & Kết quả đã lưu (${count})`,
+    syncingText: 'Đang đồng bộ danh sách tài liệu từ Database...',
+    emptyText:
+      'Chưa có phiếu khám nào. Hãy chụp ảnh phiếu khám, tải file PDF hoặc bấm "Nhập kết quả thủ công".',
+    taskPrefix: 'Task',
+    analyzingQueue: 'Đang phân tích trên Celery Queue...',
+    extractFailedDefault: 'Quá trình trích xuất Celery bị gián đoạn.',
+    retryExtractBtn: 'Thử lại trích xuất (Retry)',
+    removeFileBtn: 'Xoá file',
+    slipImageHeader: 'Ảnh chụp phiếu khám gốc',
+    slipDocHeader: 'Tài liệu phiếu khám gốc',
+    compareBtn: 'Mở màn hình Đối chiếu',
+    overlayHint: 'Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu',
+    pdfSlipHint:
+      'Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database',
+    savedTagPrefix: (stage: string) =>
+      `Đã đối chiếu & lưu vào Database (${stage})`,
+    manualEntryBtn: 'Nhập kết quả thủ công',
+    modalHeaderTitle: 'Đối chiếu & Xác nhận dữ liệu',
+    modalHeaderSubEdit: 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch',
+    modalHeaderSubView:
+      'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi',
+    originalPrefix: 'Bản gốc',
+    zoomOut: 'Thu nhỏ ảnh',
+    zoomIn: 'Phóng to ảnh',
+    modalPdfHintEdit:
+      'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.',
+    modalPdfHintView:
+      'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.',
+    disclaimerBody:
+      'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
+    disclaimerTitle: 'Tuyên bố giới hạn:',
+    weekEditorPrefix: 'Mốc đối chiếu:',
+    modalSectionLabel: (count: number) =>
+      `Các chỉ số đã phân tích từ file (${count} chỉ số):`,
+    enterValuePlaceholder: 'Nhập giá trị...',
+    refRangePrefix: 'Ngưỡng chuẩn:',
+    finishEditBtn: 'Xong chỉnh sửa',
+    editBtn: 'Chỉnh sửa',
+    savingDbBtn: 'Đang lưu Database...',
+    confirmSaveBtn: 'Xác nhận & Lưu vào hồ sơ',
+    celeryFailedError: 'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.',
+    fileTooLargeTitle: 'File quá lớn',
+    fileTooLargeBody: 'Vui lòng chọn file tối đa 10MB.',
+    uploadServerFail: 'Không thể tải tài liệu lên máy chủ.',
+    uploadErrorTitle: 'Lỗi tải lên',
+    batchUploading: (count: number) =>
+      `Đang tải lên hàng loạt ${count} phiếu khám...`,
+    batchProcessing: (completed: number, total: number, pct: number) =>
+      `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`,
+    batchDoneTitle: 'Tải hàng loạt hoàn tất',
+    batchDoneBody: (count: number) =>
+      `Đã phân tích xong ${count} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`,
+    batchErrorTitle: 'Lỗi tải hàng loạt',
+    batchErrorBody: 'Không thể tải hàng loạt lên máy chủ.',
+    retryFailMsg: 'Thử lại trích xuất thất bại.',
+    deleteTitle: 'Xoá tài liệu',
+    deleteConfirm: (name: string) =>
+      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${name}" khỏi hệ thống và Database không?`,
+    cancelBtn: 'Huỷ',
+    deleteForeverBtn: 'Xoá vĩnh viễn',
+    cannotDeleteTitle: 'Không thể xoá tài liệu',
+    cannotDeleteBody:
+      'Máy chủ không cho phép xoá tài liệu này hoặc gặp lỗi kết nối. Vui lòng thử lại.',
+    successTitle: 'Thành công',
+    deleteSuccessBody: 'Đã xoá tài liệu khỏi hệ thống và cơ sở dữ liệu.',
+    savedDbTitle: 'Đã đối chiếu & Lưu vào Database',
+    savedDbBody:
+      'Các chỉ số phiếu khám đã được xác nhận và đồng bộ trực tiếp vào cơ sở dữ liệu PostgreSQL!',
+    savedDbEndpointsLabel: 'Chi tiết kết nối Database:',
+    saveProfileErrorTitle: 'Lưu hồ sơ',
+    saveProfileFallback: 'Đã cập nhật hồ sơ. Vui lòng kiểm tra kết nối máy chủ.',
+    permissionDeniedTitle: 'Chưa cấp quyền',
+    cameraPermissionBody: 'Hãy cho phép ứng dụng dùng camera trong Cài đặt.',
+    chooserTitle: 'Tải lên phiếu khám cận lâm sàng',
+    chooserSub: 'Chọn phương thức tải lên:',
+    chooserTakePhoto: 'Chụp ảnh phiếu khám (Đơn lẻ)',
+    chooserPickImage: 'Chọn 1 ảnh từ thư viện',
+    chooserPickPdf: 'Chọn 1 file PDF / Ảnh',
+    chooserBatch: 'Tải lên hàng loạt (Batch Upload)',
+  },
+  en: {
+    defaultFileName: 'Medical report document',
+    todayPrefix: 'Today',
+    screenTitle: 'Upload & Verify Checkup Reports',
+    dropTitle: 'Take photo or upload medical report (PDF/Image)',
+    dropSub:
+      'Supports single or batch upload • Synced directly to the database',
+    uploadSingle: 'Single upload',
+    uploadBatch: 'Batch upload',
+    savedSectionTitle: (count: number) => `Saved Documents & Results (${count})`,
+    syncingText: 'Syncing document list from database...',
+    emptyText:
+      'No reports uploaded yet. Take a photo, upload a PDF, or tap "Enter results manually".',
+    taskPrefix: 'Task',
+    analyzingQueue: 'Analyzing in Celery Queue...',
+    extractFailedDefault: 'Celery extraction was interrupted.',
+    retryExtractBtn: 'Retry extraction',
+    removeFileBtn: 'Delete file',
+    slipImageHeader: 'Original report photo',
+    slipDocHeader: 'Original report document',
+    compareBtn: 'Open Verification',
+    overlayHint: 'Tap to inspect warnings, compare & confirm data',
+    pdfSlipHint:
+      'Tap to review extracted metrics, compare & confirm saving to database',
+    savedTagPrefix: (stage: string) =>
+      `Verified & saved to Database (${stage})`,
+    manualEntryBtn: 'Enter results manually',
+    modalHeaderTitle: 'Compare & Verify Data',
+    modalHeaderSubEdit: 'Edit mode active — Correct any mismatched values',
+    modalHeaderSubView:
+      'View mode for extracted metrics — Tap "Edit" to make changes',
+    originalPrefix: 'Original',
+    zoomOut: 'Zoom out',
+    zoomIn: 'Zoom in',
+    modalPdfHintEdit:
+      'Edit mode is enabled. Tap any metric input below to update its value.',
+    modalPdfHintView:
+      'Below are metrics extracted from the report. Tap "Edit" at the bottom if adjustments are needed.',
+    disclaimerBody:
+      'Verification details are for reference only and do not replace a specialist diagnosis.',
+    disclaimerTitle: 'Reference disclaimer:',
+    weekEditorPrefix: 'Reference stage:',
+    modalSectionLabel: (count: number) =>
+      `Extracted report metrics (${count} metrics):`,
+    enterValuePlaceholder: 'Enter value...',
+    refRangePrefix: 'Standard range:',
+    finishEditBtn: 'Done editing',
+    editBtn: 'Edit',
+    savingDbBtn: 'Saving to Database...',
+    confirmSaveBtn: 'Verify & Save to Profile',
+    celeryFailedError: 'Celery extraction failed. Please tap Retry.',
+    fileTooLargeTitle: 'File too large',
+    fileTooLargeBody: 'Please choose a file up to 10MB.',
+    uploadServerFail: 'Could not upload document to the server.',
+    uploadErrorTitle: 'Upload error',
+    batchUploading: (count: number) =>
+      `Uploading batch of ${count} reports...`,
+    batchProcessing: (completed: number, total: number, pct: number) =>
+      `Processing report batch: ${completed}/${total} done (${pct}%)...`,
+    batchDoneTitle: 'Batch upload complete',
+    batchDoneBody: (count: number) =>
+      `Analyzed ${count} reports. Tap "Open Verification" on each item to review and save.`,
+    batchErrorTitle: 'Batch upload error',
+    batchErrorBody: 'Could not upload batch to the server.',
+    retryFailMsg: 'Retry extraction failed.',
+    deleteTitle: 'Delete document',
+    deleteConfirm: (name: string) =>
+      `Are you sure you want to permanently delete "${name}" from the app and database?`,
+    cancelBtn: 'Cancel',
+    deleteForeverBtn: 'Delete permanently',
+    cannotDeleteTitle: 'Cannot delete document',
+    cannotDeleteBody:
+      'Server denied deletion or connection failed. Please try again.',
+    successTitle: 'Success',
+    deleteSuccessBody: 'Document deleted from app and database.',
+    savedDbTitle: 'Verified & Saved to Database',
+    savedDbBody:
+      'Report metrics have been verified and synced directly to PostgreSQL!',
+    savedDbEndpointsLabel: 'Database connection details:',
+    saveProfileErrorTitle: 'Save profile',
+    saveProfileFallback: 'Profile updated. Please check server connectivity.',
+    permissionDeniedTitle: 'Permission required',
+    cameraPermissionBody: 'Please allow camera access in device Settings.',
+    chooserTitle: 'Upload paraclinical report',
+    chooserSub: 'Choose upload method:',
+    chooserTakePhoto: 'Take report photo (Single)',
+    chooserPickImage: 'Choose 1 photo from library',
+    chooserPickPdf: 'Choose 1 PDF / Image file',
+    chooserBatch: 'Batch upload multiple files',
+  },
+} as const;
 
 type RangePair = [number, number];
 type WeeklyFetalStandard = {
@@ -223,7 +497,7 @@ const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
   41: { bpd: [91, 100], hc: [328, 360], ac: [340, 382], fl: [73, 80], efw: [3300, 4200] },
 };
 
-export function getPregnancyStageInfo(week: number) {
+export function getPregnancyStageInfo(week: number, lang: AppLang = 'vi') {
   const clampedWeek = Math.max(12, Math.min(41, Math.round(week || 24)));
   const month = Math.min(9, Math.max(3, Math.ceil(clampedWeek / 4.3)));
   const trimester = clampedWeek <= 13 ? 1 : clampedWeek <= 27 ? 2 : 3;
@@ -231,16 +505,20 @@ export function getPregnancyStageInfo(week: number) {
     clampedWeek,
     month,
     trimester,
-    stageLabel: `Tuần ${clampedWeek} · Tháng thứ ${month} (Tam cá nguyệt ${trimester})`,
+    stageLabel:
+      lang === 'en'
+        ? `Week ${clampedWeek} · Month ${month} (Trimester ${trimester})`
+        : `Tuần ${clampedWeek} · Tháng thứ ${month} (Tam cá nguyệt ${trimester})`,
   };
 }
 
 export function getFetalMetricBoundsByWeek(
   key: 'bpd' | 'hc' | 'ac' | 'fl' | 'efw',
   week: number,
-  unit: string
+  unit: string,
+  lang: AppLang = 'vi'
 ) {
-  const { clampedWeek } = getPregnancyStageInfo(week);
+  const { clampedWeek } = getPregnancyStageInfo(week, lang);
   const std = FETAL_GROWTH_BY_WEEK[clampedWeek] || FETAL_GROWTH_BY_WEEK[24];
   const [minNormal, maxNormal] = std[key];
   const span = Math.max(4, maxNormal - minNormal);
@@ -254,7 +532,10 @@ export function getFetalMetricBoundsByWeek(
     maxNormal,
     dangerLow,
     dangerHigh,
-    refRange: `${minNormal} – ${maxNormal} ${unit} (Chuẩn tuần ${clampedWeek})`,
+    refRange:
+      lang === 'en'
+        ? `${minNormal} – ${maxNormal} ${unit} (Week ${clampedWeek} standard)`
+        : `${minNormal} – ${maxNormal} ${unit} (Chuẩn tuần ${clampedWeek})`,
   };
 }
 
@@ -272,7 +553,8 @@ export async function resolveAccountStorageKey(): Promise<string> {
 export function evaluateMetricByWeek(
   key: string,
   rawValue: string,
-  gestationalWeek: number = 24
+  gestationalWeek: number = 24,
+  lang: AppLang = 'vi'
 ): {
   severity: SeverityLevel;
   clinicalNote: string;
@@ -280,18 +562,19 @@ export function evaluateMetricByWeek(
 } {
   const clean = rawValue.trim();
   const lower = clean.toLowerCase();
-  const { clampedWeek, month, trimester } = getPregnancyStageInfo(gestationalWeek);
+  const isEn = lang === 'en';
+  const { clampedWeek, month, trimester } = getPregnancyStageInfo(gestationalWeek, lang);
 
   if (key === 'bpd' || key === 'hc' || key === 'ac' || key === 'fl' || key === 'efw') {
     const unit = key === 'efw' ? 'g' : 'mm';
-    const bounds = getFetalMetricBoundsByWeek(key, clampedWeek, unit);
+    const bounds = getFetalMetricBoundsByWeek(key, clampedWeek, unit, lang);
     const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
     const num = numMatch ? parseFloat(numMatch[0]) : NaN;
 
     if (isNaN(num) || num <= 0) {
       return {
         severity: 'danger',
-        clinicalNote: 'Giá trị không hợp lệ',
+        clinicalNote: isEn ? 'Invalid value' : 'Giá trị không hợp lệ',
         refRange: bounds.refRange,
       };
     }
@@ -299,7 +582,9 @@ export function evaluateMetricByWeek(
     if (num < bounds.dangerLow) {
       return {
         severity: 'danger',
-        clinicalNote: `Mức Đỏ (< 3rd): Thấp hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên đi khám để bác sĩ kiểm tra kỹ hơn cho bé nhé.`,
+        clinicalNote: isEn
+          ? `Red (< 3rd): Significantly below Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please consult your doctor for a closer check.`
+          : `Mức Đỏ (< 3rd): Thấp hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên đi khám để bác sĩ kiểm tra kỹ hơn cho bé nhé.`,
         refRange: bounds.refRange,
       };
     }
@@ -307,7 +592,9 @@ export function evaluateMetricByWeek(
     if (num > bounds.dangerHigh) {
       return {
         severity: 'danger',
-        clinicalNote: `Mức Đỏ (> 97th): Cao hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên trao đổi trực tiếp với bác sĩ nhé.`,
+        clinicalNote: isEn
+          ? `Red (> 97th): Significantly above Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please discuss directly with your doctor.`
+          : `Mức Đỏ (> 97th): Cao hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên trao đổi trực tiếp với bác sĩ nhé.`,
         refRange: bounds.refRange,
       };
     }
@@ -315,7 +602,9 @@ export function evaluateMetricByWeek(
     if (num < bounds.minNormal) {
       return {
         severity: 'warning',
-        clinicalNote: `Mức Vàng (3rd–10th): Hơi thấp nhẹ so với chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ chú ý dinh dưỡng và theo dõi kỳ khám tới nhé.`,
+        clinicalNote: isEn
+          ? `Yellow (3rd–10th): Slightly below Week ${clampedWeek} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Focus on nutrition and monitor at the next visit.`
+          : `Mức Vàng (3rd–10th): Hơi thấp nhẹ so với chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ chú ý dinh dưỡng và theo dõi kỳ khám tới nhé.`,
         refRange: bounds.refRange,
       };
     }
@@ -323,21 +612,27 @@ export function evaluateMetricByWeek(
     if (num > bounds.maxNormal) {
       return {
         severity: 'warning',
-        clinicalNote: `Mức Vàng (90th–97th): Nhỉnh hơn chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ lưu ý theo dõi thêm cùng bác sĩ nhé.`,
+        clinicalNote: isEn
+          ? `Yellow (90th–97th): Slightly above Week ${clampedWeek} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please monitor together with your doctor.`
+          : `Mức Vàng (90th–97th): Nhỉnh hơn chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ lưu ý theo dõi thêm cùng bác sĩ nhé.`,
         refRange: bounds.refRange,
       };
     }
 
     return {
       severity: 'normal',
-      clinicalNote: `Mức Xanh (10th–90th): Đạt chuẩn Tuần ${clampedWeek} · Tháng thứ ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Thai phát triển tương xứng tuổi thai.`,
+      clinicalNote: isEn
+        ? `Green (10th–90th): Within Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Fetal growth aligns with gestational age.`
+        : `Mức Xanh (10th–90th): Đạt chuẩn Tuần ${clampedWeek} · Tháng thứ ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Thai phát triển tương xứng tuổi thai.`,
       refRange: bounds.refRange,
     };
   }
 
   if (key === 'hgb') {
     const minHgb = trimester === 2 ? 10.5 : 11.0;
-    const refText = `${minHgb.toFixed(1)} – 14.5 g/dL (Tam cá nguyệt ${trimester})`;
+    const refText = isEn
+      ? `${minHgb.toFixed(1)} – 14.5 g/dL (Trimester ${trimester})`
+      : `${minHgb.toFixed(1)} – 14.5 g/dL (Tam cá nguyệt ${trimester})`;
     const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
     const num = numMatch ? parseFloat(numMatch[0]) : NaN;
 
@@ -345,20 +640,26 @@ export function evaluateMetricByWeek(
       if (num < 9.5) {
         return {
           severity: 'danger',
-          clinicalNote: `Mức Đỏ: Huyết sắc tố ở tháng thứ ${month} thấp (${num} < 9.5 g/dL). Mẹ nên đến gặp bác sĩ để được tư vấn chăm sóc phù hợp nhé.`,
+          clinicalNote: isEn
+            ? `Red: Hemoglobin in month ${month} is low (${num} < 9.5 g/dL). Please consult your doctor for care advice.`
+            : `Mức Đỏ: Huyết sắc tố ở tháng thứ ${month} thấp (${num} < 9.5 g/dL). Mẹ nên đến gặp bác sĩ để được tư vấn chăm sóc phù hợp nhé.`,
           refRange: refText,
         };
       }
       if (num < minHgb) {
         return {
           severity: 'warning',
-          clinicalNote: `Mức Vàng: Huyết sắc tố hơi thấp nhẹ so với chuẩn Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Mẹ hãy tham khảo ý kiến bác sĩ nhé.`,
+          clinicalNote: isEn
+            ? `Yellow: Hemoglobin is slightly low for Trimester ${trimester} (< ${minHgb} g/dL). Please check with your doctor.`
+            : `Mức Vàng: Huyết sắc tố hơi thấp nhẹ so với chuẩn Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Mẹ hãy tham khảo ý kiến bác sĩ nhé.`,
           refRange: refText,
         };
       }
       return {
         severity: 'normal',
-        clinicalNote: `Đủ huyết sắc tố chuẩn Tam cá nguyệt ${trimester} (≥ ${minHgb} g/dL).`,
+        clinicalNote: isEn
+          ? `Adequate hemoglobin for Trimester ${trimester} (≥ ${minHgb} g/dL).`
+          : `Đủ huyết sắc tố chuẩn Tam cá nguyệt ${trimester} (≥ ${minHgb} g/dL).`,
         refRange: refText,
       };
     }
@@ -371,27 +672,46 @@ export function evaluateMetricByWeek(
       if (num >= 0.3) {
         return {
           severity: 'danger',
-          clinicalNote: `Mức Đỏ: Đạm niệu cao (${num} g/L ≥ 0.3) ở tuần ${clampedWeek} — Mẹ nên đi khám sớm để bác sĩ kiểm tra kết hợp cùng huyết áp nhé.`,
+          clinicalNote: isEn
+            ? `Red: High urine protein (${num} g/L ≥ 0.3) at week ${clampedWeek} — Please see your doctor promptly to check alongside blood pressure.`
+            : `Mức Đỏ: Đạm niệu cao (${num} g/L ≥ 0.3) ở tuần ${clampedWeek} — Mẹ nên đi khám sớm để bác sĩ kiểm tra kết hợp cùng huyết áp nhé.`,
         };
       }
       if (num >= 0.15) {
         return {
           severity: 'warning',
-          clinicalNote: `Mức Vàng: Có vết Protein niệu (${num} g/L) ở tuần ${clampedWeek} — Mẹ nhớ uống đủ nước và theo dõi huyết áp nhé.`,
+          clinicalNote: isEn
+            ? `Yellow: Trace urine protein (${num} g/L) at week ${clampedWeek} — Stay hydrated and monitor blood pressure.`
+            : `Mức Vàng: Có vết Protein niệu (${num} g/L) ở tuần ${clampedWeek} — Mẹ nhớ uống đủ nước và theo dõi huyết áp nhé.`,
         };
       }
       return {
         severity: 'normal',
-        clinicalNote: 'Âm tính (< 0.15 g/L) — Chỉ số nước tiểu bình thường.',
+        clinicalNote: isEn
+          ? 'Negative (< 0.15 g/L) — Normal urinalysis.'
+          : 'Âm tính (< 0.15 g/L) — Chỉ số nước tiểu bình thường.',
       };
     }
     if (lower.includes('++') || lower.includes('+++')) {
-      return { severity: 'danger', clinicalNote: 'Mức Đỏ: Đạm niệu cao — Mẹ nên đi khám sớm nhé.' };
+      return {
+        severity: 'danger',
+        clinicalNote: isEn
+          ? 'Red: High urine protein — Please visit your doctor soon.'
+          : 'Mức Đỏ: Đạm niệu cao — Mẹ nên đi khám sớm nhé.',
+      };
     }
     if (lower.includes('vết') || lower.includes('trace') || lower.includes('+')) {
-      return { severity: 'warning', clinicalNote: 'Mức Vàng: Có vết Protein niệu — Cần theo dõi và kiểm tra lại.' };
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
+          ? 'Yellow: Trace urine protein — Monitor and recheck.'
+          : 'Mức Vàng: Có vết Protein niệu — Cần theo dõi và kiểm tra lại.',
+      };
     }
-    return { severity: 'normal', clinicalNote: 'Âm tính (Negative) — Bình thường' };
+    return {
+      severity: 'normal',
+      clinicalNote: isEn ? 'Negative — Normal' : 'Âm tính (Negative) — Bình thường',
+    };
   }
 
   if (key === 'glu') {
@@ -401,24 +721,32 @@ export function evaluateMetricByWeek(
       if (num >= 5.6) {
         return {
           severity: 'danger',
-          clinicalNote: `Mức Đỏ: Đường huyết lúc đói cao (${num} ≥ 5.6 mmol/L) ở tuần ${clampedWeek} — Mẹ nên đến gặp bác sĩ để kiểm tra chuyên sâu hơn nhé.`,
+          clinicalNote: isEn
+            ? `Red: High fasting glucose (${num} ≥ 5.6 mmol/L) at week ${clampedWeek} — Please see your doctor for specialist evaluation.`
+            : `Mức Đỏ: Đường huyết lúc đói cao (${num} ≥ 5.6 mmol/L) ở tuần ${clampedWeek} — Mẹ nên đến gặp bác sĩ để kiểm tra chuyên sâu hơn nhé.`,
         };
       }
       if (num >= 5.1) {
         return {
           severity: 'warning',
-          clinicalNote: `Mức Vàng: Đường huyết lúc đói vượt nhẹ ngưỡng chuẩn (${num} ≥ 5.1 mmol/L) — Mẹ nên hạn chế tinh bột/đường và trao đổi với bác sĩ nhé.`,
+          clinicalNote: isEn
+            ? `Yellow: Fasting glucose slightly elevated (${num} ≥ 5.1 mmol/L) — Limit refined carbs/sugar and consult your doctor.`
+            : `Mức Vàng: Đường huyết lúc đói vượt nhẹ ngưỡng chuẩn (${num} ≥ 5.1 mmol/L) — Mẹ nên hạn chế tinh bột/đường và trao đổi với bác sĩ nhé.`,
         };
       }
       if (num < 3.3) {
         return {
           severity: 'warning',
-          clinicalNote: `Đường huyết lúc đói thấp (${num} < 3.3 mmol/L) — Mẹ lưu ý ăn uống đầy đủ nhé.`,
+          clinicalNote: isEn
+            ? `Low fasting glucose (${num} < 3.3 mmol/L) — Ensure adequate balanced meals.`
+            : `Đường huyết lúc đói thấp (${num} < 3.3 mmol/L) — Mẹ lưu ý ăn uống đầy đủ nhé.`,
         };
       }
       return {
         severity: 'normal',
-        clinicalNote: `Đường huyết lúc đói ổn định (${num} < 5.1 mmol/L).`,
+        clinicalNote: isEn
+          ? `Stable fasting glucose (${num} < 5.1 mmol/L).`
+          : `Đường huyết lúc đói ổn định (${num} < 5.1 mmol/L).`,
       };
     }
   }
@@ -431,99 +759,193 @@ export function evaluateMetricByWeek(
       if (sys >= 140 || dia >= 90 || sys < 90) {
         return {
           severity: 'danger',
-          clinicalNote: `Mức Đỏ: Huyết áp (${clean} mmHg) nằm ngoài khoảng ổn định — Mẹ hãy nghỉ ngơi và sớm đến gặp bác sĩ nhé.`,
+          clinicalNote: isEn
+            ? `Red: Blood pressure (${clean} mmHg) is outside the stable range — Rest and see a doctor promptly.`
+            : `Mức Đỏ: Huyết áp (${clean} mmHg) nằm ngoài khoảng ổn định — Mẹ hãy nghỉ ngơi và sớm đến gặp bác sĩ nhé.`,
         };
       }
       if (sys >= 130 || dia >= 85) {
         return {
           severity: 'warning',
-          clinicalNote: `Mức Vàng: Huyết áp chớm cao (${clean} mmHg) — Mẹ nên nghỉ ngơi, ăn nhạt và đo lại hàng ngày nhé.`,
+          clinicalNote: isEn
+            ? `Yellow: Blood pressure mildly elevated (${clean} mmHg) — Rest, reduce salt, and monitor daily.`
+            : `Mức Vàng: Huyết áp chớm cao (${clean} mmHg) — Mẹ nên nghỉ ngơi, ăn nhạt và đo lại hàng ngày nhé.`,
         };
       }
     }
-    return { severity: 'normal', clinicalNote: 'Huyết áp ổn định (< 130/85 mmHg).' };
+    return {
+      severity: 'normal',
+      clinicalNote: isEn
+        ? 'Stable blood pressure (< 130/85 mmHg).'
+        : 'Huyết áp ổn định (< 130/85 mmHg).',
+    };
   }
 
   if (key === 'leu') {
-    if (lower.includes('dương') || lower.includes('+') || (parseFloat(clean) || 0) > 25) {
-      return { severity: 'warning', clinicalNote: 'Bạch cầu niệu dương tính — Cần trao đổi thêm với bác sĩ' };
+    if (lower.includes('dương') || lower.includes('pos') || lower.includes('+') || (parseFloat(clean) || 0) > 25) {
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
+          ? 'Positive urine leukocytes — Discuss with your doctor'
+          : 'Bạch cầu niệu dương tính — Cần trao đổi thêm với bác sĩ',
+      };
     }
-    return { severity: 'normal', clinicalNote: 'Âm tính — Bình thường' };
+    return {
+      severity: 'normal',
+      clinicalNote: isEn ? 'Negative — Normal' : 'Âm tính — Bình thường',
+    };
   }
 
   const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
   const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-  if (isNaN(num)) return { severity: 'normal', clinicalNote: 'Trong giới hạn sinh lý' };
+  if (isNaN(num)) {
+    return {
+      severity: 'normal',
+      clinicalNote: isEn ? 'Within physiological range' : 'Trong giới hạn sinh lý',
+    };
+  }
 
   switch (key) {
     case 'fhr':
       if (num < 110 || num > 170) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Nhịp tim thai ngoài ngưỡng 110–170 bpm, mẹ nên đi khám ngay nhé' };
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: Fetal heart rate outside 110–170 bpm range, seek prompt evaluation'
+            : 'Mức Đỏ: Nhịp tim thai ngoài ngưỡng 110–170 bpm, mẹ nên đi khám ngay nhé',
+        };
       }
       if (num < 120 || num > 160) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Nhịp tim thai lệch nhẹ ngưỡng 120–160 bpm, cần theo dõi thêm' };
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Fetal heart rate mildly outside 120–160 bpm, continue monitoring'
+            : 'Mức Vàng: Nhịp tim thai lệch nhẹ ngưỡng 120–160 bpm, cần theo dõi thêm',
+        };
       }
-      return { severity: 'normal', clinicalNote: 'Nhịp tim thai đều rõ, đáp ứng tốt (120–160 bpm)' };
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Regular fetal heart rate within normal range (120–160 bpm)'
+          : 'Nhịp tim thai đều rõ, đáp ứng tốt (120–160 bpm)',
+      };
 
     case 'afi':
       if (num < 50 || num > 240) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Chỉ số nước ối lệch nhiều (< 50mm hoặc > 240mm), mẹ nên đi khám sớm nhé' };
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: Amniotic fluid index significantly abnormal (< 50mm or > 240mm), see a doctor promptly'
+            : 'Mức Đỏ: Chỉ số nước ối lệch nhiều (< 50mm hoặc > 240mm), mẹ nên đi khám sớm nhé',
+        };
       }
       if (num < 80 || num > 180) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Nước ối lệch nhẹ khoảng 80–180 mm — Mẹ nhớ uống đủ nước nhé' };
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Amniotic fluid mildly outside 80–180 mm — Remember to stay well hydrated'
+            : 'Mức Vàng: Nước ối lệch nhẹ khoảng 80–180 mm — Mẹ nhớ uống đủ nước nhé',
+        };
       }
-      return { severity: 'normal', clinicalNote: 'Lượng nước ối bình thường (80–180 mm)' };
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal amniotic fluid volume (80–180 mm)'
+          : 'Lượng nước ối bình thường (80–180 mm)',
+      };
 
     case 'wbc':
       if (num > 15.0 || num < 3.5) {
-        return { severity: 'danger', clinicalNote: 'Mức Đỏ: Bạch cầu lệch nhiều so với chuẩn, mẹ nên nhờ bác sĩ kiểm tra nhé' };
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: White blood cell count significantly off normal range, consult your doctor'
+            : 'Mức Đỏ: Bạch cầu lệch nhiều so với chuẩn, mẹ nên nhờ bác sĩ kiểm tra nhé',
+        };
       }
       if (num > 11.0 || num < 4.5) {
-        return { severity: 'warning', clinicalNote: 'Mức Vàng: Bạch cầu thay đổi nhẹ sinh lý thai kỳ' };
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Mild physiological WBC variation in pregnancy'
+            : 'Mức Vàng: Bạch cầu thay đổi nhẹ sinh lý thai kỳ',
+        };
       }
-      return { severity: 'normal', clinicalNote: 'Số lượng bạch cầu bình thường (4.5–11.0 G/L)' };
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal white blood cell count (4.5–11.0 G/L)'
+          : 'Số lượng bạch cầu bình thường (4.5–11.0 G/L)',
+      };
 
     case 'ph':
       if (num < 4.5 || num > 8.0) {
-        return { severity: 'warning', clinicalNote: 'Độ pH nước tiểu lệch ngưỡng 5.0–7.5' };
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Urine pH outside 5.0–7.5 range'
+            : 'Độ pH nước tiểu lệch ngưỡng 5.0–7.5',
+        };
       }
-      return { severity: 'normal', clinicalNote: 'Độ pH nước tiểu bình thường (5.0–7.5)' };
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal urine pH (5.0–7.5)'
+          : 'Độ pH nước tiểu bình thường (5.0–7.5)',
+      };
 
     default:
-      return { severity: 'normal', clinicalNote: 'Ổn định theo tuổi thai' };
+      return {
+        severity: 'normal',
+        clinicalNote: isEn ? 'Stable for gestational age' : 'Ổn định theo tuổi thai',
+      };
   }
 }
 
 export function summarizeAnalysisState(
   metrics: MedicalMetric[],
   fileName: string,
-  gestationalWeek: number = 24
+  gestationalWeek: number = 24,
+  lang: AppLang = 'vi'
 ) {
-  const { stageLabel } = getPregnancyStageInfo(gestationalWeek);
+  const { stageLabel } = getPregnancyStageInfo(gestationalWeek, lang);
   const dangerList = metrics.filter((m) => m.severity === 'danger');
   const warningList = metrics.filter((m) => m.severity === 'warning');
+  const isEn = lang === 'en';
 
   if (dangerList.length > 0) {
-    const details = dangerList.map((m) => `${m.label}: ${m.value} ${m.unit}`).join('; ');
+    const details = dangerList
+      .map((m) => `${localizeMetricLabel(m.key, m.label, lang)}: ${m.value} ${m.unit}`)
+      .join('; ');
     return {
       overallSeverity: 'danger' as SeverityLevel,
-      doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC ĐỎ: Phát hiện ${dangerList.length} chỉ số nằm ngoài ngưỡng an toàn [${details}]${
-        warningList.length > 0 ? ` và ${warningList.length} chỉ số cần theo dõi` : ''
-      }. Mẹ nên sớm đến cơ sở y tế để bác sĩ chuyên khoa trực tiếp kiểm tra và tư vấn nhé.`,
+      doctorConclusion: isEn
+        ? `[${stageLabel}] — RED: Detected ${dangerList.length} metric(s) outside safe bounds [${details}]${
+            warningList.length > 0 ? ` and ${warningList.length} metric(s) to monitor` : ''
+          }. Please visit your obstetrician promptly for direct evaluation.`
+        : `[Đối chiếu chuẩn ${stageLabel}] — MỨC ĐỎ: Phát hiện ${dangerList.length} chỉ số nằm ngoài ngưỡng an toàn [${details}]${
+            warningList.length > 0 ? ` và ${warningList.length} chỉ số cần theo dõi` : ''
+          }. Mẹ nên sớm đến cơ sở y tế để bác sĩ chuyên khoa trực tiếp kiểm tra và tư vấn nhé.`,
     };
   }
 
   if (warningList.length > 0) {
-    const details = warningList.map((m) => `${m.label}: ${m.value} ${m.unit}`).join('; ');
+    const details = warningList
+      .map((m) => `${localizeMetricLabel(m.key, m.label, lang)}: ${m.value} ${m.unit}`)
+      .join('; ');
     return {
       overallSeverity: 'warning' as SeverityLevel,
-      doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC VÀNG: Có ${warningList.length} chỉ số cần lưu ý theo dõi thêm [${details}]. Mẹ hãy giữ tinh thần thoải mái, ăn uống nghỉ ngơi điều độ và trao đổi với bác sĩ trong kỳ khám tới nhé.`,
+      doctorConclusion: isEn
+        ? `[${stageLabel}] — YELLOW: ${warningList.length} metric(s) require closer follow-up [${details}]. Rest well, maintain balanced nutrition, and discuss at your next visit.`
+        : `[Đối chiếu chuẩn ${stageLabel}] — MỨC VÀNG: Có ${warningList.length} chỉ số cần lưu ý theo dõi thêm [${details}]. Mẹ hãy giữ tinh thần thoải mái, ăn uống nghỉ ngơi điều độ và trao đổi với bác sĩ trong kỳ khám tới nhé.`,
     };
   }
 
   return {
     overallSeverity: 'normal' as SeverityLevel,
-    doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC XANH: Tất cả ${metrics.length} chỉ số từ "${fileName}" đều nằm trong khoảng chuẩn của tuần thai hiện tại. Mẹ và bé đang phát triển rất tốt!`,
+    doctorConclusion: isEn
+      ? `[${stageLabel}] — GREEN: All ${metrics.length} metrics from "${fileName}" are within normal ranges for your gestational week.`
+      : `[Đối chiếu chuẩn ${stageLabel}] — MỨC XANH: Tất cả ${metrics.length} chỉ số từ "${fileName}" đều nằm trong khoảng chuẩn của tuần thai hiện tại. Mẹ và bé đang phát triển rất tốt!`,
   };
 }
 
@@ -533,12 +955,13 @@ function buildMetricByWeek(
   value: string,
   unit: string,
   defaultRefRange: string,
-  gestationalWeek: number
+  gestationalWeek: number,
+  lang: AppLang = 'vi'
 ): MedicalMetric {
-  const evalResult = evaluateMetricByWeek(key, value, gestationalWeek);
+  const evalResult = evaluateMetricByWeek(key, value, gestationalWeek, lang);
   return {
     key,
-    label,
+    label: localizeMetricLabel(key, label, lang),
     value,
     unit,
     refRange: evalResult.refRange || defaultRefRange,
@@ -562,9 +985,11 @@ function detectWeekFromFileName(fileName: string): number {
 function parseBackendIngestResult(
   payload: any,
   fileName: string,
-  fallbackWeek: number = 24
+  fallbackWeek: number = 24,
+  lang: AppLang = 'vi'
 ): MedicalAnalysisResult | null {
   if (!payload || typeof payload !== 'object') return null;
+  const isEn = lang === 'en';
   const rawAnalysis =
     payload.analysis ||
     payload.extracted_data ||
@@ -586,29 +1011,36 @@ function parseBackendIngestResult(
         fallbackWeek
     ) ||
     detectWeekFromFileName(fileName);
-  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week);
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(week, lang);
 
   if (Array.isArray(rawAnalysis?.metrics) && rawAnalysis.metrics.length > 0) {
     const metrics: MedicalMetric[] = rawAnalysis.metrics.map((m: any) =>
       buildMetricByWeek(
         String(m.key || m.code || 'metric').toLowerCase(),
-        String(m.label || m.name || m.key || 'Chỉ số'),
+        String(m.label || m.name || m.key || (isEn ? 'Metric' : 'Chỉ số')),
         String(m.value ?? ''),
         String(m.unit ?? ''),
         String(m.refRange || m.ref_range || ''),
-        clampedWeek
+        clampedWeek,
+        lang
       )
     );
-    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
+    const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek, lang);
     return {
       recordType:
         rawAnalysis.recordType ||
         rawAnalysis.record_type ||
-        'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+        (isEn
+          ? 'Prenatal Checkup & Paraclinical Lab Report'
+          : 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng'),
       gestationalWeek: clampedWeek,
       gestationalDays: Number(rawAnalysis.gestationalDays ?? rawAnalysis.gestational_days ?? 0),
       gestationalAge: stageLabel,
-      summary: rawAnalysis.summary || `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`,
+      summary:
+        rawAnalysis.summary ||
+        (isEn
+          ? `Extracted from Ingest pipeline (${stageLabel}).`
+          : `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`),
       doctorConclusion:
         rawAnalysis.explanation_patient ||
         rawAnalysis.app_explanation ||
@@ -623,20 +1055,25 @@ function parseBackendIngestResult(
   }
 
   const knownKeys: { key: string; label: string; unit: string; ref: string }[] = [
-    { key: 'bp', label: 'Huyết áp mẹ (BP)', unit: 'mmHg', ref: '< 130/85 mmHg' },
-    { key: 'weight', label: 'Cân nặng mẹ', unit: 'kg', ref: 'Theo BMI thai kỳ' },
-    { key: 'fhr', label: 'Nhịp tim thai (FHR)', unit: 'bpm', ref: '120 – 160 bpm' },
-    { key: 'bpd', label: 'Đường kính lưỡng đỉnh (BPD)', unit: 'mm', ref: '' },
-    { key: 'hc', label: 'Chu vi đầu (HC)', unit: 'mm', ref: '' },
-    { key: 'fl', label: 'Chiều dài xương đùi (FL)', unit: 'mm', ref: '' },
-    { key: 'ac', label: 'Chu vi vòng bụng (AC)', unit: 'mm', ref: '' },
-    { key: 'efw', label: 'Cân nặng thai ước tính (EFW)', unit: 'g', ref: '' },
-    { key: 'afi', label: 'Chỉ số nước ối (AFI)', unit: 'mm', ref: '80 – 180 mm' },
-    { key: 'hgb', label: 'Hemoglobin máu (HGB)', unit: 'g/dL', ref: '' },
-    { key: 'wbc', label: 'Bạch cầu máu (WBC)', unit: 'G/L', ref: '4.5 – 11.0 G/L' },
-    { key: 'glu', label: 'Đường huyết lúc đói (Fasting Glucose)', unit: 'mmol/L', ref: '< 5.1 mmol/L' },
-    { key: 'pro', label: 'Protein niệu (Urine Protein)', unit: 'g/L', ref: '< 0.15 g/L' },
-    { key: 'ph', label: 'Độ pH nước tiểu', unit: '', ref: '5.0 – 7.5' },
+    { key: 'bp', label: localizeMetricLabel('bp', 'BP', lang), unit: 'mmHg', ref: '< 130/85 mmHg' },
+    {
+      key: 'weight',
+      label: localizeMetricLabel('weight', 'Weight', lang),
+      unit: 'kg',
+      ref: isEn ? 'By pregnancy BMI' : 'Theo BMI thai kỳ',
+    },
+    { key: 'fhr', label: localizeMetricLabel('fhr', 'FHR', lang), unit: 'bpm', ref: '120 – 160 bpm' },
+    { key: 'bpd', label: localizeMetricLabel('bpd', 'BPD', lang), unit: 'mm', ref: '' },
+    { key: 'hc', label: localizeMetricLabel('hc', 'HC', lang), unit: 'mm', ref: '' },
+    { key: 'fl', label: localizeMetricLabel('fl', 'FL', lang), unit: 'mm', ref: '' },
+    { key: 'ac', label: localizeMetricLabel('ac', 'AC', lang), unit: 'mm', ref: '' },
+    { key: 'efw', label: localizeMetricLabel('efw', 'EFW', lang), unit: 'g', ref: '' },
+    { key: 'afi', label: localizeMetricLabel('afi', 'AFI', lang), unit: 'mm', ref: '80 – 180 mm' },
+    { key: 'hgb', label: localizeMetricLabel('hgb', 'HGB', lang), unit: 'g/dL', ref: '' },
+    { key: 'wbc', label: localizeMetricLabel('wbc', 'WBC', lang), unit: 'G/L', ref: '4.5 – 11.0 G/L' },
+    { key: 'glu', label: localizeMetricLabel('glu', 'Glucose', lang), unit: 'mmol/L', ref: '< 5.1 mmol/L' },
+    { key: 'pro', label: localizeMetricLabel('pro', 'Protein', lang), unit: 'g/L', ref: '< 0.15 g/L' },
+    { key: 'ph', label: localizeMetricLabel('ph', 'pH', lang), unit: '', ref: '5.0 – 7.5' },
   ];
 
   const fields =
@@ -660,19 +1097,25 @@ function parseBackendIngestResult(
       rawAnalysis?.[item.key.toUpperCase()];
     if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
       extractedMetrics.push(
-        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek)
+        buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek, lang)
       );
     }
   }
 
   if (extractedMetrics.length > 0) {
-    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek);
+    const evalState = summarizeAnalysisState(extractedMetrics, fileName, clampedWeek, lang);
     return {
-      recordType: rawAnalysis.record_type || 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
+      recordType:
+        rawAnalysis.record_type ||
+        (isEn
+          ? 'Prenatal Checkup & Paraclinical Lab Report'
+          : 'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng'),
       gestationalWeek: clampedWeek,
       gestationalDays: 0,
       gestationalAge: stageLabel,
-      summary: `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
+      summary: isEn
+        ? `Extracted ${extractedMetrics.length} paraclinical metrics.`
+        : `Đã trích xuất ${extractedMetrics.length} chỉ số cận lâm sàng.`,
       doctorConclusion: evalState.doctorConclusion,
       rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
       model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
@@ -687,36 +1130,66 @@ function parseBackendIngestResult(
 
 const buildDefaultExtractedAnalysis = (
   fileName: string,
-  defaultWeek: number = 24
+  defaultWeek: number = 24,
+  lang: AppLang = 'vi'
 ): MedicalAnalysisResult => {
+  const isEn = lang === 'en';
   const detectedWeek = detectWeekFromFileName(fileName) || defaultWeek;
-  const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek);
+  const { clampedWeek, stageLabel } = getPregnancyStageInfo(detectedWeek, lang);
 
   const metrics: MedicalMetric[] = [
-    buildMetricByWeek('bp', 'Huyết áp mẹ (BP)', '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek),
-    buildMetricByWeek('weight', 'Cân nặng mẹ', '56.5', 'kg', 'Tăng 6.5 kg (BMI 22.1)', clampedWeek),
-    buildMetricByWeek('fhr', 'Nhịp tim thai (FHR)', '148', 'bpm', '120 – 160 bpm', clampedWeek),
-    buildMetricByWeek('bpd', 'Đường kính lưỡng đỉnh (BPD)', '58', 'mm', '', clampedWeek),
-    buildMetricByWeek('hc', 'Chu vi đầu (HC)', '215', 'mm', '', clampedWeek),
-    buildMetricByWeek('fl', 'Chiều dài xương đùi (FL)', '43', 'mm', '', clampedWeek),
-    buildMetricByWeek('ac', 'Chu vi vòng bụng (AC)', '195', 'mm', '', clampedWeek),
-    buildMetricByWeek('efw', 'Cân nặng thai ước tính (EFW)', '710', 'g', '', clampedWeek),
-    buildMetricByWeek('afi', 'Chỉ số nước ối (AFI)', '135', 'mm', '80 – 180 mm', clampedWeek),
-    buildMetricByWeek('hgb', 'Hemoglobin máu (HGB)', '11.8', 'g/dL', '', clampedWeek),
-    buildMetricByWeek('wbc', 'Bạch cầu máu (WBC)', '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek),
-    buildMetricByWeek('glu', 'Đường huyết lúc đói (Fasting Glucose)', '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek),
-    buildMetricByWeek('pro', 'Protein niệu (Urine Protein)', '0.15 (Vết)', 'g/L', '< 0.15 g/L (Âm tính)', clampedWeek),
-    buildMetricByWeek('ph', 'Độ pH nước tiểu', '6.9', '', '5.0 – 7.5', clampedWeek),
-    buildMetricByWeek('leu', 'Bạch cầu niệu (Leukocytes)', 'Âm tính', '', 'Âm tính (Negative)', clampedWeek),
+    buildMetricByWeek('bp', localizeMetricLabel('bp', 'BP', lang), '118/76', 'mmHg', '< 130/85 mmHg', clampedWeek, lang),
+    buildMetricByWeek(
+      'weight',
+      localizeMetricLabel('weight', 'Weight', lang),
+      '56.5',
+      'kg',
+      isEn ? '+6.5 kg (BMI 22.1)' : 'Tăng 6.5 kg (BMI 22.1)',
+      clampedWeek,
+      lang
+    ),
+    buildMetricByWeek('fhr', localizeMetricLabel('fhr', 'FHR', lang), '148', 'bpm', '120 – 160 bpm', clampedWeek, lang),
+    buildMetricByWeek('bpd', localizeMetricLabel('bpd', 'BPD', lang), '58', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('hc', localizeMetricLabel('hc', 'HC', lang), '215', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('fl', localizeMetricLabel('fl', 'FL', lang), '43', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('ac', localizeMetricLabel('ac', 'AC', lang), '195', 'mm', '', clampedWeek, lang),
+    buildMetricByWeek('efw', localizeMetricLabel('efw', 'EFW', lang), '710', 'g', '', clampedWeek, lang),
+    buildMetricByWeek('afi', localizeMetricLabel('afi', 'AFI', lang), '135', 'mm', '80 – 180 mm', clampedWeek, lang),
+    buildMetricByWeek('hgb', localizeMetricLabel('hgb', 'HGB', lang), '11.8', 'g/dL', '', clampedWeek, lang),
+    buildMetricByWeek('wbc', localizeMetricLabel('wbc', 'WBC', lang), '7.5', 'G/L', '4.5 – 11.0 G/L', clampedWeek, lang),
+    buildMetricByWeek('glu', localizeMetricLabel('glu', 'Glucose', lang), '5.4', 'mmol/L', '< 5.1 mmol/L', clampedWeek, lang),
+    buildMetricByWeek(
+      'pro',
+      localizeMetricLabel('pro', 'Protein', lang),
+      isEn ? '0.15 (Trace)' : '0.15 (Vết)',
+      'g/L',
+      isEn ? '< 0.15 g/L (Negative)' : '< 0.15 g/L (Âm tính)',
+      clampedWeek,
+      lang
+    ),
+    buildMetricByWeek('ph', localizeMetricLabel('ph', 'pH', lang), '6.9', '', '5.0 – 7.5', clampedWeek, lang),
+    buildMetricByWeek(
+      'leu',
+      localizeMetricLabel('leu', 'Leukocytes', lang),
+      isEn ? 'Negative' : 'Âm tính',
+      '',
+      isEn ? 'Negative' : 'Âm tính (Negative)',
+      clampedWeek,
+      lang
+    ),
   ];
 
-  const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek);
+  const evalState = summarizeAnalysisState(metrics, fileName, clampedWeek, lang);
   return {
-    recordType: 'Phiếu Khám Thai, Siêu Âm 4D & Xét Nghiệm Tiền Sản',
+    recordType: isEn
+      ? 'Prenatal Checkup, 4D Ultrasound & Screening Report'
+      : 'Phiếu Khám Thai, Siêu Âm 4D & Xét Nghiệm Tiền Sản',
     gestationalWeek: clampedWeek,
     gestationalDays: 3,
     gestationalAge: stageLabel,
-    summary: `Đã phân tích và đối chiếu theo chuẩn ${stageLabel}.`,
+    summary: isEn
+      ? `Analyzed and matched against ${stageLabel}.`
+      : `Đã phân tích và đối chiếu theo chuẩn ${stageLabel}.`,
     doctorConclusion: evalState.doctorConclusion,
     rule_version: DEFAULT_RULE_VERSION,
     model_version: DEFAULT_MODEL_VERSION,
@@ -727,13 +1200,13 @@ const buildDefaultExtractedAnalysis = (
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const nowLabel = () => {
+const nowLabel = (lang: AppLang = 'vi') => {
   const d = new Date();
-  return `Hôm nay, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${UPLOAD_COPY[lang].todayPrefix}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-export function decodeFileName(name?: string): string {
-  if (!name) return 'Tài liệu phiếu khám';
+export function decodeFileName(name?: string, lang: AppLang = 'vi'): string {
+  if (!name) return UPLOAD_COPY[lang].defaultFileName;
   try {
     return decodeURIComponent(name);
   } catch {
@@ -754,6 +1227,18 @@ function isImageItem(item: UploadItem): boolean {
 }
 
 export default function UploadScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const lang = preferences.language;
+  const copy = UPLOAD_COPY[lang];
+  const statusStyle = getStatusStyle(lang, isDark);
+  const severityTheme = getSeverityTheme(theme, isDark, lang);
+
+  const langRef = useRef<AppLang>(lang);
+  langRef.current = lang;
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
+
   const [items, setItems] = useState<UploadItem[]>([]);
   const [loadingStorage, setLoadingStorage] = useState(true);
   const [savingToDb, setSavingToDb] = useState(false);
@@ -811,8 +1296,7 @@ export default function UploadScreen({ navigation }: Props) {
             : 50.0,
         explanationDoctor: analysis.doctorConclusion,
         explanationPatient: analysis.appConclusion || analysis.doctorConclusion,
-        disclaimerText:
-          'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
+        disclaimerText: copyRef.current.disclaimerBody,
         ruleVersion: analysis.rule_version || DEFAULT_RULE_VERSION,
         modelVersion: analysis.model_version || DEFAULT_MODEL_VERSION,
         metrics: analysis.metrics.map((m) => ({
@@ -833,6 +1317,7 @@ export default function UploadScreen({ navigation }: Props) {
      ========================================================================= */
   const loadAccountData = useCallback(async () => {
     if (isPickingFileRef.current) return;
+    const activeLang = langRef.current;
     try {
       await restoreSession();
       const storageKey = await resolveAccountStorageKey();
@@ -874,14 +1359,14 @@ export default function UploadScreen({ navigation }: Props) {
           remoteIdSet.add(fId);
 
           const rawFileName = rf.file_name || `Phieu_kham_${fId.slice(0, 6)}.pdf`;
-          const fName = decodeFileName(rawFileName);
+          const fName = decodeFileName(rawFileName, activeLang);
 
           // Tìm dữ liệu tương ứng trong localList nếu có cache URI/analysis
           const existing = localList.find(
             (it) =>
               it.fileId === fId ||
               it.id === fId ||
-              decodeFileName(it.name) === fName
+              decodeFileName(it.name, activeLang) === fName
           );
 
           const rawStatus = String(rf.status || '').toLowerCase();
@@ -895,9 +1380,9 @@ export default function UploadScreen({ navigation }: Props) {
               : 'pending';
 
           const parsedAnalysis =
-            parseBackendIngestResult(rf, fName, safeWeek) ||
+            parseBackendIngestResult(rf, fName, safeWeek, activeLang) ||
             existing?.analysis ||
-            buildDefaultExtractedAnalysis(fName, safeWeek);
+            buildDefaultExtractedAnalysis(fName, safeWeek, activeLang);
 
           syncedItems.push({
             id: fId, // Đồng bộ ID dùng chính UUID của PostgreSQL
@@ -906,8 +1391,10 @@ export default function UploadScreen({ navigation }: Props) {
             checkupId: rf.checkup_id || existing?.checkupId || null,
             name: fName,
             time: rf.created_at
-              ? new Date(rf.created_at).toLocaleDateString('vi-VN')
-              : existing?.time || nowLabel(),
+              ? new Date(rf.created_at).toLocaleDateString(
+                  activeLang === 'en' ? 'en-GB' : 'vi-VN'
+                )
+              : existing?.time || nowLabel(activeLang),
             status: existing?.status === 'done' ? 'done' : mappedStatus,
             uri: existing?.uri,
             presignedUrl: existing?.presignedUrl,
@@ -934,7 +1421,7 @@ export default function UploadScreen({ navigation }: Props) {
         setLoadingStorage(false);
       }
     }
-  }, []);
+  }, [lang]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1038,12 +1525,14 @@ export default function UploadScreen({ navigation }: Props) {
               resolvedFileId
             );
 
+            const activeLang = langRef.current;
             const presignedViewUrl = fileDetail?.presigned_view_url || undefined;
             const analysis =
               parseBackendIngestResult(
                 verificationPayload || fileDetail || taskData,
                 fileName,
-                profileWeek
+                profileWeek,
+                activeLang
               ) ||
               parseBackendIngestResult(
                 {
@@ -1060,9 +1549,10 @@ export default function UploadScreen({ navigation }: Props) {
                   gestational_week: profileWeek,
                 },
                 fileName,
-                profileWeek
+                profileWeek,
+                activeLang
               ) ||
-              buildDefaultExtractedAnalysis(fileName, profileWeek);
+              buildDefaultExtractedAnalysis(fileName, profileWeek, activeLang);
 
             let finishedItem: UploadItem | null = null;
             updateItemsAndPersist((prev) =>
@@ -1096,7 +1586,7 @@ export default function UploadScreen({ navigation }: Props) {
             const errMsg =
               taskData?.stage_message ||
               taskData?.error_code ||
-              'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.';
+              copyRef.current.celeryFailedError;
             updateItemsAndPersist((prev) =>
               prev.map((item) =>
                 item.id === localItemId
@@ -1124,9 +1614,10 @@ export default function UploadScreen({ navigation }: Props) {
         fileDetail = detailRes?.data || detailRes;
       }
 
+      const activeLang = langRef.current;
       const analysis =
-        parseBackendIngestResult(fileDetail, fileName, profileWeek) ||
-        buildDefaultExtractedAnalysis(fileName, profileWeek);
+        parseBackendIngestResult(fileDetail, fileName, profileWeek, activeLang) ||
+        buildDefaultExtractedAnalysis(fileName, profileWeek, activeLang);
 
       let fallbackItem: UploadItem | null = null;
       updateItemsAndPersist((prev) =>
@@ -1161,8 +1652,10 @@ export default function UploadScreen({ navigation }: Props) {
     size?: number | null,
     mimeType: string = 'application/pdf'
   ) => {
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
     if (size && size > MAX_SIZE) {
-      Alert.alert('File quá lớn', 'Vui lòng chọn file tối đa 10MB.');
+      Alert.alert(activeCopy.fileTooLargeTitle, activeCopy.fileTooLargeBody);
       return;
     }
 
@@ -1171,7 +1664,7 @@ export default function UploadScreen({ navigation }: Props) {
       id: newItemId,
       profileId: profileId || undefined,
       name,
-      time: nowLabel(),
+      time: nowLabel(activeLang),
       status: 'processing',
       uri,
       mimeType,
@@ -1221,8 +1714,8 @@ export default function UploadScreen({ navigation }: Props) {
         presignedUrl: fileDetail?.presigned_view_url,
         status: 'pending',
         analysis:
-          parseBackendIngestResult(fileDetail || resData, name, profileWeek) ||
-          buildDefaultExtractedAnalysis(name, profileWeek),
+          parseBackendIngestResult(fileDetail || resData, name, profileWeek, activeLang) ||
+          buildDefaultExtractedAnalysis(name, profileWeek, activeLang),
       };
 
       updateItemsAndPersist((prev) =>
@@ -1237,12 +1730,12 @@ export default function UploadScreen({ navigation }: Props) {
                 ...item,
                 status: 'failed',
                 canRetry: true,
-                errorMessage: err?.message || 'Không thể tải tài liệu lên máy chủ.',
+                errorMessage: err?.message || activeCopy.uploadServerFail,
               }
             : item
         )
       );
-      Alert.alert('Lỗi tải lên', err?.message || 'Không thể tải tài liệu lên máy chủ.');
+      Alert.alert(activeCopy.uploadErrorTitle, err?.message || activeCopy.uploadServerFail);
     }
   };
 
@@ -1250,6 +1743,8 @@ export default function UploadScreen({ navigation }: Props) {
      API 2 & 4: POST /api/v1/ingest/upload-batch & GET /batches/{batch_id}/status
      ========================================================================= */
   const pickAndUploadBatch = async () => {
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
     try {
       isPickingFileRef.current = true;
       const result = await DocumentPicker.getDocumentAsync({
@@ -1273,16 +1768,14 @@ export default function UploadScreen({ navigation }: Props) {
       const newBatchItems: UploadItem[] = result.assets.map((asset, idx) => ({
         id: `${batchNow}_${idx}`,
         name: asset.name,
-        time: nowLabel(),
+        time: nowLabel(activeLang),
         status: 'processing',
         uri: asset.uri,
         mimeType: resolveMime(asset.name, asset.mimeType),
       }));
 
       updateItemsAndPersist((prev) => [...newBatchItems, ...prev]);
-      setBatchProgressText(
-        `Đang tải lên hàng loạt ${newBatchItems.length} phiếu khám...`
-      );
+      setBatchProgressText(activeCopy.batchUploading(newBatchItems.length));
 
       try {
         const validPid = await ensureActivePregnancyProfileId(profileWeek);
@@ -1328,9 +1821,7 @@ export default function UploadScreen({ navigation }: Props) {
             const pct = Number(stData?.overall_progress_percentage ?? 0);
 
             if (isMountedRef.current) {
-              setBatchProgressText(
-                `Đang xử lý lô phiếu khám: ${completed}/${total} hoàn tất (${pct}%)...`
-              );
+              setBatchProgressText(copyRef.current.batchProcessing(completed, total, pct));
             }
 
             if (stData?.is_all_finished || (total > 0 && completed >= total)) {
@@ -1348,7 +1839,11 @@ export default function UploadScreen({ navigation }: Props) {
               ? {
                   ...item,
                   status: 'pending',
-                  analysis: buildDefaultExtractedAnalysis(item.name, profileWeek),
+                  analysis: buildDefaultExtractedAnalysis(
+                    item.name,
+                    profileWeek,
+                    langRef.current
+                  ),
                 }
               : item
           )
@@ -1356,12 +1851,15 @@ export default function UploadScreen({ navigation }: Props) {
 
         setBatchProgressText(null);
         Alert.alert(
-          'Tải hàng loạt hoàn tất',
-          `Đã phân tích xong ${newBatchItems.length} phiếu khám. Bấm "Mở màn hình Đối chiếu" trên từng phiếu để kiểm tra và lưu.`
+          copyRef.current.batchDoneTitle,
+          copyRef.current.batchDoneBody(newBatchItems.length)
         );
       } catch (err: any) {
         setBatchProgressText(null);
-        Alert.alert('Lỗi tải hàng loạt', err?.message || 'Không thể tải hàng loạt lên máy chủ.');
+        Alert.alert(
+          copyRef.current.batchErrorTitle,
+          err?.message || copyRef.current.batchErrorBody
+        );
       }
     } finally {
       isPickingFileRef.current = false;
@@ -1393,7 +1891,7 @@ export default function UploadScreen({ navigation }: Props) {
         return;
       }
 
-      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek);
+      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek, langRef.current);
       updateItemsAndPersist((prev) =>
         prev.map((it) =>
           it.id === item.id
@@ -1413,7 +1911,7 @@ export default function UploadScreen({ navigation }: Props) {
             ? {
                 ...it,
                 status: 'failed',
-                errorMessage: e?.message || 'Thử lại trích xuất thất bại.',
+                errorMessage: e?.message || copyRef.current.retryFailMsg,
               }
             : it
         )
@@ -1425,14 +1923,16 @@ export default function UploadScreen({ navigation }: Props) {
      API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
      ========================================================================= */
   const deleteItem = (item: UploadItem) => {
-    const displayName = decodeFileName(item.name);
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
+    const displayName = decodeFileName(item.name, activeLang);
     Alert.alert(
-      'Xoá tài liệu',
-      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${displayName}" khỏi hệ thống và Database không?`,
+      activeCopy.deleteTitle,
+      activeCopy.deleteConfirm(displayName),
       [
-        { text: 'Huỷ', style: 'cancel' },
+        { text: activeCopy.cancelBtn, style: 'cancel' },
         {
-          text: 'Xoá vĩnh viễn',
+          text: activeCopy.deleteForeverBtn,
           style: 'destructive',
           onPress: async () => {
             if (verifyModalItem?.id === item.id) setVerifyModalItem(null);
@@ -1453,7 +1953,7 @@ export default function UploadScreen({ navigation }: Props) {
                   (rf: any) =>
                     String(rf.id) === item.fileId ||
                     String(rf.id) === item.id ||
-                    decodeFileName(rf.file_name) === displayName
+                    decodeFileName(rf.file_name, activeLang) === displayName
                 );
                 if (match && isUuid(match.id)) {
                   targetFileId = String(match.id);
@@ -1474,8 +1974,8 @@ export default function UploadScreen({ navigation }: Props) {
                 setDeletingFileId(null);
                 console.error('Lỗi khi xoá tài liệu trên Database:', e);
                 Alert.alert(
-                  'Không thể xoá tài liệu',
-                  e?.message || 'Máy chủ không cho phép xoá tài liệu này hoặc gặp lỗi kết nối. Vui lòng thử lại.'
+                  copyRef.current.cannotDeleteTitle,
+                  e?.message || copyRef.current.cannotDeleteBody
                 );
                 return; // QUAN TRỌNG: Không xoá local nếu DB xoá thất bại, tránh lỗi reload bị hiện lại!
               } finally {
@@ -1499,7 +1999,7 @@ export default function UploadScreen({ navigation }: Props) {
               return updated;
             });
 
-            Alert.alert('Thành công', 'Đã xoá tài liệu khỏi hệ thống và cơ sở dữ liệu.');
+            Alert.alert(copyRef.current.successTitle, copyRef.current.deleteSuccessBody);
           },
         },
       ]
@@ -1508,17 +2008,19 @@ export default function UploadScreen({ navigation }: Props) {
 
   const applyEditedMetricsToItem = (item: UploadItem, markConfirmed: boolean = false): UploadItem => {
     if (!item.analysis) return item;
+    const activeLang = langRef.current;
     const parsedWeek = parseInt(draftWeek, 10);
     const weekToUse = !isNaN(parsedWeek)
       ? Math.max(12, Math.min(41, parsedWeek))
       : item.analysis.gestationalWeek || 24;
-    const { stageLabel } = getPregnancyStageInfo(weekToUse);
+    const { stageLabel } = getPregnancyStageInfo(weekToUse, activeLang);
 
     const updatedMetrics = item.analysis.metrics.map((m) => {
       const newVal = draftMetrics[m.key] !== undefined ? draftMetrics[m.key].trim() : m.value;
-      const reEval = evaluateMetricByWeek(m.key, newVal, weekToUse);
+      const reEval = evaluateMetricByWeek(m.key, newVal, weekToUse, activeLang);
       return {
         ...m,
+        label: localizeMetricLabel(m.key, m.label, activeLang),
         value: newVal,
         refRange: reEval.refRange || m.refRange,
         severity: reEval.severity,
@@ -1526,7 +2028,7 @@ export default function UploadScreen({ navigation }: Props) {
       };
     });
 
-    const summaryState = summarizeAnalysisState(updatedMetrics, item.name, weekToUse);
+    const summaryState = summarizeAnalysisState(updatedMetrics, item.name, weekToUse, activeLang);
 
     return {
       ...item,
@@ -1547,6 +2049,7 @@ export default function UploadScreen({ navigation }: Props) {
   const confirmFromVerificationModal = async () => {
     if (!verifyModalItem || savingToDb) return;
     setSavingToDb(true);
+    const activeCopy = copyRef.current;
 
     try {
       const targetId = verifyModalItem.id;
@@ -1562,16 +2065,16 @@ export default function UploadScreen({ navigation }: Props) {
       setIsModalEditing(false);
       setDraftMetrics({});
       const endpointsMsg = dbRes?.savedEndpoints?.length
-        ? `\n\nChi tiết kết nối Database:\n• ${dbRes.savedEndpoints.join('\n• ')}`
+        ? `\n\n${activeCopy.savedDbEndpointsLabel}\n• ${dbRes.savedEndpoints.join('\n• ')}`
         : '';
       Alert.alert(
-        'Đã đối chiếu & Lưu vào Database',
-        `Các chỉ số phiếu khám đã được xác nhận và đồng bộ trực tiếp vào cơ sở dữ liệu PostgreSQL!${endpointsMsg}`
+        activeCopy.savedDbTitle,
+        `${activeCopy.savedDbBody}${endpointsMsg}`
       );
     } catch (e: any) {
       Alert.alert(
-        'Lưu hồ sơ',
-        e?.message || 'Đã cập nhật hồ sơ. Vui lòng kiểm tra kết nối máy chủ.'
+        activeCopy.saveProfileErrorTitle,
+        e?.message || activeCopy.saveProfileFallback
       );
     } finally {
       setSavingToDb(false);
@@ -1583,15 +2086,17 @@ export default function UploadScreen({ navigation }: Props) {
       isPickingFileRef.current = true;
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Chưa cấp quyền', 'Hãy cho phép ứng dụng dùng camera trong Cài đặt.');
+        Alert.alert(copy.permissionDeniedTitle, copy.cameraPermissionBody);
         return;
       }
       const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
       if (result.canceled) return;
       const asset = result.assets[0];
+      const fallbackName =
+        lang === 'en' ? `Report_${Date.now()}.jpg` : `Anh_phieu_kham_${Date.now()}.jpg`;
       await uploadAndAnalyzeFile(
         asset.uri,
-        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
+        asset.fileName ?? fallbackName,
         asset.fileSize,
         asset.mimeType ?? 'image/jpeg'
       );
@@ -1606,9 +2111,11 @@ export default function UploadScreen({ navigation }: Props) {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
       if (result.canceled) return;
       const asset = result.assets[0];
+      const fallbackName =
+        lang === 'en' ? `Report_${Date.now()}.jpg` : `Anh_phieu_kham_${Date.now()}.jpg`;
       await uploadAndAnalyzeFile(
         asset.uri,
-        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
+        asset.fileName ?? fallbackName,
         asset.fileSize,
         asset.mimeType ?? 'image/jpeg'
       );
@@ -1648,12 +2155,12 @@ export default function UploadScreen({ navigation }: Props) {
   };
 
   const openChooser = () => {
-    Alert.alert('Tải lên phiếu khám cận lâm sàng', 'Chọn phương thức tải lên:', [
-      { text: 'Chụp ảnh phiếu khám (Đơn lẻ)', onPress: takePhoto },
-      { text: 'Chọn 1 ảnh từ thư viện', onPress: pickImage },
-      { text: 'Chọn 1 file PDF / Ảnh', onPress: pickPdf },
-      { text: 'Tải lên hàng loạt (Batch Upload)', onPress: pickAndUploadBatch },
-      { text: 'Huỷ', style: 'cancel' },
+    Alert.alert(copy.chooserTitle, copy.chooserSub, [
+      { text: copy.chooserTakePhoto, onPress: takePhoto },
+      { text: copy.chooserPickImage, onPress: pickImage },
+      { text: copy.chooserPickPdf, onPress: pickPdf },
+      { text: copy.chooserBatch, onPress: pickAndUploadBatch },
+      { text: copy.cancelBtn, style: 'cancel' },
     ]);
   };
 
@@ -1662,9 +2169,10 @@ export default function UploadScreen({ navigation }: Props) {
   const activeModalMetrics: MedicalMetric[] = verifyModalItem?.analysis
     ? verifyModalItem.analysis.metrics.map((m) => {
         const val = draftMetrics[m.key] ?? m.value;
-        const ev = evaluateMetricByWeek(m.key, val, activeModalWeek);
+        const ev = evaluateMetricByWeek(m.key, val, activeModalWeek, lang);
         return {
           ...m,
+          label: localizeMetricLabel(m.key, m.label, lang),
           value: val,
           refRange: ev.refRange || m.refRange,
           severity: ev.severity,
@@ -1674,90 +2182,141 @@ export default function UploadScreen({ navigation }: Props) {
     : [];
 
   const activeModalSummary = verifyModalItem?.analysis
-    ? summarizeAnalysisState(activeModalMetrics, verifyModalItem.name, activeModalWeek)
+    ? summarizeAnalysisState(activeModalMetrics, verifyModalItem.name, activeModalWeek, lang)
     : null;
   const activeModalTheme = activeModalSummary
-    ? SEVERITY_THEME[activeModalSummary.overallSeverity]
-    : SEVERITY_THEME.normal;
+    ? severityTheme[activeModalSummary.overallSeverity]
+    : severityTheme.normal;
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="arrow-back" size={18} color={colors.navy} />
-        </Pressable>
-
-        <Text style={styles.headerTitle}>Tải lên & Đối chiếu phiếu khám</Text>
-
-        <Pressable style={styles.headerButton} onPress={openChooser}>
-          <Ionicons name="add" size={20} color={colors.navy} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title={copy.screenTitle}
+        onBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+          const parentNav = navigation.getParent();
+          if (parentNav?.canGoBack()) {
+            parentNav.goBack();
+            return;
+          }
+          navigation.navigate('Home');
+        }}
+        backLabel={lang === 'en' ? 'Go back' : 'Quay lại'}
+        rightIcon="add"
+        onRightPress={openChooser}
+        rightAccessibilityLabel={copy.uploadSingle}
+      />
 
       <ScrollView
+        style={{ backgroundColor: theme.background }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Pressable style={styles.dropZone} onPress={openChooser}>
-          <View style={styles.cameraCircle}>
-            <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
+        <Pressable
+          style={[styles.dropZone, { backgroundColor: theme.surface }]}
+          onPress={openChooser}
+        >
+          <View style={[styles.cameraCircle, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="cloud-upload-outline" size={28} color={theme.tealText} />
           </View>
 
-          <Text style={styles.dropTitle}>Chụp ảnh hoặc tải lên phiếu khám (PDF/Ảnh)</Text>
-          <Text style={styles.dropSub}>
-            Hỗ trợ tải đơn lẻ hoặc tải hàng loạt (Batch Upload) • Đồng bộ trực tiếp vào Database
+          <Text style={[styles.dropTitle, fontStyle(15.5, { lineHeight: 22, min: 14 }), { color: theme.text }]}>
+            {copy.dropTitle}
           </Text>
-
           <View style={styles.uploadBtnRow}>
             <Pressable style={styles.chooseButton} onPress={openChooser}>
               <Ionicons name="document-attach-outline" size={15} color={colors.white} />
-              <Text style={styles.chooseText}>Tải lên đơn lẻ</Text>
+              <Text style={[styles.chooseText, fontStyle(13.5, { min: 12.5, max: 16 })]}>
+                {copy.uploadSingle}
+              </Text>
             </Pressable>
 
-            <Pressable style={styles.batchButton} onPress={pickAndUploadBatch}>
-              <Ionicons name="documents-outline" size={15} color={colors.primaryDark} />
-              <Text style={styles.batchButtonText}>Tải hàng loạt (Batch)</Text>
+            <Pressable
+              style={[styles.batchButton, { backgroundColor: theme.tealSoft }]}
+              onPress={pickAndUploadBatch}
+            >
+              <Ionicons name="documents-outline" size={15} color={theme.tealText} />
+              <Text style={[styles.batchButtonText, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {copy.uploadBatch}
+              </Text>
             </Pressable>
           </View>
         </Pressable>
 
         {!!batchProgressText && (
-          <View style={styles.batchBanner}>
-            <ActivityIndicator size="small" color="#0F766E" />
-            <Text style={styles.batchBannerText}>{batchProgressText}</Text>
+          <View
+            style={[
+              styles.batchBanner,
+              { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+            ]}
+          >
+            <ActivityIndicator size="small" color={theme.tealText} />
+            <Text style={[styles.batchBannerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.tealText }]}>
+              {batchProgressText}
+            </Text>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>
-          Tài liệu & Kết quả đã lưu ({items.length})
+        <Text style={[styles.sectionTitle, fontStyle(15.5, { min: 14.5 }), { color: theme.textSecondary }]}>
+          {copy.savedSectionTitle(items.length)}
         </Text>
 
         {loadingStorage ? (
-          <View style={styles.emptyBox}>
+          <View
+            style={[
+              styles.emptyBox,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.emptyText}>Đang đồng bộ danh sách tài liệu từ Database...</Text>
+            <Text style={[styles.emptyText, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.syncingText}
+            </Text>
           </View>
         ) : items.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Ionicons name="document-outline" size={32} color="#94A3B8" />
-            <Text style={styles.emptyText}>
-              Chưa có phiếu khám nào. Hãy chụp ảnh phiếu khám, tải file PDF hoặc bấm "Nhập kết quả thủ công".
+          <View
+            style={[
+              styles.emptyBox,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="document-outline" size={32} color={theme.muted} />
+            <Text style={[styles.emptyText, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.emptyText}
             </Text>
           </View>
         ) : (
           items.map((item) => {
-            const s = STATUS_STYLE[item.status];
+            const s = statusStyle[item.status];
             const isPdf = item.name.toLowerCase().endsWith('.pdf');
             const previewSourceUri = item.presignedUrl || item.uri;
             const hasImagePreview = Boolean(previewSourceUri) && isImageItem(item);
 
             return (
-              <View key={item.id} style={styles.itemCard}>
+              <View
+                key={item.id}
+                style={[
+                  styles.itemCard,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
                 <View style={styles.itemHeaderRow}>
-                  <View style={[styles.fileIcon, isPdf && { backgroundColor: '#FEF2F2' }]}>
+                  <View
+                    style={[
+                      styles.fileIcon,
+                      {
+                        backgroundColor: isPdf
+                          ? theme.dangerBackground
+                          : theme.surfaceAlt,
+                      },
+                    ]}
+                  >
                     <Ionicons
                       name={
                         hasImagePreview
@@ -1767,54 +2326,79 @@ export default function UploadScreen({ navigation }: Props) {
                           : 'document-text-outline'
                       }
                       size={18}
-                      color={isPdf ? '#EF4444' : colors.primary}
+                      color={isPdf ? theme.danger : theme.tealText}
                     />
                   </View>
 
                   <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {decodeFileName(item.name)}
+                    <Text style={[styles.itemName, fontStyle(15, { min: 14 }), { color: theme.text }]} numberOfLines={1}>
+                      {decodeFileName(item.name, lang)}
                     </Text>
-                    <Text style={styles.itemTime}>
-                      {item.time}
-                      {item.taskId ? ` • Task: #${item.taskId.slice(-6)}` : ''}
+                    <Text style={[styles.itemTime, fontStyle(12.5, { min: 11.5 }), { color: theme.textSecondary }]}>
+                      {localizeUploadTime(item.time, lang)}
+                      {item.taskId ? ` • ${copy.taskPrefix}: #${item.taskId.slice(-6)}` : ''}
                     </Text>
                   </View>
 
                   <View style={[styles.badge, { backgroundColor: s.bg }]}>
-                    <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
+                    <Text style={[styles.badgeText, fontStyle(11.5, { min: 10.5, max: 13.5 }), { color: s.color }]}>
+                      {s.label}
+                    </Text>
                   </View>
 
                   {deletingFileId === item.id ? (
-                    <ActivityIndicator size="small" color="#EF4444" style={{ marginLeft: 8 }} />
+                    <ActivityIndicator size="small" color={theme.danger} style={{ marginLeft: 8 }} />
                   ) : (
                     <Pressable
                       onPress={() => deleteItem(item)}
                       hitSlop={8}
-                      style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
+                      style={({ pressed }) => [
+                        styles.deleteButton,
+                        { backgroundColor: theme.dangerBackground },
+                        pressed && { opacity: 0.6 },
+                      ]}
                     >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={18} color={theme.danger} />
                     </Pressable>
                   )}
                 </View>
 
                 {item.status === 'processing' && (
-                  <View style={styles.processingBox}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.processingText}>
+                  <View
+                    style={[
+                      styles.processingBox,
+                      { borderTopColor: theme.divider },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={theme.tealText} />
+                    <Text
+                      style={[
+                        styles.processingText,
+                        fontStyle(13.5, { lineHeight: 19, min: 12.5 }),
+                        { color: isDark ? '#FDE047' : '#A16207' },
+                      ]}
+                    >
                       {item.stageMessage
                         ? `${item.stageMessage} (${item.progressPercentage ?? 0}%)`
-                        : 'Đang phân tích trên Celery Queue...'}
+                        : copy.analyzingQueue}
                     </Text>
                   </View>
                 )}
 
                 {item.status === 'failed' && (
-                  <View style={styles.failedBox}>
+                  <View
+                    style={[
+                      styles.failedBox,
+                      {
+                        backgroundColor: theme.dangerBackground,
+                        borderColor: theme.dangerBorder,
+                      },
+                    ]}
+                  >
                     <View style={styles.failedHeader}>
-                      <Ionicons name="alert-circle" size={18} color="#DC2626" />
-                      <Text style={styles.failedTitle}>
-                        {item.errorMessage || 'Quá trình trích xuất Celery bị gián đoạn.'}
+                      <Ionicons name="alert-circle" size={18} color={theme.danger} />
+                      <Text style={[styles.failedTitle, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.danger }]}>
+                        {item.errorMessage || copy.extractFailedDefault}
                       </Text>
                     </View>
                     <View style={styles.failedActionRow}>
@@ -1823,17 +2407,31 @@ export default function UploadScreen({ navigation }: Props) {
                         onPress={() => retryFailedFile(item)}
                       >
                         <Ionicons name="refresh" size={15} color={colors.white} />
-                        <Text style={styles.retryBtnText}>Thử lại trích xuất (Retry)</Text>
+                        <Text style={[styles.retryBtnText, fontStyle(13, { min: 12 })]}>
+                          {copy.retryExtractBtn}
+                        </Text>
                       </Pressable>
 
                       {deletingFileId === item.id ? (
-                        <ActivityIndicator size="small" color="#EF4444" style={{ marginHorizontal: 16 }} />
+                        <ActivityIndicator
+                          size="small"
+                          color={theme.danger}
+                          style={{ marginHorizontal: 16 }}
+                        />
                       ) : (
                         <Pressable
-                          style={styles.removeFailedBtn}
+                          style={[
+                            styles.removeFailedBtn,
+                            {
+                              backgroundColor: theme.surface,
+                              borderColor: theme.dangerBorder,
+                            },
+                          ]}
                           onPress={() => deleteItem(item)}
                         >
-                          <Text style={styles.removeFailedBtnText}>Xoá file</Text>
+                          <Text style={[styles.removeFailedBtnText, fontStyle(13, { min: 12 }), { color: theme.danger }]}>
+                            {copy.removeFileBtn}
+                          </Text>
                         </Pressable>
                       )}
                     </View>
@@ -1842,12 +2440,20 @@ export default function UploadScreen({ navigation }: Props) {
 
                 {/* CHỈ HIỂN THỊ KHUNG MỞ MÀN HÌNH ĐỐI CHIẾU, KHÔNG HIỂN THỊ CÁC CHỈ SỐ Ở NGOÀI */}
                 {item.analysis && (
-                  <View style={styles.compactVerifyBox}>
+                  <View
+                    style={[
+                      styles.compactVerifyBox,
+                      {
+                        backgroundColor: theme.surfaceAlt,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <View style={styles.slipPreviewHeader}>
                       <View style={styles.slipPreviewTitleRow}>
-                        <Ionicons name="eye-outline" size={15} color={colors.primaryDark} />
-                        <Text style={styles.slipPreviewTitle}>
-                          {hasImagePreview ? 'Ảnh chụp phiếu khám gốc' : 'Tài liệu phiếu khám gốc'}
+                        <Ionicons name="eye-outline" size={15} color={theme.tealText} />
+                        <Text style={[styles.slipPreviewTitle, fontStyle(13.5, { min: 12.5 }), { color: theme.text }]}>
+                          {hasImagePreview ? copy.slipImageHeader : copy.slipDocHeader}
                         </Text>
                       </View>
                       <Pressable
@@ -1855,8 +2461,8 @@ export default function UploadScreen({ navigation }: Props) {
                         onPress={() => openVerificationModal(item)}
                       >
                         <Ionicons name="git-compare-outline" size={14} color={colors.white} />
-                        <Text style={styles.compareSplitBtnText}>
-                          Mở màn hình Đối chiếu
+                        <Text style={[styles.compareSplitBtnText, fontStyle(12.5, { min: 11.5, max: 14.5 })]}>
+                          {copy.compareBtn}
                         </Text>
                       </Pressable>
                     </View>
@@ -1865,40 +2471,54 @@ export default function UploadScreen({ navigation }: Props) {
                       <Pressable onPress={() => openVerificationModal(item)}>
                         <Image
                           source={{ uri: previewSourceUri }}
-                          style={styles.slipThumbnail}
+                          style={[styles.slipThumbnail, { backgroundColor: theme.border }]}
                           resizeMode="cover"
                         />
                         <View style={styles.slipOverlayHint}>
                           <Ionicons name="expand-outline" size={14} color={colors.white} />
-                          <Text style={styles.slipOverlayHintText}>
-                            Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu
+                          <Text style={[styles.slipOverlayHintText, fontStyle(12, { min: 11, max: 14 })]}>
+                            {copy.overlayHint}
                           </Text>
                         </View>
                       </Pressable>
                     ) : (
                       <Pressable
-                        style={styles.pdfSlipPreviewBox}
+                        style={[
+                          styles.pdfSlipPreviewBox,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         onPress={() => openVerificationModal(item)}
                       >
-                        <Ionicons name="document-text" size={24} color="#EF4444" />
+                        <Ionicons name="document-text" size={24} color={theme.danger} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.pdfSlipName} numberOfLines={1}>
-                            {decodeFileName(item.name)}
+                          <Text
+                            style={[styles.pdfSlipName, fontStyle(13.5, { min: 12.5 }), { color: theme.text }]}
+                            numberOfLines={1}
+                          >
+                            {decodeFileName(item.name, lang)}
                           </Text>
-                          <Text style={styles.pdfSlipSub}>
-                            Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database
+                          <Text style={[styles.pdfSlipSub, fontStyle(12, { lineHeight: 17, min: 11 }), { color: theme.tealText }]}>
+                            {copy.pdfSlipHint}
                           </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#64748B" />
+                        <Ionicons name="chevron-forward" size={18} color={theme.muted} />
                       </Pressable>
                     )}
 
                     {item.analysis.savedToProfile && (
-                      <View style={styles.savedRow}>
+                      <View style={[styles.savedRow, { borderTopColor: theme.divider }]}>
                         <View style={styles.savedTag}>
-                          <Ionicons name="checkmark-done" size={14} color={colors.primaryDark} />
-                          <Text style={styles.savedTagText}>
-                            Đã đối chiếu & lưu vào Database ({item.analysis.gestationalAge})
+                          <Ionicons name="checkmark-done" size={14} color={theme.tealText} />
+                          <Text style={[styles.savedTagText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                            {copy.savedTagPrefix(
+                              getPregnancyStageInfo(
+                                item.analysis.gestationalWeek || 24,
+                                lang
+                              ).stageLabel
+                            )}
                           </Text>
                         </View>
                       </View>
@@ -1913,10 +2533,16 @@ export default function UploadScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           onPress={() => navigation.navigate('ManualResultEntry')}
-          style={({ pressed }) => [styles.manualButton, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [
+            styles.manualButton,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            pressed && { opacity: 0.85 },
+          ]}
         >
-          <Ionicons name="create-outline" size={18} color={colors.primary} />
-          <Text style={styles.manualButtonText}>Nhập kết quả thủ công</Text>
+          <Ionicons name="create-outline" size={18} color={theme.tealText} />
+          <Text style={[styles.manualButtonText, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]}>
+            {copy.manualEntryBtn}
+          </Text>
         </Pressable>
       </ScrollView>
 
@@ -1929,39 +2555,47 @@ export default function UploadScreen({ navigation }: Props) {
           setIsModalEditing(false);
         }}
       >
-        <SafeAreaView style={styles.modalScreen} edges={['top', 'bottom']}>
-          <View style={styles.modalHeader}>
+        <SafeAreaView
+          style={[styles.modalScreen, { backgroundColor: theme.background }]}
+          edges={['top', 'bottom']}
+        >
+          <View
+            style={[
+              styles.modalHeader,
+              { backgroundColor: theme.surface, borderBottomColor: theme.border },
+            ]}
+          >
             <Pressable
-              style={styles.headerButton}
+              style={[styles.headerButton, { backgroundColor: theme.surfaceAlt }]}
               onPress={() => {
                 setVerifyModalItem(null);
                 setIsModalEditing(false);
               }}
             >
-              <Ionicons name="close" size={20} color={colors.navy} />
+              <Ionicons name="close" size={20} color={theme.text} />
             </Pressable>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={styles.modalHeaderTitle}>Đối chiếu & Xác nhận dữ liệu</Text>
-              <Text style={styles.modalHeaderSub}>
-                {isModalEditing
-                  ? 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch'
-                  : 'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi'}
+            <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+              <Text style={[styles.modalHeaderTitle, fontStyle(16, { max: 19 }), { color: theme.text }]}>
+                {copy.modalHeaderTitle}
+              </Text>
+              <Text style={[styles.modalHeaderSub, fontStyle(12, { lineHeight: 17, min: 11 }), { color: theme.textSecondary }]}>
+                {isModalEditing ? copy.modalHeaderSubEdit : copy.modalHeaderSubView}
               </Text>
             </View>
-            <View style={{ width: 32 }} />
+            <View style={{ width: 40 }} />
           </View>
 
           {verifyModalItem && verifyModalItem.analysis && (
             <KeyboardAvoidingView
-              style={styles.flex}
+              style={[styles.flex, { backgroundColor: theme.background }]}
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
               <View style={[styles.splitTopPane, zoomSlipImage && styles.splitTopPaneExpanded]}>
                 <View style={styles.splitTopBar}>
                   <View style={styles.slipPreviewTitleRow}>
                     <Ionicons name="document-text-outline" size={15} color={colors.white} />
-                    <Text style={styles.splitTopBarTitle} numberOfLines={1}>
-                      Bản gốc: {decodeFileName(verifyModalItem.name)}
+                    <Text style={[styles.splitTopBarTitle, fontStyle(13, { min: 12 })]} numberOfLines={1}>
+                      {copy.originalPrefix}: {decodeFileName(verifyModalItem.name, lang)}
                     </Text>
                   </View>
                   {isImageItem(verifyModalItem) && (
@@ -1974,8 +2608,8 @@ export default function UploadScreen({ navigation }: Props) {
                         size={14}
                         color={colors.white}
                       />
-                      <Text style={styles.zoomToggleText}>
-                        {zoomSlipImage ? 'Thu nhỏ ảnh' : 'Phóng to ảnh'}
+                      <Text style={[styles.zoomToggleText, fontStyle(12, { min: 11, max: 14 })]}>
+                        {zoomSlipImage ? copy.zoomOut : copy.zoomIn}
                       </Text>
                     </Pressable>
                   )}
@@ -2001,13 +2635,11 @@ export default function UploadScreen({ navigation }: Props) {
                   <View style={styles.modalPdfSummaryPane}>
                     <Ionicons name="document-attach" size={28} color="#F87171" />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.modalPdfTitle} numberOfLines={1}>
-                        {decodeFileName(verifyModalItem.name)}
+                      <Text style={[styles.modalPdfTitle, fontStyle(14, { min: 13 })]} numberOfLines={1}>
+                        {decodeFileName(verifyModalItem.name, lang)}
                       </Text>
-                      <Text style={styles.modalPdfHint}>
-                        {isModalEditing
-                          ? 'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.'
-                          : 'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.'}
+                      <Text style={[styles.modalPdfHint, fontStyle(12.5, { lineHeight: 18, min: 11.5 })]}>
+                        {isModalEditing ? copy.modalPdfHintEdit : copy.modalPdfHintView}
                       </Text>
                     </View>
                   </View>
@@ -2015,7 +2647,7 @@ export default function UploadScreen({ navigation }: Props) {
               </View>
 
               <ScrollView
-                style={styles.flex}
+                style={[styles.flex, { backgroundColor: theme.background }]}
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled"
               >
@@ -2027,7 +2659,7 @@ export default function UploadScreen({ navigation }: Props) {
                       {
                         backgroundColor:
                           activeModalSummary.overallSeverity === 'normal'
-                            ? '#ECFDF5'
+                            ? theme.badgeGreenBg
                             : activeModalTheme.cardBg,
                         borderColor:
                           activeModalSummary.overallSeverity === 'normal'
@@ -2041,17 +2673,20 @@ export default function UploadScreen({ navigation }: Props) {
                       size={18}
                       color={
                         activeModalSummary.overallSeverity === 'normal'
-                          ? '#059669'
+                          ? isDark
+                            ? '#34D399'
+                            : '#059669'
                           : activeModalTheme.valueColor
                       }
                     />
                     <Text
                       style={[
                         styles.doctorBannerText,
+                        fontStyle(14.5, { lineHeight: 21, min: 13.5 }),
                         {
                           color:
                             activeModalSummary.overallSeverity === 'normal'
-                              ? '#065F46'
+                              ? theme.badgeGreenText
                               : activeModalTheme.valueColor,
                         },
                       ]}
@@ -2061,48 +2696,78 @@ export default function UploadScreen({ navigation }: Props) {
                   </View>
                 )}
 
-                <View style={styles.fixedDisclaimerBox}>
-                  <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
-                  <Text style={styles.fixedDisclaimerText}>
-                    Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.
+                <View
+                  style={[
+                    styles.fixedDisclaimerBox,
+                    {
+                      backgroundColor: theme.surfaceAlt,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={14} color={theme.muted} />
+                  <Text style={[styles.fixedDisclaimerText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.textSecondary }]}>
+                    {copy.disclaimerTitle} {copy.disclaimerBody}
                   </Text>
                 </View>
 
-                <View style={styles.weekEditorRow}>
-                  <Text style={styles.weekEditorLabel}>
-                    Mốc đối chiếu: {getPregnancyStageInfo(activeModalWeek).stageLabel}
+                <View
+                  style={[
+                    styles.weekEditorRow,
+                    {
+                      backgroundColor: theme.tealSoft,
+                      borderColor: theme.tealBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.weekEditorLabel, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+                    {copy.weekEditorPrefix} {getPregnancyStageInfo(activeModalWeek, lang).stageLabel}
                   </Text>
                   {isModalEditing && (
                     <View style={styles.weekStepper}>
                       <Pressable
-                        style={styles.weekStepBtn}
+                        style={[
+                          styles.weekStepBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.border },
+                        ]}
                         onPress={() =>
                           setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
                         }
                       >
-                        <Ionicons name="remove" size={16} color={colors.navy} />
+                        <Ionicons name="remove" size={16} color={theme.text} />
                       </Pressable>
                       <TextInput
-                        style={styles.weekInput}
+                        style={[
+                          styles.weekInput,
+                          fontStyle(14, { min: 13, max: 16 }),
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.tealBorder,
+                            color: theme.text,
+                          },
+                        ]}
                         value={draftWeek}
                         onChangeText={setDraftWeek}
                         keyboardType="number-pad"
                         maxLength={2}
                       />
                       <Pressable
-                        style={styles.weekStepBtn}
+                        style={[
+                          styles.weekStepBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.border },
+                        ]}
                         onPress={() =>
                           setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
                         }
                       >
-                        <Ionicons name="add" size={16} color={colors.navy} />
+                        <Ionicons name="add" size={16} color={theme.text} />
                       </Pressable>
                     </View>
                   )}
                 </View>
 
-                <Text style={styles.modalSectionLabel}>
-                  Các chỉ số đã phân tích từ file ({verifyModalItem.analysis.metrics.length} chỉ số):
+                <Text style={[styles.modalSectionLabel, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                  {copy.modalSectionLabel(verifyModalItem.analysis.metrics.length)}
                 </Text>
 
                 {verifyModalItem.analysis.metrics.map((m) => {
@@ -2110,9 +2775,10 @@ export default function UploadScreen({ navigation }: Props) {
                   const liveEval = evaluateMetricByWeek(
                     m.key,
                     currentVal,
-                    activeModalWeek
+                    activeModalWeek,
+                    lang
                   );
-                  const mTheme = SEVERITY_THEME[liveEval.severity];
+                  const mTheme = severityTheme[liveEval.severity];
 
                   return (
                     <View
@@ -2126,9 +2792,11 @@ export default function UploadScreen({ navigation }: Props) {
                       ]}
                     >
                       <View style={styles.metricTopRow}>
-                        <Text style={styles.verifyMetricLabel}>{m.label}</Text>
+                        <Text style={[styles.verifyMetricLabel, fontStyle(14, { lineHeight: 20, min: 13 }), { color: theme.text }]}>
+                          {localizeMetricLabel(m.key, m.label, lang)}
+                        </Text>
                         <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
-                          <Text style={[styles.severityPillText, { color: mTheme.badgeColor }]}>
+                          <Text style={[styles.severityPillText, fontStyle(11.5, { min: 10.5, max: 13 }), { color: mTheme.badgeColor }]}>
                             {mTheme.badgeLabel}
                           </Text>
                         </View>
@@ -2137,30 +2805,45 @@ export default function UploadScreen({ navigation }: Props) {
                       {isModalEditing ? (
                         <View style={styles.verifyInputRow}>
                           <TextInput
-                            style={[styles.verifyInput, { color: mTheme.valueColor }]}
+                            style={[
+                              styles.verifyInput,
+                              fontStyle(16, { min: 15 }),
+                              { backgroundColor: theme.surface, color: mTheme.valueColor },
+                            ]}
                             value={currentVal}
                             onChangeText={(text) =>
                               setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
                             }
-                            placeholder="Nhập giá trị..."
-                            placeholderTextColor="#94A3B8"
+                            placeholder={copy.enterValuePlaceholder}
+                            placeholderTextColor={theme.muted}
                           />
-                          {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
+                          {!!m.unit && (
+                            <Text style={[styles.verifyUnitText, fontStyle(13.5, { min: 12.5 }), { color: theme.textSecondary }]}>
+                              {m.unit}
+                            </Text>
+                          )}
                         </View>
                       ) : (
-                        <View style={styles.readOnlyValueBox}>
-                          <Text style={[styles.readOnlyValueText, { color: mTheme.valueColor }]}>
+                        <View
+                          style={[
+                            styles.readOnlyValueBox,
+                            { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                          ]}
+                        >
+                          <Text style={[styles.readOnlyValueText, fontStyle(16, { min: 15 }), { color: mTheme.valueColor }]}>
                             {currentVal} {m.unit}
                           </Text>
                         </View>
                       )}
 
-                      <Text style={styles.refRangeText}>
-                        Ngưỡng chuẩn: {liveEval.refRange || m.refRange}
+                      <Text style={[styles.refRangeText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                        {copy.refRangePrefix} {liveEval.refRange || m.refRange}
                       </Text>
                       <Text
                         style={[
                           styles.clinicalNoteText,
+                          fontStyle(13.5, { lineHeight: 20, min: 12.5 }),
+                          { color: theme.textSecondary },
                           liveEval.severity !== 'normal' && {
                             color: mTheme.valueColor,
                             fontWeight: '700',
@@ -2174,10 +2857,16 @@ export default function UploadScreen({ navigation }: Props) {
                 })}
               </ScrollView>
 
-              <View style={styles.modalFooter}>
+              <View
+                style={[
+                  styles.modalFooter,
+                  { backgroundColor: theme.surface, borderTopColor: theme.border },
+                ]}
+              >
                 <Pressable
                   style={[
                     styles.toggleEditModalBtn,
+                    { backgroundColor: theme.tealSoft },
                     isModalEditing && styles.toggleEditModalBtnActive,
                   ]}
                   onPress={() => setIsModalEditing((prev) => !prev)}
@@ -2185,15 +2874,17 @@ export default function UploadScreen({ navigation }: Props) {
                   <Ionicons
                     name={isModalEditing ? 'checkmark-outline' : 'create-outline'}
                     size={18}
-                    color={isModalEditing ? colors.white : colors.primaryDark}
+                    color={isModalEditing ? colors.white : theme.tealText}
                   />
                   <Text
                     style={[
                       styles.toggleEditModalBtnText,
+                      fontStyle(14, { min: 13, max: 16.5 }),
+                      { color: theme.tealText },
                       isModalEditing && { color: colors.white },
                     ]}
                   >
-                    {isModalEditing ? 'Xong chỉnh sửa' : 'Chỉnh sửa'}
+                    {isModalEditing ? copy.finishEditBtn : copy.editBtn}
                   </Text>
                 </Pressable>
 
@@ -2207,8 +2898,8 @@ export default function UploadScreen({ navigation }: Props) {
                   ) : (
                     <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
                   )}
-                  <Text style={styles.confirmModalBtnText}>
-                    {savingToDb ? 'Đang lưu Database...' : 'Xác nhận & Lưu vào hồ sơ'}
+                  <Text style={[styles.confirmModalBtnText, fontStyle(14, { min: 13, max: 16.5 })]}>
+                    {savingToDb ? copy.savingDbBtn : copy.confirmSaveBtn}
                   </Text>
                 </Pressable>
               </View>
@@ -2233,14 +2924,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   headerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', color: colors.navy, marginHorizontal: 8 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 },
   dropZone: {
     alignItems: 'center',
@@ -2261,16 +2952,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  dropTitle: { fontSize: 14, fontWeight: '800', color: colors.navy, textAlign: 'center' },
+  dropTitle: { fontSize: 15.5, fontWeight: '800', color: colors.navy, textAlign: 'center' },
   dropSub: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: colors.textLight,
     marginTop: 5,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 19,
   },
   uploadBtnRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 10,
     marginTop: 16,
@@ -2279,26 +2972,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 38,
+    minHeight: 42,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: colors.primary,
     justifyContent: 'center',
   },
-  chooseText: { fontSize: 12.5, fontWeight: '700', color: colors.white },
+  chooseText: { fontSize: 13.5, fontWeight: '700', color: colors.white },
   batchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 38,
+    minHeight: 42,
     paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: '#ECFDF5',
     borderWidth: 1,
     borderColor: colors.primary,
     justifyContent: 'center',
   },
-  batchButtonText: { fontSize: 12.5, fontWeight: '700', color: colors.primaryDark },
+  batchButtonText: { fontSize: 13.5, fontWeight: '700', color: colors.primaryDark },
   batchBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2313,12 +3008,12 @@ const styles = StyleSheet.create({
   },
   batchBannerText: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#0F766E',
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: '700',
     color: '#334155',
     marginTop: 18,
@@ -2334,7 +3029,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  emptyText: { fontSize: 12.5, color: '#64748B', marginTop: 8, textAlign: 'center' },
+  emptyText: { fontSize: 14.5, color: '#64748B', marginTop: 8, textAlign: 'center', lineHeight: 21 },
   itemCard: {
     backgroundColor: colors.white,
     borderRadius: 14,
@@ -2353,10 +3048,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemInfo: { flex: 1, marginLeft: 12, marginRight: 8 },
-  itemName: { fontSize: 13.5, fontWeight: '700', color: colors.navy },
-  itemTime: { fontSize: 11, color: colors.textLight, marginTop: 3 },
+  itemName: { fontSize: 15, fontWeight: '700', color: colors.navy },
+  itemTime: { fontSize: 12.5, color: colors.textLight, marginTop: 3 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  badgeText: { fontSize: 10.5, fontWeight: '700' },
+  badgeText: { fontSize: 11.5, fontWeight: '700' },
   deleteButton: { marginLeft: 8, padding: 6, borderRadius: 8, backgroundColor: '#FEF2F2' },
   processingBox: {
     flexDirection: 'row',
@@ -2367,7 +3062,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
-  processingText: { fontSize: 12, color: '#A16207', fontWeight: '600', flex: 1 },
+  processingText: { fontSize: 13.5, color: '#A16207', fontWeight: '600', flex: 1 },
   failedBox: {
     marginTop: 12,
     padding: 10,
@@ -2384,7 +3079,7 @@ const styles = StyleSheet.create({
   },
   failedTitle: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#991B1B',
   },
@@ -2400,24 +3095,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#DC2626',
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
   },
   retryBtnText: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.white,
   },
   removeFailedBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 8,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: '#FCA5A5',
   },
   removeFailedBtnText: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#DC2626',
   },
@@ -2431,8 +3126,10 @@ const styles = StyleSheet.create({
   },
   slipPreviewHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 8,
   },
   slipPreviewTitleRow: {
@@ -2442,7 +3139,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slipPreviewTitle: {
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '800',
     color: colors.navy,
   },
@@ -2452,11 +3149,11 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.primary,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 6,
   },
   compareSplitBtnText: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '700',
     color: colors.white,
   },
@@ -2481,7 +3178,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   slipOverlayHintText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.white,
   },
@@ -2496,12 +3193,12 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   pdfSlipName: {
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '700',
     color: colors.navy,
   },
   pdfSlipSub: {
-    fontSize: 10.5,
+    fontSize: 12,
     color: '#0F766E',
     fontWeight: '600',
     marginTop: 2,
@@ -2515,11 +3212,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
-  savedTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savedTagText: { fontSize: 11.5, fontWeight: '700', color: colors.primaryDark },
+  savedTag: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  savedTagText: { flex: 1, fontSize: 12.5, fontWeight: '700', color: colors.primaryDark },
   manualButton: {
     marginTop: 18,
-    minHeight: 42,
+    minHeight: 46,
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -2531,20 +3228,21 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 10,
   },
-  manualButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  manualButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.primary },
 
   modalScreen: { flex: 1, backgroundColor: '#F5F8FA' },
   modalHeader: {
-    height: 58,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
-  modalHeaderTitle: { fontSize: 15, fontWeight: '800', color: colors.navy },
-  modalHeaderSub: { fontSize: 10.5, color: '#64748B', marginTop: 2 },
+  modalHeaderTitle: { fontSize: 16, fontWeight: '800', color: colors.navy },
+  modalHeaderSub: { fontSize: 12, color: '#64748B', marginTop: 2, textAlign: 'center' },
   splitTopPane: {
     backgroundColor: '#0F172A',
     borderBottomWidth: 2,
@@ -2560,7 +3258,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
   },
   splitTopBarTitle: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.white,
     flex: 1,
@@ -2571,11 +3269,11 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.primary,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 6,
   },
   zoomToggleText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.white,
   },
@@ -2588,8 +3286,8 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: '#1E293B',
   },
-  modalPdfTitle: { fontSize: 13, fontWeight: '800', color: colors.white },
-  modalPdfHint: { fontSize: 11, color: '#CBD5E1', marginTop: 4, lineHeight: 15 },
+  modalPdfTitle: { fontSize: 14, fontWeight: '800', color: colors.white },
+  modalPdfHint: { fontSize: 12.5, color: '#CBD5E1', marginTop: 4, lineHeight: 18 },
   modalScrollContent: { padding: 16, paddingBottom: 24 },
   doctorBanner: {
     flexDirection: 'row',
@@ -2600,7 +3298,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginBottom: 10,
   },
-  doctorBannerText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  doctorBannerText: { flex: 1, fontSize: 14.5, fontWeight: '700', lineHeight: 21 },
   fixedDisclaimerBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2614,8 +3312,8 @@ const styles = StyleSheet.create({
   },
   fixedDisclaimerText: {
     flex: 1,
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: '#334155',
     fontWeight: '600',
   },
@@ -2632,7 +3330,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   weekEditorLabel: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#0F766E',
     flex: 1,
@@ -2644,8 +3342,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   weekStepBtn: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: 6,
     backgroundColor: colors.white,
     alignItems: 'center',
@@ -2654,10 +3352,10 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   weekInput: {
-    width: 42,
-    height: 28,
+    width: 44,
+    height: 30,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: colors.navy,
     backgroundColor: colors.white,
@@ -2667,7 +3365,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   modalSectionLabel: {
-    fontSize: 12.5,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#334155',
     marginBottom: 10,
@@ -2682,11 +3380,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 4,
+    gap: 6,
   },
-  verifyMetricLabel: { fontSize: 12, fontWeight: '800', color: colors.navy, flex: 1 },
-  severityPill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  severityPillText: { fontSize: 9.5, fontWeight: '800' },
+  verifyMetricLabel: { fontSize: 14, fontWeight: '800', color: colors.navy, flex: 1 },
+  severityPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  severityPillText: { fontSize: 11.5, fontWeight: '800' },
   readOnlyValueBox: {
     marginTop: 6,
     marginBottom: 4,
@@ -2698,7 +3396,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   readOnlyValueText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
   },
   verifyInputRow: {
@@ -2709,7 +3407,7 @@ const styles = StyleSheet.create({
   },
   verifyInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
@@ -2719,13 +3417,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   verifyUnitText: {
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#475569',
     marginLeft: 8,
   },
-  refRangeText: { fontSize: 10.5, color: '#0F766E', fontWeight: '700', marginTop: 3 },
-  clinicalNoteText: { fontSize: 11, color: '#475569', marginTop: 3, lineHeight: 15 },
+  refRangeText: { fontSize: 12.5, color: '#0F766E', fontWeight: '700', marginTop: 3 },
+  clinicalNoteText: { fontSize: 13.5, color: '#475569', marginTop: 4, lineHeight: 20 },
   modalFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2753,7 +3451,7 @@ const styles = StyleSheet.create({
     borderColor: '#0F766E',
   },
   toggleEditModalBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: colors.primaryDark,
   },
@@ -2768,7 +3466,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   confirmModalBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: colors.white,
   },
