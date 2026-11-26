@@ -122,7 +122,6 @@ export const DeletionRequestsReview: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
                   <th className="py-3.5 px-4">Thai phụ yêu cầu</th>
-                  <th className="py-3.5 px-4">Phạm vi xóa</th>
                   <th className="py-3.5 px-4">Lý do y khoa</th>
                   <th className="py-3.5 px-4">Trạng thái</th>
                   <th className="py-3.5 px-4 text-center">Hành động</th>
@@ -137,19 +136,6 @@ export const DeletionRequestsReview: React.FC = () => {
                       <div className="text-[11px] text-slate-400">
                         {new Date(item.created_at).toLocaleString('vi-VN')}
                       </div>
-                    </td>
-
-                    {/* Phạm vi */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {item.target_type === 'full_profile' ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                          Toàn bộ thai kỳ
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                          Một lần khám
-                        </span>
-                      )}
                     </td>
 
                     {/* Lý do */}
