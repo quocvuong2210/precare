@@ -328,61 +328,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
                     styles.otpExpired,
                     { borderColor: theme.danger },
                   ],
-              ]}
-              onPress={handleContinue}
-              disabled={otp.length !== 6 || isOtpExpired}
-              activeOpacity={0.85}
+                ]}
+                value={otp[index] || ''}
+                onChangeText={(value) => handleOtpChange(value, index)}
+                onKeyPress={({ nativeEvent }) => {
+                  if (
+                    nativeEvent.key === 'Backspace' &&
+                    !otp[index] &&
+                    index > 0
+                  ) {
+                    inputRefs.current[index - 1]?.focus();
+                  }
+                }}
+                keyboardType="number-pad"
+                maxLength={6}
+                textAlign="center"
+                selectTextOnFocus
+                editable={!isOtpExpired}
+                autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                accessibilityLabel={copy.digitAccessibility(index + 1)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.timerArea}>
+            <View style={styles.timerRow}>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={isOtpExpired ? theme.danger : theme.muted}
+              />
+              <Text
+                style={[
+                  styles.timerText,
+                  fontStyle(13, { min: 12 }),
+                  { color: theme.muted },
+                  isOtpExpired && { color: theme.danger },
+                ]}
+              >
+                {isOtpExpired
+                  ? copy.otpExpiredText
+                  : copy.validFor(formatTime(otpExpiresIn))}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={handleResendOtp}
+              disabled={!canResend}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
-                  styles.buttonText,
-                  (otp.length !== 6 || isOtpExpired) &&
-                    styles.buttonTextDisabled,
-                ]}
-              >
-                Xác nhận mã
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.footer}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={styles.footerText}>
-                Quay lại đăng nhập
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
-
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F9FC',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  progressArea: {
-    marginBottom: 25,
-  },
-  progressTrack: {
-    flexDirection: 'row',
-    height: 3,
-    gap: 4,
-  },
-  progressDone: {
-    flex: 1,
+                  styles.resendText,
+                  fontStyle(13.5, { min: 12.5 }),
+                  { color: theme.tealText },
     backgroundColor: '#438F87',
     borderRadius: 3,
   },
