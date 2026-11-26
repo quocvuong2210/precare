@@ -108,3 +108,113 @@ test('savePregnancyProfileToDB creates via POST and caches returned profile UUID
 });
 
 test('savePregnancyProfileToDB updates directly via PUT when profileId UUID is provided', async () => {
+  const { api, calls } = setup((url) => {
+    if (url.endsWith(`/pregnancy-profiles/${PROFILE_UUID}`)) {
+      return {
+        status: 200,
+        body: { success: true, data: { id: PROFILE_UUID, edd: '2026-10-20' } },
+      };
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+
+  const updated = await api.savePregnancyProfileToDB({
+    profileId: PROFILE_UUID,
+    lmp: '2026-01-13',
+    edd: '2026-10-20',
+  });
+
+  assert.equal(updated.data.edd, '2026-10-20');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].url.endsWith(`/pregnancy-profiles/${PROFILE_UUID}`));
+  assert.equal(calls[0].options.method, 'PUT');
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    lmp: '2026-01-13',
+    override_edd: '2026-10-20',
+    recalculate_edd: false,
+  });
+});
+
+test('savePregnancyProfileToDB falls back to active PUT when POST hits 400 or 409', async () => {
+  for (const conflictStatus of [400, 409]) {
+    const { api, calls } = setup((url, options) => {
+      if (url.endsWith('/pregnancy-profiles') && options.method === 'POST') {
+        return { status: conflictStatus, body: { detail: 'Already exists' } };
+      }
+      if (url.endsWith('/pregnancy-profiles/active')) {
+        return { status: 200, body: { success: true, data: { id: PROFILE_UUID } } };
+      }
+      if (url.endsWith(`/pregnancy-profiles/${PROFILE_UUID}`) && options.method === 'PUT') {
+        return {
+          status: 200,
+          body: { success: true, data: { id: PROFILE_UUID, crl_mm: 55 } },
+        };
+      }
+      throw new Error(`Unexpected request: ${options.method} ${url}`);
+    });
+
+    const res = await api.savePregnancyProfileToDB({
+      q1_ultrasound_date: '2026-03-01',
+      crl_mm: 55,
+      calculation_method: 'crl',
+      edd: '2026-09-25',
+    });
+
+    assert.equal(res.data.crl_mm, 55);
+    assert.equal(calls[0].options.method, 'POST');
+    assert.ok(calls[1].url.endsWith('/pregnancy-profiles/active'));
+    assert.equal(calls[2].options.method, 'PUT');
+    assert.deepEqual(JSON.parse(calls[2].options.body), {
+      q1_ultrasound_date: '2026-03-01',
+      crl_mm: 55,
+      override_edd: '2026-09-25',
+      recalculate_edd: false,
+    });
+  }
+});
+
+test('fetchPregnancyProfileFromDB clears stale UUID on 404 and propagates errors when throwOnError is true', async () => {
+  const notFound = setup(
+    () => ({ status: 404, body: { detail: 'Not found' } }),
+    { precare_pregnancy_profile_id: PROFILE_UUID }
+  );
+  const profile = await notFound.api.fetchPregnancyProfileFromDB('access-token', {
+    throwOnError: true,
+  });
+  assert.equal(profile, null);
+  assert.equal(notFound.stored.has('precare_pregnancy_profile_id'), false);
+
+  const forbidden = setup(() => ({
+    status: 403,
+    body: { detail: 'Không có quyền truy cập' },
+  }));
+  await assert.rejects(
+    forbidden.api.fetchPregnancyProfileFromDB('access-token', { throwOnError: true }),
+    /Không có quyền truy cập/
+  );
+
+  const offline = setup(() => {
+    throw new Error('Network unreachable');
+  });
+  await assert.rejects(
+    offline.api.fetchPregnancyProfileFromDB('access-token', { throwOnError: true }),
+    /Network unreachable/
+  );
+});
+
+test('fetchCurrentUserFromDB syncs user info from DB without extra local-only fields', async () => {
+  const { api, calls, stored } = setup((url) => {
+    assert.ok(url.endsWith('/auth/me'));
+    return {
+      status: 200,
+      body: {
+        id: '33333333-3333-4333-8333-333333333333',
+        full_name: 'Tran Thi B',
+        email: '  TranThiB@Example.com ',
+        phone_number: '0901234567',
+        birthday: '1995-05-05',
+      },
+    };
+  });
+
+  const user = await api.fetchCurrentUserFromDB();
