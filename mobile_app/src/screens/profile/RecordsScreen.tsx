@@ -543,68 +543,88 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             </Text>
           </Pressable>
         </View>
-        <View style={styles.card}>
-          {fields.medical.map((field, index) => (
-            <InfoRow key={field.key} label={field.label} value={profile[field.key]} last={index === fields.medical.length - 1} />
-          ))}
-        </View>
-        <Text style={styles.helper}>Bổ sung thông tin để bác sĩ hiểu rõ hơn về sức khỏe của mẹ.</Text>
-
-        <Text style={styles.sectionTitle}>Liên hệ khẩn cấp</Text>
-        <View style={[styles.card, styles.contactCard]}>
-          <View style={styles.contactInfo}>
-            <View style={styles.iconBox}><Ionicons name="call-outline" size={20} color={colors.primary} /></View>
-            <View style={styles.contactText}>
-              <Text style={styles.cardTitle}>{mainContact?.name || 'Chưa thêm người liên hệ'}</Text>
-              <Text style={styles.subtitle}>{mainContact
-                ? `${mainContact.relationship}\n${mainContact.phone}`
-                : 'Thêm người thân để dễ liên lạc khi mẹ cần hỗ trợ.'}</Text>
-            </View>
-          </View>
-          <OutlineButton title={contacts.length ? 'Quản lý người liên hệ' : 'Thêm người liên hệ'} icon="person-add-outline" onPress={() => setContactsVisible(true)} />
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <InfoRow
+            label={isEn ? 'Full name' : 'Họ và tên'}
+            value={account?.full_name || ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Phone number' : 'Số điện thoại'}
+            value={account?.phone_number || ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label="Email"
+            value={account?.email || ''}
+            emptyText={notUpdatedText}
+            last
+          />
         </View>
 
-        <Text style={styles.sectionTitle}>Hồ sơ khám & kết quả</Text>
+        <Text style={[styles.sectionTitle, styles.standaloneSectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Checkups & Results' : 'Hồ sơ khám & kết quả'}
+        </Text>
         <Pressable
           accessibilityRole="button"
           onPress={goToHistoryScreen}
           style={({ pressed }) => [
             styles.card,
             styles.historyCard,
+            { backgroundColor: theme.surface, borderColor: theme.border },
             pressed && styles.pressed,
           ]}
         >
-          <View style={styles.iconBox}>
-            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="document-text-outline" size={20} color={theme.tealText} />
           </View>
 
           <View style={styles.contactText}>
-            <Text style={styles.cardTitle}>Xem lịch sử kết quả</Text>
-            <Text style={styles.subtitle}>
-              Phiếu khám, xét nghiệm và siêu âm đã lưu
+            <Text style={[styles.cardTitle, fontStyle(15, { lineHeight: 21, min: 14 }), { color: theme.text }]}>
+              {isEn ? 'View result history' : 'Xem lịch sử kết quả'}
+            </Text>
+            <Text style={[styles.subtitle, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Checkup visits and biometric metrics linked to your account'
+                : 'Lần khám và chỉ số sinh trắc theo tài khoản Precare của bạn'}
             </Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+          <Ionicons name="chevron-forward" size={18} color={theme.muted} />
         </Pressable>
       </ScrollView>
 
-      <EmergencyContacts
-        visible={contactsVisible}
-        contacts={contacts}
-        onChange={handleContactsChange}
-        onClose={() => setContactsVisible(false)}
-      />
-
-      <Modal visible={editor !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditor(null)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Đóng" hitSlop={12} onPress={() => setEditor(null)}>
-                <Ionicons name="close" size={24} color={colors.navy} />
+      <Modal
+        visible={accountEditorOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => !saving && setAccountEditorOpen(false)}
+      >
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View
+              style={[
+                styles.modalHeader,
+                { backgroundColor: theme.surface, borderBottomColor: theme.divider },
+              ]}
+            >
+              <Text style={[styles.modalTitle, fontStyle(19, { max: 22 }), { color: theme.text }]}>
+                {isEn ? 'Edit account information' : 'Chỉnh sửa thông tin tài khoản'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Close' : 'Đóng'}
+                hitSlop={12}
+                disabled={saving}
+                onPress={() => setAccountEditorOpen(false)}
+              >
+                <Ionicons name="close" size={24} color={theme.text} />
               </Pressable>
             </View>
+
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
               {editor && (
                 <>
