@@ -15,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../navigation/AppNavigator";
+import ScreenHeader from "../../components/ScreenHeader";
+import { useAppSettings } from "../../context/AppSettingsContext";
 import { sendOtp, verifyOtp } from "../../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterOtpVerification">;
@@ -22,8 +24,62 @@ type Props = NativeStackScreenProps<RootStackParamList, "RegisterOtpVerification
 const PRIMARY = "#0D9488";
 const OTP_LENGTH = 6;
 
+const translations = {
+  vi: {
+    missingTokenError: "Backend không trả về verification_token.",
+    verifySuccess:
+      "Xác nhận email thành công! Bạn có thể tiếp tục bước tạo tài khoản.",
+    verifyFailed: "Xác thực OTP thất bại. Vui lòng thử lại.",
+    resendRequested: "Đã yêu cầu gửi lại mã OTP.",
+    resendFailed: "Không thể gửi lại OTP. Vui lòng thử lại.",
+    backLabel: "Quay lại",
+    title: "Xác nhận email",
+    description: "Nhập mã xác nhận gồm 6 chữ số được gửi đến",
+    changeEmail: "Thay đổi email",
+    otpLabel: "Mã xác nhận",
+    otpAccessibility: "Nhập mã xác nhận 6 chữ số",
+    verifying: "Đang xác minh...",
+    verified: "Đã xác nhận",
+    verify: "Xác nhận",
+    resendHint: "Chưa nhận được mã?",
+    resending: "Đang gửi lại...",
+    resendIn: (seconds: number) => `Gửi lại (${seconds}s)`,
+    resend: "Gửi lại mã",
+    spamNote:
+      "Nếu chưa nhận được email, bạn hãy kiểm tra thư mục Spam hoặc Thư rác.",
+    securityFooter: "Không chia sẻ mã xác nhận với người khác.",
+  },
+  en: {
+    missingTokenError: "Server did not return a verification token.",
+    verifySuccess:
+      "Email verified successfully! You can now complete creating your account.",
+    verifyFailed: "OTP verification failed. Please try again.",
+    resendRequested: "A new OTP code has been requested.",
+    resendFailed: "Unable to resend OTP. Please try again.",
+    backLabel: "Go back",
+    title: "Verify your email",
+    description: "Enter the 6-digit verification code sent to",
+    changeEmail: "Change email",
+    otpLabel: "Verification code",
+    otpAccessibility: "Enter 6-digit verification code",
+    verifying: "Verifying...",
+    verified: "Verified",
+    verify: "Verify",
+    resendHint: "Didn't receive a code?",
+    resending: "Resending...",
+    resendIn: (seconds: number) => `Resend (${seconds}s)`,
+    resend: "Resend code",
+    spamNote:
+      "If you don't see the email, please check your Spam or Junk folder.",
+    securityFooter: "Never share your verification code with anyone else.",
+  },
+};
+
 export default function RegisterOtpVerification({ navigation, route }: Props) {
   const { email, role, retryAfter = 60 } = route.params;
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const copy = translations[preferences.language];
 
   const inputRef = useRef<TextInput>(null);
   const [otp, setOtp] = useState("");
@@ -68,7 +124,7 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       const result = await verifyOtp(email, otp);
 
       if (!result.verification_token) {
-        throw new Error("Backend không trả về verification_token.");
+        throw new Error(copy.missingTokenError);
       }
 
       navigation.replace("RegisterDetails", {
@@ -81,17 +137,11 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       // Không in token vào console và không hiện token trên giao diện.
       setVerificationToken(result.verification_token);
       setMessageType("success");
-      setMessage(
-        "Xác nhận email thành công! Bạn có thể tiếp tục bước tạo tài khoản.",
-      );
+      setMessage(copy.verifySuccess);
       inputRef.current?.blur();
     } catch (error: unknown) {
       setMessageType("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Xác thực OTP thất bại. Vui lòng thử lại.",
-      );
+      setMessage(error instanceof Error ? error.message : copy.verifyFailed);
       setOtp("");
     } finally {
       setVerifying(false);
@@ -113,56 +163,6 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       );
       setOtp("");
       setMessageType("info");
-      setMessage(result.message || "Đã yêu cầu gửi lại mã OTP.");
-    } catch (error: unknown) {
-      setMessageType("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Không thể gửi lại OTP. Vui lòng thử lại.",
-      );
-    } finally {
-      setResending(false);
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Quay lại"
-            >
-              <Ionicons name="arrow-back" size={23} color="#0F172A" />
-            </Pressable>
-
-            <View style={styles.brand}>
-              <View style={styles.logo}>
-                <Ionicons name="heart-outline" size={31} color="#FFFFFF" />
-
-                <View style={styles.pulse}>
-                  <Ionicons name="pulse" size={22} color="#FFFFFF" />
-                </View>
-              </View>
-
-              <Text style={styles.appName}>PreCare</Text>
-            </View>
-
-            <View style={styles.mailIcon}>
-              <Ionicons name="mail-open-outline" size={34} color={PRIMARY} />
             </View>
 
             <Text style={styles.title}>Xác nhận email</Text>
