@@ -270,34 +270,95 @@ export default function PregnancySetupScreen({ navigation }: Props) {
     </View>
   );
 
+  const previewTrimester = preview
+    ? isEn
+      ? preview.trimesterNum === 1
+        ? '1st Trimester'
+        : preview.trimesterNum === 2
+          ? '2nd Trimester'
+          : preview.trimesterNum === 3
+            ? '3rd Trimester'
+            : ''
+      : preview.trimester || ''
+    : '';
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Pregnancy profile' : 'Hồ sơ thai kỳ'}
+        rightElement={
+          <Pressable
+            onPress={() => navigation.replace('Main')}
+            disabled={loading}
+            accessibilityRole="button"
+            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}
+          >
+            <Text style={[styles.skip, fontStyle(14.5, { min: 13.5, max: 17 }), { color: theme.muted }]}>
+              {isEn ? 'Skip for now' : 'Để sau'}
+            </Text>
+          </Pressable>
+        }
+      />
+      <KeyboardAvoidingView style={[styles.flex, { backgroundColor: theme.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.topRow}>
-            <View style={styles.stepPill}><Text style={styles.stepText}>BƯỚC 1 / 1</Text></View>
-            <Pressable onPress={() => navigation.replace('Main')} disabled={loading} accessibilityRole="button">
-              <Text style={styles.skip}>Để sau</Text>
-            </Pressable>
+            <View style={[styles.stepPill, { backgroundColor: theme.tealSoft }]}>
+              <Text style={[styles.stepText, fontStyle(12, { min: 11, max: 14 }), { color: theme.tealText }]}>
+                {isEn ? 'STEP 1 / 1' : 'BƯỚC 1 / 1'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.heroIcon}><Ionicons name="heart" size={29} color="#FFFFFF" /></View>
-          <Text style={styles.title}>Mình cùng thiết lập hồ sơ thai kỳ nhé</Text>
-          <Text style={styles.subtitle}>Thông tin này giúp PreCare theo dõi tuổi thai và ngày dự sinh của mẹ. Mẹ có thể cập nhật lại trong mục Hồ sơ.</Text>
+          <Text style={[styles.title, fontStyle(24, { lineHeight: 32, min: 21, max: 28 }), { color: theme.text }]}>
+            {isEn ? "Let's set up your pregnancy profile" : 'Mình cùng thiết lập hồ sơ thai kỳ nhé'}
+          </Text>
+          <Text style={[styles.subtitle, fontStyle(15.5, { lineHeight: 23, min: 14.5 }), { color: theme.muted }]}>
+            {isEn
+              ? 'This information helps PreCare track your gestational age and due date based on your confirmed baseline.'
+              : 'Thông tin này giúp PreCare theo dõi tuổi thai và ngày dự sinh của mẹ theo chỉ số ban đầu đã xác nhận.'}
+          </Text>
 
-          <Text style={styles.sectionTitle}>Mẹ muốn tính tuổi thai theo cách nào?</Text>
+          <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+            {isEn ? 'How would you like to calculate gestational age?' : 'Mẹ muốn tính tuổi thai theo cách nào?'}
+          </Text>
           {METHODS.map((item) => {
             const selected = method === item.id;
             return (
-              <Pressable key={item.id} onPress={() => { setMethod(item.id); setPreview(null); setError(''); }} style={[styles.methodCard, selected && styles.methodSelected]} accessibilityRole="radio" accessibilityState={{ selected }}>
-                <View style={[styles.methodIcon, selected && styles.methodIconSelected]}><Ionicons name={item.icon} size={20} color={selected ? '#FFFFFF' : colors.primary} /></View>
-                <View style={styles.methodCopy}><Text style={styles.methodTitle}>{item.title}</Text><Text style={styles.methodDescription}>{item.description}</Text></View>
-                <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={21} color={selected ? colors.primary : '#94A3B8'} />
+              <Pressable
+                key={item.id}
+                onPress={() => {
+                  setMethod(item.id);
+                  setPreview(null);
+                  setError('');
+                }}
+                style={[
+                  styles.methodCard,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  selected && { borderColor: colors.primary, backgroundColor: theme.tealSoft },
+                ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : theme.tealSoft }]}>
+                  <Ionicons name={item.icon} size={20} color={selected ? '#FFFFFF' : theme.tealText} />
+                </View>
+                <View style={styles.methodCopy}>
+                  <Text style={[styles.methodTitle, fontStyle(15, { min: 14 }), { color: theme.text }]}>
+                    {isEn ? item.titleEn : item.titleVi}
+                  </Text>
+                  <Text style={[styles.methodDescription, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.muted }]}>
+                    {isEn ? item.descEn : item.descVi}
+                  </Text>
+                </View>
+                <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={21} color={selected ? colors.primary : theme.muted} />
               </Pressable>
             );
           })}
-          <Text style={styles.methodHelp}>{methodDescription}</Text>
+          <Text style={[styles.methodHelp, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.muted }]}>
+            {methodDescription}
+          </Text>
 
           <View style={styles.formCard}>
             {method === 'lmp' && dateField('Ngày đầu kỳ kinh cuối cùng', lmp, setLmp, 'Nếu mẹ không nhớ chính xác, hãy chọn phương pháp siêu âm.')}
