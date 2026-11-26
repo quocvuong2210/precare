@@ -328,3 +328,58 @@ test('date helpers enforce fixed DD/MM/YYYY format and convert cleanly with back
   const dateExports = {};
   vm.runInNewContext(transpiledDate, { exports: dateExports });
 
+  assert.equal(dateExports.formatIsoToDmy('2026-03-01'), '01/03/2026');
+  assert.equal(dateExports.formatIsoToDmy('2026-05-24T10:15:00Z'), '24/05/2026');
+  assert.equal(dateExports.parseStrictDmyToIso('01/03/2026'), '2026-03-01');
+  assert.equal(dateExports.parseStrictDmyToIso('1/3/2026'), '2026-03-01');
+  assert.equal(dateExports.normalizeDmyString('1/3/2026'), '01/03/2026');
+  assert.equal(dateExports.parseStrictDmyToIso('2026-03-01'), null);
+  assert.equal(dateExports.parseStrictDmyToIso('31/02/2026'), null);
+  assert.equal(dateExports.formatDmyInput('01032026', ''), '01/03/2026');
+  assert.equal(dateExports.formatDmyInput('01/0', '01/03'), '01/0');
+});
+
+test('login clears stale profile ID and fetchPregnancyProfileFromDB rejects mismatched patient ownership', async () => {
+  const { api, stored } = setup(
+    (url) => {
+      if (url.endsWith('/auth/login')) {
+        return { status: 200, body: { access_token: 'new-token', refresh_token: 'new-refresh' } };
+      }
+      if (url.endsWith('/auth/me')) {
+        return {
+          status: 200,
+          body: {
+            id: '99999999-9999-4999-8999-999999999999',
+            full_name: 'Account B',
+            email: 'b@example.com',
+            role: 'pregnant_woman',
+          },
+        };
+      }
+      if (url.endsWith('/pregnancy-profiles/active')) {
+        return {
+          status: 200,
+          body: {
+            success: true,
+            data: {
+              id: PROFILE_UUID,
+              patient: { id: '33333333-3333-4333-8333-333333333333', full_name: 'Account A' },
+            },
+          },
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+    { precare_pregnancy_profile_id: PROFILE_UUID }
+  );
+
+  await api.login('b@example.com', 'password123');
+  assert.equal(stored.has('precare_pregnancy_profile_id'), false);
+  assert.equal(api.currentUserProfile.id, '99999999-9999-4999-8999-999999999999');
+
+  const mismatchedProfile = await api.fetchPregnancyProfileFromDB('new-token', {
+    throwOnError: true,
+  });
+  assert.equal(mismatchedProfile, null);
+  assert.equal(stored.has('precare_pregnancy_profile_id'), false);
+});
