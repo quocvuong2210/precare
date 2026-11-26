@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,46 +7,42 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
 export default function OnboardingScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+
   return (
-    <LinearGradient
-      colors={['#F2FCFC', '#E5F7FF']}
-      style={styles.flex}
-    >
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader title="PreCare" />
 
-      <SafeAreaView style={styles.flex}>
-        <View style={styles.content}>
-
-          {/* ================= LOGO ================= */}
+      <LinearGradient
+        colors={[theme.gradientTop, theme.gradientBottom]}
+        style={styles.flex}
+      >
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.brand}>
-
-            <View style={styles.logo}>
-              <Ionicons
-                name="heart"
-                size={36}
-                color={colors.white}
-              />
+            <View style={[styles.logo, { borderColor: theme.border }]}>
+              <Ionicons name="heart" size={36} color={colors.white} />
             </View>
 
-            <Text style={styles.appName}>
+            <Text style={[styles.appName, fontStyle(25, { lineHeight: 31, min: 22, max: 29 }), { color: theme.tealText }]}>
               PreCare
             </Text>
 
-            <Text style={styles.tagline}>
-              THEO DÕI THAI KỲ CỦA BẠN
+            <Text style={[styles.tagline, fontStyle(12, { lineHeight: 17, min: 11, max: 14 }), { color: theme.muted }]}>
+              {isEn ? 'TRACK YOUR PREGNANCY JOURNEY' : 'THEO DÕI THAI KỲ CỦA BẠN'}
             </Text>
-
           </View>
 
-
-          {/* ================= ẢNH ================= */}
-          <View style={styles.photoShadow}>
+          <View style={[styles.photoShadow, { backgroundColor: theme.surface }]}>
             <Image
               source={require('../assets/pregnant.jpg')}
               style={styles.photo}
