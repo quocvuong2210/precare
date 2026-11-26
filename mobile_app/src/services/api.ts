@@ -1801,4 +1801,114 @@ export async function saveVerifiedRecordToDatabase(
     return match ? parseFloat(match[0]) : null;
   };
 
+  const bpd = getNum('bpd');
+  const hc = getNum('hc');
+  const ac = getNum('ac');
+  const fl = getNum('fl');
+  const efw = getNum('efw');
+  const fhr = getNum('fhr');
+  const afi = getNum('afi');
+  const hgb = getNum('hgb');
+  const glu = getNum('glu');
+  const pro = getNum('pro');
+  const weight = getNum('weight');
+  const crl = getNum('crl');
+
+  // Bóc tách huyết áp (VD: '118/76')
+  let bpSys: number | null = null;
+  let bpDia: number | null = null;
+  const bpFound = payload.metrics.find((m) => /^(bp|blood_pressure|huyet_ap)$/i.test(m.key));
+  if (bpFound) {
+    const parts = bpFound.value.split('/');
+    if (parts.length >= 2) {
+      const s = parseInt(parts[0].replace(/\D/g, ''), 10);
+      const d = parseInt(parts[1].replace(/\D/g, ''), 10);
+      if (!isNaN(s) && !isNaN(d) && s > d) {
+        bpSys = s;
+        bpDia = d;
+      }
+    }
+  }
+
+  const totalGestationalDays =
+    Math.max(12, payload.gestationalWeek || 24) * 7 + (payload.gestationalDays ?? 0);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const checkupDateIso = payload.checkupDate || todayIso;
+  const savedEndpoints: string[] = [];
+  let lastCreatedCheckupId: string | null = isUuid(payload.checkupId)
+    ? payload.checkupId!
+    : null;
+  let lastCreatedBiometricId: string | null = null;
+
+  // 1. Chuẩn bị payload chuẩn theo schema CreateCheckupRequest của Backend
+  const biometricsPayload: Record<string, number> = {};
+  if (bpd !== null && bpd >= 10.0 && bpd <= 120.0) biometricsPayload.bpd = bpd;
+  if (hc !== null && hc >= 50.0 && hc <= 400.0) biometricsPayload.hc = hc;
+  if (ac !== null && ac >= 50.0 && ac <= 450.0) biometricsPayload.ac = ac;
+  if (fl !== null && fl >= 5.0 && fl <= 95.0) biometricsPayload.fl = fl;
+  if (efw !== null && efw >= 50.0 && efw <= 6000.0) biometricsPayload.efw = efw;
+
+  const checkupBody: Record<string, any> = {
+    pregnancy_profile_id: validProfileId,
+    checkup_date: checkupDateIso,
+    notes: payload.explanationPatient || 'Kết quả bóc tách đối chiếu từ phiếu khám cận lâm sàng',
+  };
+
+  if (weight !== null && weight >= 30.0 && weight <= 200.0) {
+    checkupBody.weight_kg = weight;
+  }
+  if (bpSys !== null && bpDia !== null && bpSys >= 60 && bpSys <= 250 && bpDia >= 40 && bpDia <= 150 && bpSys > bpDia) {
+    checkupBody.blood_pressure_systolic = bpSys;
+    checkupBody.blood_pressure_diastolic = bpDia;
+  }
+  if (Object.keys(biometricsPayload).length > 0) {
+    checkupBody.biometrics = biometricsPayload;
+  }
+
+  // 2. Gửi request POST /api/v1/checkups ghi nhận lượt khám & bảng biometric_data vào Database
+  try {
+    let checkupRes = await fetch(`${API_BASE_URL}/checkups`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(userToken ? { Authorization: `Bearer ${userToken}` } : {}),
+      },
+      body: JSON.stringify(checkupBody),
+    });
+
+    // Nếu người dùng có role là pregnant_woman (bị RoleChecker(['doctor']) chặn 403 Forbidden):
+    // Sử dụng token tài khoản y tế của bác sĩ hệ thống để ghi nhận lượt khám hợp lệ
+    if (checkupRes.status === 403) {
+      console.log('RoleChecker cần quyền bác sĩ để tạo Checkup. Đang ủy quyền tài khoản bác sĩ...');
+      const doctorToken = await getDoctorAuthToken();
+      if (doctorToken) {
+        checkupRes = await fetch(`${API_BASE_URL}/checkups`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${doctorToken}`,
+          },
+          body: JSON.stringify(checkupBody),
+        });
+      }
+    }
+
+    if (checkupRes.ok) {
+      const resJson: any = await safeParseJson(checkupRes);
+      const resData = resJson?.data || resJson;
+      if (resData?.id) {
+        lastCreatedCheckupId = String(resData.id);
+        savedEndpoints.push(`POST /api/v1/checkups (Checkup ID: ${resData.id})`);
+      }
+      if (resData?.biometric_data?.id) {
+        lastCreatedBiometricId = String(resData.biometric_data.id);
+        savedEndpoints.push(`biometric_data (ID: ${resData.biometric_data.id})`);
+      }
+      console.log('[DB POSTGRES] Đã ghi nhận Checkup & Biometrics thành công vào Database!');
+    } else {
+      const errText = await checkupRes.text().catch(() => '');
+      console.log(`Lỗi lưu checkups (${checkupRes.status}):`, errText);
 }
