@@ -2088,61 +2088,61 @@ export default function UploadScreen({ navigation }: Props) {
       if (!perm.granted) {
         Alert.alert(copy.permissionDeniedTitle, copy.cameraPermissionBody);
         return;
-                      />
-                      <Pressable
-                        style={styles.weekStepBtn}
-                        onPress={() =>
-                          setDraftWeek((w) => String(Math.min(41, (parseInt(w, 10) || 24) + 1)))
-                        }
-                      >
-                        <Ionicons name="add" size={16} color={colors.navy} />
-                      </Pressable>
-                    </View>
-                  )}
-                </View>
+      }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const fallbackName =
+        lang === 'en' ? `Report_${Date.now()}.jpg` : `Anh_phieu_kham_${Date.now()}.jpg`;
+      await uploadAndAnalyzeFile(
+        asset.uri,
+        asset.fileName ?? fallbackName,
+        asset.fileSize,
+        asset.mimeType ?? 'image/jpeg'
+      );
+    } finally {
+      isPickingFileRef.current = false;
+    }
+  };
 
-                <Text style={styles.modalSectionLabel}>
-                  Các chỉ số đã phân tích từ file ({verifyModalItem.analysis.metrics.length} chỉ số):
-                </Text>
+  const pickImage = async () => {
+    try {
+      isPickingFileRef.current = true;
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const fallbackName =
+        lang === 'en' ? `Report_${Date.now()}.jpg` : `Anh_phieu_kham_${Date.now()}.jpg`;
+      await uploadAndAnalyzeFile(
+        asset.uri,
+        asset.fileName ?? fallbackName,
+        asset.fileSize,
+        asset.mimeType ?? 'image/jpeg'
+      );
+    } finally {
+      isPickingFileRef.current = false;
+    }
+  };
 
-                {verifyModalItem.analysis.metrics.map((m) => {
-                  const currentVal = draftMetrics[m.key] ?? m.value;
-                  const liveEval = evaluateMetricByWeek(
-                    m.key,
-                    currentVal,
-                    activeModalWeek
-                  );
-                  const mTheme = SEVERITY_THEME[liveEval.severity];
+  const pickPdf = async () => {
+    try {
+      isPickingFileRef.current = true;
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
 
-                  return (
-                    <View
-                      key={m.key}
-                      style={[
-                        styles.verifyMetricCard,
-                        {
-                          backgroundColor: mTheme.cardBg,
-                          borderColor: isModalEditing ? colors.primary : mTheme.border,
-                        },
-                      ]}
-                    >
-                      <View style={styles.metricTopRow}>
-                        <Text style={styles.verifyMetricLabel}>{m.label}</Text>
-                        <View style={[styles.severityPill, { backgroundColor: mTheme.badgeBg }]}>
-                          <Text style={[styles.severityPillText, { color: mTheme.badgeColor }]}>
-                            {mTheme.badgeLabel}
-                          </Text>
-                        </View>
-                      </View>
+      let mime = asset.mimeType;
+      const lowerName = (asset.name || '').toLowerCase();
+      if (!mime || mime === 'application/octet-stream') {
+        if (lowerName.endsWith('.pdf')) mime = 'application/pdf';
+        else if (lowerName.endsWith('.png')) mime = 'image/png';
+        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime = 'image/jpeg';
+        else mime = 'application/pdf';
+      }
 
-                      {isModalEditing ? (
-                        <View style={styles.verifyInputRow}>
-                          <TextInput
-                            style={[styles.verifyInput, { color: mTheme.valueColor }]}
-                            value={currentVal}
-                            onChangeText={(text) =>
-                              setDraftMetrics((prev) => ({ ...prev, [m.key]: text }))
-                            }
-                            placeholder="Nhập giá trị..."
                             placeholderTextColor="#94A3B8"
                           />
                           {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
