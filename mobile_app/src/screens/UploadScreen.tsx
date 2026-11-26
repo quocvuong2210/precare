@@ -1428,61 +1428,61 @@ export default function UploadScreen({ navigation }: Props) {
       loadAccountData();
     }, [loadAccountData])
   );
-      `Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu "${displayName}" khỏi hệ thống và Database không?`,
-      [
-        { text: 'Huỷ', style: 'cancel' },
-        {
-          text: 'Xoá vĩnh viễn',
-          style: 'destructive',
-          onPress: async () => {
-            if (verifyModalItem?.id === item.id) setVerifyModalItem(null);
 
-            // 1. Xác định chính xác UUID của file trong Database
-            let targetFileId: string | null = null;
-            if (item.fileId && isUuid(item.fileId)) {
-              targetFileId = item.fileId;
-            } else if (item.id && isUuid(item.id)) {
-              targetFileId = item.id;
-            } else {
-              // Tìm kiếm đối soát trong Database theo tên file hoặc ID
-              try {
-                const realPid = profileId || (await ensureActivePregnancyProfileId(profileWeek));
-                const remoteRes: any = await getProfileIngestFiles(realPid, { page: 1, page_size: 50 });
-                const remoteList: any[] = remoteRes?.data?.items || remoteRes?.items || [];
-                const match = remoteList.find(
-                  (rf: any) =>
-                    String(rf.id) === item.fileId ||
-                    String(rf.id) === item.id ||
-                    decodeFileName(rf.file_name) === displayName
-                );
-                if (match && isUuid(match.id)) {
-                  targetFileId = String(match.id);
-                }
-              } catch (e) {
-                console.log('Không thể đối soát UUID từ DB:', e);
-              }
-            }
+  /* =========================================================================
+     MỞ MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (MẶC ĐỊNH CHỈ XEM)
+     ========================================================================= */
+  const openVerificationModal = useCallback(
+    async (item: UploadItem, shouldFetchDetail = true) => {
+      if (!item.analysis) return;
+      const fId = item.fileId || item.id;
 
-            // 2. Nếu có file trên Database, gọi API DELETE
-            if (targetFileId) {
-              setDeletingFileId(item.id);
-              try {
-                console.log(`[API 6/8] Bắt đầu xoá file ${targetFileId} trong Database...`);
-                await deleteIngestFile(targetFileId);
-                console.log(`[API 6/8] Xoá file ${targetFileId} trong Database thành công!`);
-              } catch (e: any) {
-                setDeletingFileId(null);
-                console.error('Lỗi khi xoá tài liệu trên Database:', e);
-                Alert.alert(
-                  'Không thể xoá tài liệu',
-                  e?.message || 'Máy chủ không cho phép xoá tài liệu này hoặc gặp lỗi kết nối. Vui lòng thử lại.'
-                );
-                return; // QUAN TRỌNG: Không xoá local nếu DB xoá thất bại, tránh lỗi reload bị hiện lại!
-              } finally {
-                setDeletingFileId(null);
-              }
-            } else {
-              console.log('[Xoá Local] Tài liệu chỉ tồn tại cục bộ, chưa lưu lên Database.');
+      let updatedItem = item;
+      if (shouldFetchDetail && item.fileId) {
+        try {
+          const res: any = await getIngestFileDetail(fId);
+          const detail: any = res?.data || res;
+          const viewUrl = detail?.presigned_view_url || detail?.presigned_url;
+          if (viewUrl) {
+            updatedItem = {
+              ...item,
+              presignedUrl: String(viewUrl),
+              checkupId: detail?.checkup_id ?? item.checkupId,
+            };
+            updateItemsAndPersist((prev) =>
+              prev.map((it) => (it.id === item.id ? updatedItem : it))
+            );
+          }
+        } catch {
+          // Giữ nguyên URI cục bộ
+        }
+      }
+
+      const initialDraft: Record<string, string> = {};
+      updatedItem.analysis!.metrics.forEach((m) => {
+        initialDraft[m.key] = m.value;
+      });
+      setDraftWeek(String(updatedItem.analysis!.gestationalWeek || profileWeek || 24));
+      setDraftMetrics(initialDraft);
+      setIsModalEditing(false);
+      setZoomSlipImage(false);
+      setVerifyModalItem(updatedItem);
+    },
+    [profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 3 & 5: POLLING TASK CELERY & LẤY PRESIGNED_VIEW_URL
+     ========================================================================= */
+  const pollCeleryTaskStatus = useCallback(
+    async (
+      localItemId: string,
+      taskId: string,
+      fileId: string | undefined,
+      fileName: string
+    ) => {
+      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (!isMountedRef.current) return;
             }
 
             // 3. Xoá hoàn toàn khỏi State và AsyncStorage
