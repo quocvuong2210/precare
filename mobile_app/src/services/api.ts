@@ -1648,61 +1648,61 @@ export async function getProfileIngestFiles(
       headers,
     }
   );
-        savedEndpoints.push(`POST /api/v1/checkups (Checkup ID: ${resData.id})`);
-      }
-      if (resData?.biometric_data?.id) {
-        lastCreatedBiometricId = String(resData.biometric_data.id);
-        savedEndpoints.push(`biometric_data (ID: ${resData.biometric_data.id})`);
-      }
-      console.log('[DB POSTGRES] Đã ghi nhận Checkup & Biometrics thành công vào Database!');
-    } else {
-      const errText = await checkupRes.text().catch(() => '');
-      console.log(`Lỗi lưu checkups (${checkupRes.status}):`, errText);
-    }
-  } catch (err: any) {
-    console.log('Lỗi kết nối lưu checkup:', err?.message || err);
-  }
 
-  // 3. Nếu có chỉ số CRL hoặc tuần thai siêu âm Q1, cập nhật bảng pregnancy_profiles qua PUT /pregnancy-profiles/{id}
-  if (crl !== null && crl > 0) {
-    try {
-      const profileUpdateBody: Record<string, any> = {
-        crl_mm: crl,
-        recalculate_edd: false,
-      };
-      const putRes = await fetch(`${API_BASE_URL}/pregnancy-profiles/${validProfileId}`, {
-        method: 'PUT',
-        headers: userHeaders,
-        body: JSON.stringify(profileUpdateBody),
-      });
-      if (putRes.ok) {
-        savedEndpoints.push(`PUT /api/v1/pregnancy-profiles/${validProfileId} (CRL: ${crl}mm)`);
-      }
-    } catch (e) {
-      console.log('Lỗi cập nhật pregnancy_profiles:', e);
-    }
-  }
+  const data: any = await handleResponse(response);
+  console.log(`Lấy danh sách tài liệu hồ sơ (${validProfileId}) thành công!`);
+  return data;
+}
 
-  // 4. Gọi Service Phân tích Hadlock + Safety Fusion (analysis_service trên cổng 8001)
-  const rootUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
-  const analysisServiceUrl = rootUrl.replace(':8000', ':8001');
-  try {
-    const analysisReqBody: Record<string, any> = {
-      gestational_age_days: totalGestationalDays,
-      ...(bpd !== null ? { bpd } : {}),
-      ...(hc !== null ? { hc } : {}),
-      ...(ac !== null ? { ac } : {}),
-      ...(fl !== null ? { fl } : {}),
-      ...(efw !== null ? { efw } : {}),
-    };
-
-    const predRes = await fetch(`${analysisServiceUrl}/api/v1/predict`, {
+// 8. POST /api/v1/ingest/files/{file_id}/retry — Thử lại quá trình trích xuất nếu task Celery bị failed
+export async function retryIngestFile(
+  fileId: string
+): Promise<{ success: boolean; message: string; data: string }> {
+  console.log(
+    `[API 8/8] Đang gửi yêu cầu thử lại trích xuất: ${fileId} (POST /api/v1/ingest/files/${fileId}/retry)...`
+  );
+  const headers = await getIngestAuthHeaders(true);
+  const response = await fetch(
+    `${API_BASE_URL}/ingest/files/${encodeURIComponent(fileId)}/retry`,
+    {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(analysisReqBody),
-    });
+      headers,
+    }
+  );
 
-    if (predRes.ok) {
+  const data: any = await handleResponse(response);
+  console.log(`Thử lại trích xuất tài liệu (${fileId}) thành công!`);
+  return data;
+}
+
+// =========================================================================
+// --- ĐỒNG BỘ CHỈ SỐ SIÊU ÂM & KẾT QUẢ PHÂN TÍCH XUỐNG DATABASE POSTGRESQL ---
+// =========================================================================
+
+export interface SaveVerifiedAnalysisPayload {
+  fileId?: string;
+  profileId?: string;
+  checkupId?: string | null;
+  verificationUrl?: string;
+  checkupDate?: string;
+  gestationalWeek: number;
+  gestationalDays?: number;
+  overallSeverity: 'normal' | 'warning' | 'danger';
+  percentile?: number;
+  explanationDoctor: string;
+  explanationPatient: string;
+  disclaimerText: string;
+  ruleVersion: string;
+  modelVersion: string;
+  metrics: {
+    key: string;
+    label: string;
+    value: string;
+    originalValue?: string;
+    unit: string;
+    percentile?: number;
+    severity: 'normal' | 'warning' | 'danger';
+  }[];
       savedEndpoints.push(`POST ${analysisServiceUrl}/api/v1/predict (Hadlock & RACA-Net Fusion)`);
     }
   } catch {
