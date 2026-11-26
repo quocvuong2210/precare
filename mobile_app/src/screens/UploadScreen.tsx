@@ -603,61 +603,61 @@ export function evaluateMetricByWeek(
       return {
         severity: 'warning',
         clinicalNote: isEn
-        rawAnalysis.record_type ||
-        'Phiếu Khám Thai & Xét Nghiệm Cận Lâm Sàng',
-      gestationalWeek: clampedWeek,
-      gestationalDays: Number(rawAnalysis.gestationalDays ?? rawAnalysis.gestational_days ?? 0),
-      gestationalAge: stageLabel,
-      summary: rawAnalysis.summary || `Đã trích xuất từ hệ thống Ingest (${stageLabel}).`,
-      doctorConclusion:
-        rawAnalysis.explanation_patient ||
-        rawAnalysis.app_explanation ||
-        rawAnalysis.doctorConclusion ||
-        evalState.doctorConclusion,
-      rule_version: rawAnalysis.rule_version || DEFAULT_RULE_VERSION,
-      model_version: rawAnalysis.model_version || DEFAULT_MODEL_VERSION,
-      overallSeverity: evalState.overallSeverity,
-      savedToProfile: Boolean(rawAnalysis.savedToProfile ?? rawAnalysis.saved_to_profile ?? false),
-      metrics,
+          ? `Yellow (3rd–10th): Slightly below Week ${clampedWeek} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Focus on nutrition and monitor at the next visit.`
+          : `Mức Vàng (3rd–10th): Hơi thấp nhẹ so với chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ chú ý dinh dưỡng và theo dõi kỳ khám tới nhé.`,
+        refRange: bounds.refRange,
+      };
+    }
+
+    if (num > bounds.maxNormal) {
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
+          ? `Yellow (90th–97th): Slightly above Week ${clampedWeek} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Please monitor together with your doctor.`
+          : `Mức Vàng (90th–97th): Nhỉnh hơn chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ lưu ý theo dõi thêm cùng bác sĩ nhé.`,
+        refRange: bounds.refRange,
+      };
+    }
+
+    return {
+      severity: 'normal',
+      clinicalNote: isEn
+        ? `Green (10th–90th): Within Week ${clampedWeek} · Month ${month} standard (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Fetal growth aligns with gestational age.`
+        : `Mức Xanh (10th–90th): Đạt chuẩn Tuần ${clampedWeek} · Tháng thứ ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Thai phát triển tương xứng tuổi thai.`,
+      refRange: bounds.refRange,
     };
   }
 
-  const knownKeys: { key: string; label: string; unit: string; ref: string }[] = [
-    { key: 'bp', label: 'Huyết áp mẹ (BP)', unit: 'mmHg', ref: '< 130/85 mmHg' },
-    { key: 'weight', label: 'Cân nặng mẹ', unit: 'kg', ref: 'Theo BMI thai kỳ' },
-    { key: 'fhr', label: 'Nhịp tim thai (FHR)', unit: 'bpm', ref: '120 – 160 bpm' },
-    { key: 'bpd', label: 'Đường kính lưỡng đỉnh (BPD)', unit: 'mm', ref: '' },
-    { key: 'hc', label: 'Chu vi đầu (HC)', unit: 'mm', ref: '' },
-    { key: 'fl', label: 'Chiều dài xương đùi (FL)', unit: 'mm', ref: '' },
-    { key: 'ac', label: 'Chu vi vòng bụng (AC)', unit: 'mm', ref: '' },
-    { key: 'efw', label: 'Cân nặng thai ước tính (EFW)', unit: 'g', ref: '' },
-    { key: 'afi', label: 'Chỉ số nước ối (AFI)', unit: 'mm', ref: '80 – 180 mm' },
-    { key: 'hgb', label: 'Hemoglobin máu (HGB)', unit: 'g/dL', ref: '' },
-    { key: 'wbc', label: 'Bạch cầu máu (WBC)', unit: 'G/L', ref: '4.5 – 11.0 G/L' },
-    { key: 'glu', label: 'Đường huyết lúc đói (Fasting Glucose)', unit: 'mmol/L', ref: '< 5.1 mmol/L' },
-    { key: 'pro', label: 'Protein niệu (Urine Protein)', unit: 'g/L', ref: '< 0.15 g/L' },
-    { key: 'ph', label: 'Độ pH nước tiểu', unit: '', ref: '5.0 – 7.5' },
-  ];
+  if (key === 'hgb') {
+    const minHgb = trimester === 2 ? 10.5 : 11.0;
+    const refText = isEn
+      ? `${minHgb.toFixed(1)} – 14.5 g/dL (Trimester ${trimester})`
+      : `${minHgb.toFixed(1)} – 14.5 g/dL (Tam cá nguyệt ${trimester})`;
+    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
+    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
 
-  const fields =
-    rawAnalysis?.extracted_fields ||
-    rawAnalysis?.ocr_raw_payload?.extracted_fields ||
-    rawAnalysis?.ocr_raw_payload ||
-    rawAnalysis?.payload?.extracted_fields ||
-    rawAnalysis?.payload ||
-    rawAnalysis;
-
-  const extractedMetrics: MedicalMetric[] = [];
-  for (const item of knownKeys) {
-    const rawVal =
-      fields?.[item.key] ??
-      fields?.[`${item.key}_mm`] ??
-      fields?.[`${item.key}_g`] ??
-      fields?.[item.key.toUpperCase()] ??
-      rawAnalysis?.[item.key] ??
-      rawAnalysis?.[`${item.key}_mm`] ??
-      rawAnalysis?.[`${item.key}_g`] ??
-      rawAnalysis?.[item.key.toUpperCase()];
+    if (!isNaN(num)) {
+      if (num < 9.5) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? `Red: Hemoglobin in month ${month} is low (${num} < 9.5 g/dL). Please consult your doctor for care advice.`
+            : `Mức Đỏ: Huyết sắc tố ở tháng thứ ${month} thấp (${num} < 9.5 g/dL). Mẹ nên đến gặp bác sĩ để được tư vấn chăm sóc phù hợp nhé.`,
+          refRange: refText,
+        };
+      }
+      if (num < minHgb) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? `Yellow: Hemoglobin is slightly low for Trimester ${trimester} (< ${minHgb} g/dL). Please check with your doctor.`
+            : `Mức Vàng: Huyết sắc tố hơi thấp nhẹ so với chuẩn Tam cá nguyệt ${trimester} (< ${minHgb} g/dL). Mẹ hãy tham khảo ý kiến bác sĩ nhé.`,
+          refRange: refText,
+        };
+      }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
     if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
       extractedMetrics.push(
         buildMetricByWeek(item.key, item.label, String(rawVal), item.unit, item.ref, clampedWeek)
