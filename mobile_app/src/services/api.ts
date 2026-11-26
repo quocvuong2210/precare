@@ -1153,61 +1153,61 @@ export async function fetchCheckupHistoryFromDB(
         Accept: 'application/json',
         Authorization: `Bearer ${authToken}`,
       },
- * nếu môi trường gặp sự cố FormDataPart sẽ tự động Fallback sang native XMLHttpRequest.
- */
-export async function uploadParaclinicalFile<T = any>(
-  url: string,
-  formData: FormData,
-  token?: string
-): Promise<T> {
-  const authToken =
-    token || currentAccessToken || (await getStoredAccessToken()) || '';
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: formData,
-    });
-
-    const resJson: any = await safeParseJson(res);
-    if (res.ok) {
-      return resJson;
     }
-    const errMsg =
-      resJson?.detail?.message ||
-      (typeof resJson?.detail === 'string' ? resJson.detail : null) ||
-      resJson?.message ||
-      `HTTP ${res.status}`;
-    throw new Error(errMsg);
-  } catch (err: any) {
-    if (
-      err?.message?.includes('Unsupported FormDataPart') ||
-      err?.message?.includes('Network request failed')
-    ) {
-      console.log('[Upload] Fallback sang native XMLHttpRequest...');
-      return await uploadMultipartViaXHR(url, formData, authToken);
-    }
-    throw err;
-  }
+  );
+
+  const json = await handleResponse(res);
+  return Array.isArray(json?.data) ? json.data : [];
 }
 
-// 1. POST /api/v1/ingest/upload — Tải lên đơn lẻ phiếu khám cận lâm sàng & sinh task Celery
-export async function ingestUploadSingle(
-  file: IngestFilePayload,
-  profileId?: string,
-  options?: { checkupId?: string | null; documentType?: string }
-): Promise<{ success: boolean; data: IngestUploadResponseData; message: string }> {
-  const validProfileId =
-    profileId && profileId !== 'profile_demo_01'
-      ? profileId
-      : await ensureActivePregnancyProfileId();
+// Đảm bảo luôn lấy hoặc khởi tạo UUID thật trong bảng public.pregnancy_profiles trước khi Upload/Lưu DB
+export async function ensureActivePregnancyProfileId(defaultWeek: number = 24): Promise<string> {
+  const existing = await fetchPregnancyProfileFromDB();
+  const existingId = existing?.id || existing?.profile_id || existing?.pregnancy_profile_id;
+  if (existingId && String(existingId) !== 'profile_demo_01') {
+    return String(existingId);
+  }
 
-  console.log(
-    `[API 1/8] Đang tải lên file đơn lẻ: "${file.name}" (pregnancy_profile_id=${validProfileId})...`
+  const cachedId = await AsyncStorage.getItem('precare_pregnancy_profile_id');
+  if (cachedId && cachedId !== 'profile_demo_01') {
+    return cachedId;
+  }
+
+  const lmpDate = new Date(Date.now() - defaultWeek * 7 * 24 * 60 * 60 * 1000);
+  const lmpIso = `${lmpDate.getFullYear()}-${String(lmpDate.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(lmpDate.getDate()).padStart(2, '0')}`;
+
+  try {
+    const created = await savePregnancyProfileToDB({
+      calculation_method: 'lmp',
+      lmp: lmpIso,
+    });
+    const createdId = extractProfileUuid(created);
+    if (createdId) {
+      return createdId;
+    }
+  } catch (e) {
+    console.log('Tự động khởi tạo pregnancy_profile:', e);
+  }
+
+  const retryExisting = await fetchPregnancyProfileFromDB();
+  if (retryExisting?.id) {
+    return String(retryExisting.id);
+  }
+
+  throw new Error(
+    'Chưa tìm thấy Hồ sơ thai kỳ (pregnancy_profile_id). Vui lòng vào mục Hồ sơ bấm Lưu thông tin thai kỳ trước khi tải phiếu khám.'
+  );
+}
+
+// =========================================================================
+// --- PARACLINICAL INGEST & QUEUE (8 ĐẦU API TẢI LÊN & HÀNG ĐỢI CELERY) ---
+// =========================================================================
+
+export interface IngestFilePayload {
+  uri: string;
   );
 
   const formData = new FormData();
