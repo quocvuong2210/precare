@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -16,24 +17,50 @@ export default function PrimaryButton({
   disabled = false,
 }: Props) {
   const filled = variant === 'filled';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.base,
-        filled ? styles.filled : styles.outline,
+        filled
+          ? styles.filled
+          : [
+              styles.outline,
+              isDark && {
+                backgroundColor: theme.surface,
+                borderColor: theme.tealText,
+              },
+            ],
         pressed && !disabled && { opacity: 0.85 },
         disabled && { opacity: 0.65 },
       ]}
     >
-      <Text style={[styles.label, { color: filled ? colors.white : colors.primary }]}>{title}</Text>
+      <Text
+        style={[
+          styles.label,
+          fontStyle(16, { min: 15, max: 19 }),
+          { color: filled ? colors.white : isDark ? theme.tealText : colors.primary },
+        ]}
+      >
+        {title}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  base: {
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   filled: {
     backgroundColor: colors.primary,
     shadowColor: colors.primary,

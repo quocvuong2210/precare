@@ -14,7 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../navigation/AppNavigator";
-
+import ScreenHeader from "../../components/ScreenHeader";
+import { useAppSettings } from "../../context/AppSettingsContext";
 import { sendOtp } from "../../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
@@ -22,6 +23,8 @@ type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 const PRIMARY = "#0D9488";
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === "en";
   const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -30,33 +33,27 @@ export default function RegisterScreen({ navigation }: Props) {
     const role = "pregnant_woman";
 
     if (!email) {
-      Alert.alert("Thông báo", "Vui lòng nhập email.");
-      return;
-    }
-
-    // 1. Kiểm tra email
-    if (!email) {
-      Alert.alert("Thông báo", "Vui lòng nhập email.");
+      Alert.alert(
+        isEn ? "Notice" : "Thông báo",
+        isEn ? "Please enter your email." : "Vui lòng nhập email.",
+      );
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng địa chỉ email.");
+      Alert.alert(
+        isEn ? "Invalid email" : "Email không hợp lệ",
+        isEn ? "Please enter a valid email address." : "Vui lòng nhập đúng địa chỉ email.",
+      );
       return;
     }
 
-    // 2. Ngăn gọi API nhiều lần
     if (loading) return;
 
     try {
       setLoading(true);
-
-      // 3. Chỉ gọi API gửi OTP MỘT LẦN
       const result = await sendOtp(email, role);
 
-      console.log("Gửi OTP thành công:", result.message);
-
-      // 4. Chuyển màn hình nếu API thành công
       navigation.navigate("RegisterOtpVerification", {
         email: email,
         role: role,
@@ -66,27 +63,29 @@ export default function RegisterScreen({ navigation }: Props) {
       const message =
         error instanceof Error
           ? error.message
-          : "Không thể gửi mã OTP. Vui lòng thử lại.";
+          : (isEn ? "Unable to send OTP code. Please try again." : "Không thể gửi mã OTP. Vui lòng thử lại.");
 
-      console.error("Lỗi gửi OTP:", message);
-
-      Alert.alert("Gửi OTP thất bại", message);
+      Alert.alert(isEn ? "OTP failed" : "Gửi OTP thất bại", message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={["top", "bottom"]}>
+      <StatusBar style={preferences.darkMode ? "light" : "dark"} />
+      <ScreenHeader
+        title={isEn ? "Sign up" : "Đăng ký"}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
 
       <ScrollView
+        style={{ backgroundColor: theme.background }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.main}>
-          {/* Logo */}
           <View style={styles.brand}>
             <View style={styles.logo}>
               <Ionicons name="heart-outline" size={31} color="#FFFFFF" />
@@ -95,27 +94,33 @@ export default function RegisterScreen({ navigation }: Props) {
               </View>
             </View>
 
-            <Text style={styles.appName}>PreCare</Text>
+            <Text style={[styles.appName, fontStyle(19, { min: 17.5, max: 22 }), { color: theme.tealText }]}>PreCare</Text>
           </View>
 
-          {/* Heading */}
-          <Text style={styles.title}>Tạo tài khoản mới</Text>
-          <Text style={styles.subtitle}>
-            Đăng ký để cập nhật hồ sơ thai kỳ kỹ thuật số.
+          <Text style={[styles.title, fontStyle(22, { lineHeight: 29, min: 20, max: 26 }), { color: theme.text }]}>
+            {isEn ? "Create a new account" : "Tạo tài khoản mới"}
+          </Text>
+          <Text style={[styles.subtitle, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+            {isEn
+              ? "Register to track your digital pregnancy profile."
+              : "Đăng ký để cập nhật hồ sơ thai kỳ kỹ thuật số."}
           </Text>
 
-          {/* Email / phone */}
           <View style={styles.form}>
-            <Text style={styles.label}>
-              Email hoặc số điện thoại <Text style={styles.required}>*</Text>
+            <Text style={[styles.label, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.textSecondary }]}>
+              {isEn ? "Email address" : "Email hoặc số điện thoại"} <Text style={styles.required}>*</Text>
             </Text>
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                fontStyle(15.5, { min: 14.5, max: 18 }),
+                { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+              ]}
               value={identifier}
               onChangeText={setIdentifier}
-              placeholder="Nhập email của bạn"
-              placeholderTextColor="#94A8C3"
+              placeholder={isEn ? "Enter your email" : "Nhập email của bạn"}
+              placeholderTextColor={theme.muted}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -132,79 +137,79 @@ export default function RegisterScreen({ navigation }: Props) {
                 loading && { opacity: 0.6 },
               ]}
             >
-              <Text style={styles.continueText}>
-                {loading ? "Đang gửi mã OTP..." : "Tiếp tục"}
+              <Text style={[styles.continueText, fontStyle(15.5, { min: 14.5, max: 18 })]}>
+                {loading
+                  ? (isEn ? "Sending OTP..." : "Đang gửi mã OTP...")
+                  : (isEn ? "Continue" : "Tiếp tục")}
               </Text>
             </Pressable>
           </View>
 
-          {/* Divider */}
           <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Hoặc đăng ký bằng</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            <Text style={[styles.dividerText, fontStyle(12.5, { min: 11.5, max: 14.5 }), { color: theme.muted }]}>
+              {isEn ? "Or sign up with" : "Hoặc đăng ký bằng"}
+            </Text>
+            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
           </View>
 
-          {/* Social buttons */}
           <View style={styles.socialRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Đăng ký bằng Google"
+              accessibilityLabel={isEn ? "Sign up with Google" : "Đăng ký bằng Google"}
               style={({ pressed }) => [
                 styles.socialButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
                 pressed && styles.pressed,
               ]}
-              onPress={() => {
-                //to do: Google registration.
-              }}
+              onPress={() => {}}
             >
-              <Ionicons name="logo-google" size={15} color="#475569" />
-              <Text style={styles.socialText}>Google</Text>
+              <Ionicons name="logo-google" size={15} color={theme.muted} />
+              <Text style={[styles.socialText, fontStyle(13.5, { min: 12.5, max: 15.5 }), { color: theme.text }]}>Google</Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Đăng ký bằng Facebook"
+              accessibilityLabel={isEn ? "Sign up with Facebook" : "Đăng ký bằng Facebook"}
               style={({ pressed }) => [
                 styles.socialButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
                 pressed && styles.pressed,
               ]}
-              onPress={() => {
-                // TODO: Facebook registration.
-              }}
+              onPress={() => {}}
             >
-              <Ionicons name="logo-facebook" size={15} color="#475569" />
-              <Text style={styles.socialText}>Facebook</Text>
+              <Ionicons name="logo-facebook" size={15} color={theme.muted} />
+              <Text style={[styles.socialText, fontStyle(13.5, { min: 12.5, max: 15.5 }), { color: theme.text }]}>Facebook</Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Đăng ký bằng Apple"
+              accessibilityLabel={isEn ? "Sign up with Apple" : "Đăng ký bằng Apple"}
               style={({ pressed }) => [
                 styles.socialButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
                 pressed && styles.pressed,
               ]}
-              onPress={() => {
-                // TODO: Apple registration.
-              }}
+              onPress={() => {}}
             >
-              <Ionicons name="logo-apple" size={17} color="#475569" />
-              <Text style={styles.socialText}>Apple</Text>
+              <Ionicons name="logo-apple" size={17} color={theme.muted} />
+              <Text style={[styles.socialText, fontStyle(13.5, { min: 12.5, max: 15.5 }), { color: theme.text }]}>Apple</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Footer stays near the bottom on tall screens */}
         <View style={styles.footer}>
-          <View style={styles.loginRow}>
-            <Text style={styles.loginText}>Đã có tài khoản?</Text>
+          <View style={[styles.loginRow, { borderTopColor: theme.border }]}>
+            <Text style={[styles.loginText, fontStyle(14, { lineHeight: 21, min: 13 }), { color: theme.muted }]}>
+              {isEn ? "Already have an account?" : "Đã có tài khoản?"}
+            </Text>
 
             <Pressable
               accessibilityRole="button"
               hitSlop={8}
               onPress={() => navigation.navigate("Login")}
             >
-              <Text style={styles.loginLink}>Đăng nhập</Text>
+              <Text style={[styles.loginLink, fontStyle(14, { lineHeight: 21, min: 13 }), { color: theme.tealText }]}>{isEn ? "Sign in" : "Đăng nhập"}</Text>
             </Pressable>
           </View>
         </View>
@@ -267,8 +272,8 @@ const styles = StyleSheet.create({
 
   subtitle: {
     marginTop: 5,
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 22,
     color: "#64748B",
   },
 
@@ -278,8 +283,8 @@ const styles = StyleSheet.create({
 
   label: {
     marginBottom: 7,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14.5,
+    lineHeight: 20,
     fontWeight: "600",
     color: "#1E293B",
   },
@@ -289,21 +294,21 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    minHeight: 42,
+    minHeight: 48,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: "#DFE8F3",
     borderRadius: 7,
     backgroundColor: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 15.5,
     color: "#0F172A",
   },
 
   continueButton: {
-    minHeight: 42,
+    minHeight: 48,
     marginTop: 18,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 7,
     backgroundColor: PRIMARY,
     alignItems: "center",
@@ -311,7 +316,7 @@ const styles = StyleSheet.create({
   },
 
   continueText: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: "600",
     color: "#FFFFFF",
   },
@@ -331,19 +336,22 @@ const styles = StyleSheet.create({
   },
 
   dividerText: {
-    fontSize: 10,
+    fontSize: 12.5,
     color: "#94A8C3",
   },
 
   socialRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
 
   socialButton: {
     flex: 1,
-    minHeight: 36,
+    minWidth: 96,
+    minHeight: 44,
     paddingVertical: 8,
+    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: "#DFE8F3",
     borderRadius: 7,
@@ -355,7 +363,7 @@ const styles = StyleSheet.create({
   },
 
   socialText: {
-    fontSize: 11,
+    fontSize: 13.5,
     fontWeight: "600",
     color: "#0F172A",
   },
@@ -382,14 +390,14 @@ const styles = StyleSheet.create({
   },
 
   loginText: {
-    fontSize: 12,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     color: "#64748B",
   },
 
   loginLink: {
-    fontSize: 12,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: "700",
     color: PRIMARY,
   },

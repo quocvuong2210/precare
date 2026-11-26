@@ -15,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { RootStackParamList } from "../../navigation/AppNavigator";
+import ScreenHeader from "../../components/ScreenHeader";
+import { useAppSettings } from "../../context/AppSettingsContext";
 import { sendOtp, verifyOtp } from "../../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterOtpVerification">;
@@ -22,8 +24,62 @@ type Props = NativeStackScreenProps<RootStackParamList, "RegisterOtpVerification
 const PRIMARY = "#0D9488";
 const OTP_LENGTH = 6;
 
+const translations = {
+  vi: {
+    missingTokenError: "Backend không trả về verification_token.",
+    verifySuccess:
+      "Xác nhận email thành công! Bạn có thể tiếp tục bước tạo tài khoản.",
+    verifyFailed: "Xác thực OTP thất bại. Vui lòng thử lại.",
+    resendRequested: "Đã yêu cầu gửi lại mã OTP.",
+    resendFailed: "Không thể gửi lại OTP. Vui lòng thử lại.",
+    backLabel: "Quay lại",
+    title: "Xác nhận email",
+    description: "Nhập mã xác nhận gồm 6 chữ số được gửi đến",
+    changeEmail: "Thay đổi email",
+    otpLabel: "Mã xác nhận",
+    otpAccessibility: "Nhập mã xác nhận 6 chữ số",
+    verifying: "Đang xác minh...",
+    verified: "Đã xác nhận",
+    verify: "Xác nhận",
+    resendHint: "Chưa nhận được mã?",
+    resending: "Đang gửi lại...",
+    resendIn: (seconds: number) => `Gửi lại (${seconds}s)`,
+    resend: "Gửi lại mã",
+    spamNote:
+      "Nếu chưa nhận được email, bạn hãy kiểm tra thư mục Spam hoặc Thư rác.",
+    securityFooter: "Không chia sẻ mã xác nhận với người khác.",
+  },
+  en: {
+    missingTokenError: "Server did not return a verification token.",
+    verifySuccess:
+      "Email verified successfully! You can now complete creating your account.",
+    verifyFailed: "OTP verification failed. Please try again.",
+    resendRequested: "A new OTP code has been requested.",
+    resendFailed: "Unable to resend OTP. Please try again.",
+    backLabel: "Go back",
+    title: "Verify your email",
+    description: "Enter the 6-digit verification code sent to",
+    changeEmail: "Change email",
+    otpLabel: "Verification code",
+    otpAccessibility: "Enter 6-digit verification code",
+    verifying: "Verifying...",
+    verified: "Verified",
+    verify: "Verify",
+    resendHint: "Didn't receive a code?",
+    resending: "Resending...",
+    resendIn: (seconds: number) => `Resend (${seconds}s)`,
+    resend: "Resend code",
+    spamNote:
+      "If you don't see the email, please check your Spam or Junk folder.",
+    securityFooter: "Never share your verification code with anyone else.",
+  },
+};
+
 export default function RegisterOtpVerification({ navigation, route }: Props) {
   const { email, role, retryAfter = 60 } = route.params;
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const copy = translations[preferences.language];
 
   const inputRef = useRef<TextInput>(null);
   const [otp, setOtp] = useState("");
@@ -68,7 +124,7 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       const result = await verifyOtp(email, otp);
 
       if (!result.verification_token) {
-        throw new Error("Backend không trả về verification_token.");
+        throw new Error(copy.missingTokenError);
       }
 
       navigation.replace("RegisterDetails", {
@@ -81,17 +137,11 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       // Không in token vào console và không hiện token trên giao diện.
       setVerificationToken(result.verification_token);
       setMessageType("success");
-      setMessage(
-        "Xác nhận email thành công! Bạn có thể tiếp tục bước tạo tài khoản.",
-      );
+      setMessage(copy.verifySuccess);
       inputRef.current?.blur();
     } catch (error: unknown) {
       setMessageType("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Xác thực OTP thất bại. Vui lòng thử lại.",
-      );
+      setMessage(error instanceof Error ? error.message : copy.verifyFailed);
       setOtp("");
     } finally {
       setVerifying(false);
@@ -113,25 +163,26 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       );
       setOtp("");
       setMessageType("info");
-      setMessage(result.message || "Đã yêu cầu gửi lại mã OTP.");
+      setMessage(result.message || copy.resendRequested);
     } catch (error: unknown) {
       setMessageType("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Không thể gửi lại OTP. Vui lòng thử lại.",
-      );
+      setMessage(error instanceof Error ? error.message : copy.resendFailed);
     } finally {
       setResending(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={["top", "bottom"]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <ScreenHeader
+        title={preferences.language === 'en' ? "Verify OTP" : "Xác thực mã OTP"}
+        onBack={() => navigation.goBack()}
+        backLabel={copy.backLabel}
+      />
 
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: theme.background }]}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
@@ -140,15 +191,6 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <View>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Quay lại"
-            >
-              <Ionicons name="arrow-back" size={23} color="#0F172A" />
-            </Pressable>
-
             <View style={styles.brand}>
               <View style={styles.logo}>
                 <Ionicons name="heart-outline" size={31} color="#FFFFFF" />
@@ -158,30 +200,42 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                 </View>
               </View>
 
-              <Text style={styles.appName}>PreCare</Text>
+              <Text style={[styles.appName, fontStyle(20, { min: 18, max: 23 }), { color: theme.tealText }]}>
+                PreCare
+              </Text>
             </View>
 
-            <View style={styles.mailIcon}>
-              <Ionicons name="mail-open-outline" size={34} color={PRIMARY} />
+            <View style={[styles.mailIcon, { backgroundColor: theme.tealSoft }]}>
+              <Ionicons
+                name="mail-open-outline"
+                size={34}
+                color={theme.tealText}
+              />
             </View>
 
-            <Text style={styles.title}>Xác nhận email</Text>
-
-            <Text style={styles.description}>
-              Nhập mã xác nhận gồm 6 chữ số được gửi đến
+            <Text style={[styles.title, fontStyle(24, { lineHeight: 32, min: 22, max: 28 }), { color: theme.text }]}>
+              {copy.title}
             </Text>
 
-            <Text style={styles.email}>{email}</Text>
+            <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
+              {copy.description}
+            </Text>
+
+            <Text style={[styles.email, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.text }]}>{email}</Text>
 
             <Pressable
               style={styles.changeEmailButton}
               onPress={() => navigation.goBack()}
               accessibilityRole="button"
             >
-              <Text style={styles.changeEmailText}>Thay đổi email</Text>
+              <Text style={[styles.changeEmailText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                {copy.changeEmail}
+              </Text>
             </Pressable>
 
-            <Text style={styles.label}>Mã xác nhận</Text>
+            <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.otpLabel}
+            </Text>
 
             {/* A single input supports typing, pasting and autofill. */}
             <View style={styles.otpContainer}>
@@ -200,11 +254,26 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                       key={index}
                       style={[
                         styles.otpBox,
-                        !!otp[index] && styles.otpBoxFilled,
-                        active && styles.otpBoxActive,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.border,
+                        },
+                        !!otp[index] && [
+                          styles.otpBoxFilled,
+                          {
+                            backgroundColor: theme.tealSoft,
+                            borderColor: theme.tealBorder,
+                          },
+                        ],
+                        active && [
+                          styles.otpBoxActive,
+                          { borderColor: theme.tealText },
+                        ],
                       ]}
                     >
-                      <Text style={styles.otpDigit}>{otp[index] || ""}</Text>
+                      <Text style={[styles.otpDigit, fontStyle(23, { min: 20, max: 26 }), { color: theme.text }]}>
+                        {otp[index] || ""}
+                      </Text>
                     </View>
                   );
                 })}
@@ -228,7 +297,7 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                 maxLength={OTP_LENGTH}
                 caretHidden
                 selectionColor="transparent"
-                accessibilityLabel="Nhập mã xác nhận 6 chữ số"
+                accessibilityLabel={copy.otpAccessibility}
               />
             </View>
 
@@ -236,8 +305,15 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
               <Text
                 style={[
                   styles.message,
-                  messageType === "success" && styles.messageSuccess,
-                  messageType === "error" && styles.messageError,
+                  fontStyle(14, { lineHeight: 20, min: 13 }),
+                  messageType === "success" && [
+                    styles.messageSuccess,
+                    { color: theme.tealText },
+                  ],
+                  messageType === "error" && [
+                    styles.messageError,
+                    { color: theme.danger },
+                  ],
                 ]}
                 accessibilityLiveRegion="polite"
               >
@@ -257,25 +333,30 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
               }}
               style={({ pressed }) => [
                 styles.verifyButton,
-                (!isComplete || verifying || resending) &&
+                (!isComplete || verifying || resending) && [
                   styles.buttonDisabled,
+                  isDark && { backgroundColor: theme.surfaceAlt },
+                ],
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.verifyText}>
+              <Text style={[styles.verifyText, fontStyle(15.5, { min: 14.5, max: 18 })]}>
                 {verifying
-                  ? "Đang xác minh..."
+                  ? copy.verifying
                   : verificationToken
-                    ? "Đã xác nhận"
-                    : "Xác nhận"}
+                    ? copy.verified
+                    : copy.verify}
               </Text>
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </Pressable>
 
             <View style={styles.resendRow}>
-              <Text style={styles.resendHint}>Chưa nhận được mã?</Text>
+              <Text style={[styles.resendHint, fontStyle(14, { min: 13 }), { color: theme.textSecondary }]}>
+                {copy.resendHint}
+              </Text>
 
               <Pressable
+                style={styles.resendButton}
                 disabled={
                   countdown > 0 || verifying || resending || !!verificationToken
                 }
@@ -293,34 +374,42 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
                 <Text
                   style={[
                     styles.resendLink,
+                    fontStyle(14, { min: 13 }),
+                    { color: theme.tealText },
                     (countdown > 0 ||
                       verifying ||
                       resending ||
-                      !!verificationToken) &&
+                      !!verificationToken) && [
                       styles.resendDisabled,
+                      { color: theme.muted },
+                    ],
                   ]}
                 >
                   {verificationToken
-                    ? "Đã xác nhận"
+                    ? copy.verified
                     : resending
-                      ? "Đang gửi lại..."
+                      ? copy.resending
                       : countdown > 0
-                        ? `Gửi lại (${countdown}s)`
-                        : "Gửi lại mã"}
+                        ? copy.resendIn(countdown)
+                        : copy.resend}
                 </Text>
               </Pressable>
             </View>
 
-            <View style={styles.note}>
+            <View
+              style={[
+                styles.note,
+                isDark && { backgroundColor: theme.surfaceAlt },
+              ]}
+            >
               <Ionicons
                 name="information-circle-outline"
                 size={19}
-                color="#64748B"
+                color={theme.muted}
               />
 
-              <Text style={styles.noteText}>
-                Nếu chưa nhận được email, bạn hãy kiểm tra thư mục Spam hoặc Thư
-                rác.
+              <Text style={[styles.noteText, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.textSecondary }]}>
+                {copy.spamNote}
               </Text>
             </View>
           </View>
@@ -329,10 +418,10 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
             <Ionicons
               name="shield-checkmark-outline"
               size={15}
-              color="#94A3B8"
+              color={theme.muted}
             />
-            <Text style={styles.footerText}>
-              Không chia sẻ mã xác nhận với người khác.
+            <Text style={[styles.footerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>
+              {copy.securityFooter}
             </Text>
           </View>
         </ScrollView>
@@ -381,7 +470,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     marginTop: 10,
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: "700",
     color: "#00847C",
   },
@@ -404,34 +493,36 @@ const styles = StyleSheet.create({
   },
   description: {
     marginTop: 10,
-    fontSize: 13,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: "center",
     color: "#64748B",
   },
   email: {
     marginTop: 4,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
     color: "#0F172A",
     textAlign: "center",
   },
   changeEmailButton: {
+    minHeight: 44,
+    justifyContent: "center",
     alignSelf: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginTop: 2,
   },
   changeEmailText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
     color: PRIMARY,
   },
   label: {
     marginTop: 24,
     marginBottom: 10,
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: "600",
     color: "#334155",
   },
@@ -479,9 +570,9 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 10,
-    fontSize: 12,
+    fontSize: 14,
     color: "#B45309",
-    lineHeight: 18,
+    lineHeight: 20,
   },
   messageError: {
     color: "#DC2626",
@@ -490,7 +581,8 @@ const styles = StyleSheet.create({
     color: "#0D9488",
   },
   verifyButton: {
-    minHeight: 46,
+    minHeight: 48,
+    paddingVertical: 12,
     marginTop: 24,
     borderRadius: 8,
     backgroundColor: PRIMARY,
@@ -503,7 +595,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#91CEC8",
   },
   verifyText: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: "600",
     color: "#FFFFFF",
   },
@@ -519,11 +611,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   resendHint: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#64748B",
   },
+  resendButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
   resendLink: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
     color: PRIMARY,
   },
@@ -541,8 +638,8 @@ const styles = StyleSheet.create({
   },
   noteText: {
     flex: 1,
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: "#64748B",
   },
   footer: {
@@ -555,8 +652,8 @@ const styles = StyleSheet.create({
   },
   footerText: {
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     color: "#94A3B8",
   },
 });

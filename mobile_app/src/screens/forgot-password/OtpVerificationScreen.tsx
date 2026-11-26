@@ -14,16 +14,93 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { forgotPassword } from '../../services/api';
 
 const OTP_VALID_SECONDS = 15 * 60;
 const RESEND_WAIT_SECONDS = 3 * 60;
 const MAX_RESEND_COUNT = 3;
 
+const translations = {
+  vi: {
+    notice: 'Thông báo',
+    limitReached: 'Bạn đã sử dụng hết 3 lượt gửi lại OTP.',
+    pleaseWait: 'Vui lòng chờ',
+    waitMessage: (time: string) => `Bạn có thể gửi lại mã sau ${time}.`,
+    resendSuccessTitle: 'Gửi mã thành công',
+    resendSuccessBody:
+      'OTP mới đã được gửi đến email của bạn. Mã có hiệu lực trong 15 phút.',
+    resendErrorTitle: 'Không thể gửi mã',
+    retryLater: 'Vui lòng thử lại sau.',
+    expiredTitle: 'OTP đã hết hạn',
+    expiredBody: 'Mã xác thực đã hết hạn. Vui lòng gửi lại mã mới.',
+    enterSixDigits: 'Vui lòng nhập đủ 6 chữ số OTP.',
+    stepText: 'Bước 2/3 · Xác thực tài khoản',
+    title: 'Nhập mã xác thực',
+    description:
+      'Nhập mã OTP 6 số được gửi đến email để tiếp tục đặt lại mật khẩu.',
+    change: 'Thay đổi',
+    otpLabel: 'Mã OTP',
+    digitAccessibility: (idx: number) => `Chữ số OTP ${idx}`,
+    otpExpiredText: 'Mã OTP đã hết hạn',
+    validFor: (time: string) => `Mã có hiệu lực trong ${time}`,
+    sendingCode: 'Đang gửi mã...',
+    noMoreResends: 'Đã hết 3 lượt gửi lại',
+    resendIn: (time: string) => `Gửi lại mã sau ${time}`,
+    resendPrompt: 'Chưa nhận được mã? Gửi lại mã',
+    resentCount: (count: number, max: number) =>
+      `Đã gửi lại ${count}/${max} lượt`,
+    sentNotice: 'Mã OTP đã được gửi đến email của bạn',
+    securityTip:
+      'Không chia sẻ mã OTP với bất kỳ ai, kể cả người tự xưng là nhân viên PreCare.',
+    confirmButton: 'Xác nhận mã',
+    backToLogin: 'Quay lại đăng nhập',
+  },
+  en: {
+    notice: 'Notice',
+    limitReached: 'You have used all 3 OTP resend attempts.',
+    pleaseWait: 'Please wait',
+    waitMessage: (time: string) => `You can resend a code in ${time}.`,
+    resendSuccessTitle: 'Code sent',
+    resendSuccessBody:
+      'A new OTP has been sent to your email. It is valid for 15 minutes.',
+    resendErrorTitle: 'Unable to send code',
+    retryLater: 'Please try again later.',
+    expiredTitle: 'OTP expired',
+    expiredBody: 'The verification code has expired. Please request a new one.',
+    enterSixDigits: 'Please enter all 6 OTP digits.',
+    stepText: 'Step 2/3 · Verify account',
+    title: 'Enter verification code',
+    description:
+      'Enter the 6-digit OTP sent to your email to continue resetting your password.',
+    change: 'Change',
+    otpLabel: 'OTP Code',
+    digitAccessibility: (idx: number) => `OTP digit ${idx}`,
+    otpExpiredText: 'OTP code has expired',
+    validFor: (time: string) => `Code expires in ${time}`,
+    sendingCode: 'Sending code...',
+    noMoreResends: 'All 3 resends used',
+    resendIn: (time: string) => `Resend code in ${time}`,
+    resendPrompt: "Didn't receive a code? Resend",
+    resentCount: (count: number, max: number) =>
+      `Resent ${count}/${max} times`,
+    sentNotice: 'An OTP code has been sent to your email',
+    securityTip:
+      'Never share your OTP code with anyone, even someone claiming to be PreCare staff.',
+    confirmButton: 'Verify code',
+    backToLogin: 'Back to Sign in',
+  },
+};
+
 export default function OtpVerificationScreen({ navigation, route }: any) {
   const email = route.params?.email || '';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const copy = translations[preferences.language];
 
   const [otp, setOtp] = useState('');
   const [otpExpiresIn, setOtpExpiresIn] = useState(OTP_VALID_SECONDS);
@@ -113,18 +190,12 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
     }
 
     if (resendCount >= MAX_RESEND_COUNT) {
-      Alert.alert(
-        'Thông báo',
-        'Bạn đã sử dụng hết 3 lượt gửi lại OTP.',
-      );
+      Alert.alert(copy.notice, copy.limitReached);
       return;
     }
 
     if (resendCooldown > 0) {
-      Alert.alert(
-        'Vui lòng chờ',
-        `Bạn có thể gửi lại mã sau ${formatTime(resendCooldown)}.`,
-      );
+      Alert.alert(copy.pleaseWait, copy.waitMessage(formatTime(resendCooldown)));
       return;
     }
 
@@ -140,15 +211,9 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
       setResendCooldown(RESEND_WAIT_SECONDS);
       setResendCount((prev) => prev + 1);
 
-      Alert.alert(
-        'Gửi mã thành công',
-        'OTP mới đã được gửi đến email của bạn. Mã có hiệu lực trong 15 phút.',
-      );
+      Alert.alert(copy.resendSuccessTitle, copy.resendSuccessBody);
     } catch (error: any) {
-      Alert.alert(
-        'Không thể gửi mã',
-        error?.message || 'Vui lòng thử lại sau.',
-      );
+      Alert.alert(copy.resendErrorTitle, error?.message || copy.retryLater);
     } finally {
       setResending(false);
     }
@@ -156,15 +221,12 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
 
   const handleContinue = () => {
     if (otpExpiresIn === 0) {
-      Alert.alert(
-        'OTP đã hết hạn',
-        'Mã xác thực đã hết hạn. Vui lòng gửi lại mã mới.',
-      );
+      Alert.alert(copy.expiredTitle, copy.expiredBody);
       return;
     }
 
     if (!/^\d{6}$/.test(otp)) {
-      Alert.alert('Thông báo', 'Vui lòng nhập đủ 6 chữ số OTP.');
+      Alert.alert(copy.notice, copy.enterSixDigits);
       return;
     }
 
@@ -182,9 +244,14 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
   const isOtpExpired = otpExpiresIn === 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={preferences.language === 'en' ? 'Verify OTP' : 'Xác thực mã OTP'}
+        onBack={() => navigation.goBack()}
+      />
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: theme.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
@@ -196,34 +263,45 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
             <View style={styles.progressTrack}>
               <View style={styles.progressDone} />
               <View style={styles.progressActive} />
-              <View style={styles.progressInactive} />
+              <View
+                style={[
+                  styles.progressInactive,
+                  { backgroundColor: theme.divider },
+                ]}
+              />
             </View>
 
-            <Text style={styles.progressText}>
-              Bước 2/3 · Xác thực tài khoản
+            <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
+              {copy.stepText}
             </Text>
           </View>
 
-          <Text style={styles.title}>Nhập mã xác thực</Text>
+          <Text style={[styles.title, fontStyle(23, { lineHeight: 30, min: 21, max: 27 }), { color: theme.text }]}>
+            {copy.title}
+          </Text>
 
-          <Text style={styles.description}>
-            Nhập mã OTP 6 số được gửi đến email để tiếp tục
-            đặt lại mật khẩu.
+          <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
+            {copy.description}
           </Text>
 
           <View style={styles.emailRow}>
-            <Text style={styles.emailText}>
+            <Text style={[styles.emailText, fontStyle(14, { min: 13 }), { color: theme.text }]}>
               {maskedEmail(email)}
             </Text>
 
             <TouchableOpacity
+              style={styles.linkTouch}
               onPress={() => navigation.navigate('ForgotPassword')}
             >
-              <Text style={styles.changeEmail}>Thay đổi</Text>
+              <Text style={[styles.changeEmail, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {copy.change}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Mã OTP</Text>
+          <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+            {copy.otpLabel}
+          </Text>
 
           <View style={styles.otpRow}>
             {Array.from({ length: 6 }).map((_, index) => (
@@ -234,11 +312,22 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
                 }}
                 style={[
                   styles.otpInput,
-                  otp[index] ? styles.otpFilled : null,
-                  index === otp.length && otp.length < 6
-                    ? styles.otpFocused
+                  fontStyle(21, { min: 19, max: 24 }),
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                  otp[index]
+                    ? [styles.otpFilled, { borderColor: theme.tealText }]
                     : null,
-                  isOtpExpired && styles.otpExpired,
+                  index === otp.length && otp.length < 6
+                    ? [styles.otpFocused, { borderColor: theme.tealText }]
+                    : null,
+                  isOtpExpired && [
+                    styles.otpExpired,
+                    { borderColor: theme.danger },
+                  ],
                 ]}
                 value={otp[index] || ''}
                 onChangeText={(value) => handleOtpChange(value, index)}
@@ -257,7 +346,7 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
                 selectTextOnFocus
                 editable={!isOtpExpired}
                 autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                accessibilityLabel={`Chữ số OTP ${index + 1}`}
+                accessibilityLabel={copy.digitAccessibility(index + 1)}
               />
             ))}
           </View>
@@ -267,17 +356,19 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
               <Ionicons
                 name="time-outline"
                 size={14}
-                color={isOtpExpired ? '#DC2626' : '#64748B'}
+                color={isOtpExpired ? theme.danger : theme.muted}
               />
               <Text
                 style={[
                   styles.timerText,
-                  isOtpExpired && styles.expiredText,
+                  fontStyle(13, { min: 12 }),
+                  { color: theme.muted },
+                  isOtpExpired && { color: theme.danger },
                 ]}
               >
                 {isOtpExpired
-                  ? 'Mã OTP đã hết hạn'
-                  : `Mã có hiệu lực trong ${formatTime(otpExpiresIn)}`}
+                  ? copy.otpExpiredText
+                  : copy.validFor(formatTime(otpExpiresIn))}
               </Text>
             </View>
 
@@ -290,35 +381,45 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
               <Text
                 style={[
                   styles.resendText,
-                  !canResend && styles.resendDisabled,
+                  fontStyle(13.5, { min: 12.5 }),
+                  { color: theme.tealText },
+                  !canResend && { color: theme.muted },
                 ]}
               >
                 {resending
-                  ? 'Đang gửi mã...'
+                  ? copy.sendingCode
                   : resendCount >= MAX_RESEND_COUNT
-                    ? 'Đã hết 3 lượt gửi lại'
+                    ? copy.noMoreResends
                     : resendCooldown > 0
-                      ? `Gửi lại mã sau ${formatTime(resendCooldown)}`
-                      : 'Chưa nhận được mã? Gửi lại mã'}
+                      ? copy.resendIn(formatTime(resendCooldown))
+                      : copy.resendPrompt}
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.statusText}>
+            <Text style={[styles.statusText, fontStyle(13, { min: 12 }), { color: theme.tealText }]}>
               {resendCount > 0
-                ? `Đã gửi lại ${resendCount}/${MAX_RESEND_COUNT} lượt`
-                : 'Mã OTP đã được gửi đến email của bạn'}
+                ? copy.resentCount(resendCount, MAX_RESEND_COUNT)
+                : copy.sentNotice}
             </Text>
           </View>
 
-          <View style={styles.infoBox}>
+          <View
+            style={[
+              styles.infoBox,
+              {
+                backgroundColor: theme.tealSoft,
+                borderColor: theme.tealBorder,
+                borderWidth: isDark ? 1 : 0,
+              },
+            ]}
+          >
             <Ionicons
               name="shield-checkmark-outline"
               size={16}
-              color="#21877F"
+              color={theme.tealText}
             />
-            <Text style={styles.infoText}>
-              Không chia sẻ mã OTP với bất kỳ ai, kể cả người
-              tự xưng là nhân viên PreCare.
+            <Text style={[styles.infoText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+              {copy.securityTip}
             </Text>
           </View>
 
@@ -326,8 +427,9 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
             <TouchableOpacity
               style={[
                 styles.button,
-                (otp.length !== 6 || isOtpExpired) &&
-                  styles.buttonDisabled,
+                (otp.length !== 6 || isOtpExpired) && {
+                  backgroundColor: isDark ? theme.surfaceAlt : '#E2E7EF',
+                },
               ]}
               onPress={handleContinue}
               disabled={otp.length !== 6 || isOtpExpired}
@@ -336,11 +438,13 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
               <Text
                 style={[
                   styles.buttonText,
-                  (otp.length !== 6 || isOtpExpired) &&
-                    styles.buttonTextDisabled,
+                  fontStyle(15.5, { min: 14.5, max: 18 }),
+                  (otp.length !== 6 || isOtpExpired) && {
+                    color: theme.muted,
+                  },
                 ]}
               >
-                Xác nhận mã
+                {copy.confirmButton}
               </Text>
             </TouchableOpacity>
 
@@ -348,8 +452,8 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
               style={styles.footer}
               onPress={() => navigation.navigate('Login')}
             >
-              <Text style={styles.footerText}>
-                Quay lại đăng nhập
+              <Text style={[styles.footerText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                {copy.backToLogin}
               </Text>
             </TouchableOpacity>
           </View>
@@ -398,7 +502,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     color: '#64748B',
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 9,
   },
   title: {
@@ -409,29 +513,35 @@ const styles = StyleSheet.create({
   },
   description: {
     color: '#718096',
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 22,
   },
   emailRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 22,
     marginBottom: 24,
   },
   emailText: {
     color: '#263449',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
+  },
+  linkTouch: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   changeEmail: {
     color: '#258D83',
-    fontSize: 11,
+    fontSize: 13.5,
     fontWeight: '700',
   },
   label: {
     color: '#263449',
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '700',
     marginBottom: 10,
   },
@@ -442,7 +552,7 @@ const styles = StyleSheet.create({
   },
   otpInput: {
     flex: 1,
-    height: 54,
+    minHeight: 54,
     minWidth: 0,
     borderRadius: 9,
     borderWidth: 1,
@@ -474,17 +584,19 @@ const styles = StyleSheet.create({
   },
   timerText: {
     color: '#64748B',
-    fontSize: 10,
+    fontSize: 13,
   },
   expiredText: {
     color: '#DC2626',
   },
   resendButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 10,
   },
   resendText: {
     color: '#438F87',
-    fontSize: 10,
+    fontSize: 13.5,
     fontWeight: '600',
   },
   resendDisabled: {
@@ -492,7 +604,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: '#39847E',
-    fontSize: 11,
+    fontSize: 13,
     textAlign: 'center',
   },
   infoBox: {
@@ -508,15 +620,16 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     color: '#39847E',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
   bottomArea: {
     marginTop: 'auto',
     paddingTop: 28,
   },
   button: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     borderRadius: 7,
     backgroundColor: '#438F87',
     alignItems: 'center',
@@ -527,19 +640,21 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15.5,
     fontWeight: '700',
   },
   buttonTextDisabled: {
     color: '#94A3B8',
   },
   footer: {
+    minHeight: 44,
     alignItems: 'center',
-    paddingTop: 13,
+    justifyContent: 'center',
+    paddingTop: 10,
   },
   footerText: {
     color: '#168C80',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

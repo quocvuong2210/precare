@@ -20,6 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { UploadStackParamList } from '../navigation/UploadNavigator';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import {
   evaluateMetricByWeek,
@@ -35,21 +37,24 @@ type MetricKey = 'bpd' | 'hc' | 'ac' | 'fl' | 'efw';
 
 type MetricMeta = {
   key: MetricKey;
-  label: string;
+  labelVi: string;
+  labelEn: string;
   unit: string;
 };
 
 const METRICS_META: MetricMeta[] = [
-  { key: 'bpd', label: 'BPD · Đường kính lưỡng đỉnh', unit: 'mm' },
-  { key: 'hc',  label: 'HC · Chu vi đầu',             unit: 'mm' },
-  { key: 'ac',  label: 'AC · Chu vi vòng bụng',       unit: 'mm' },
-  { key: 'fl',  label: 'FL · Chiều dài xương đùi',    unit: 'mm' },
-  { key: 'efw', label: 'EFW · Cân nặng thai ước tính', unit: 'g' },
+  { key: 'bpd', labelVi: 'BPD · Đường kính lưỡng đỉnh', labelEn: 'BPD · Biparietal diameter', unit: 'mm' },
+  { key: 'hc',  labelVi: 'HC · Chu vi đầu',             labelEn: 'HC · Head circumference', unit: 'mm' },
+  { key: 'ac',  labelVi: 'AC · Chu vi vòng bụng',       labelEn: 'AC · Abdominal circumference', unit: 'mm' },
+  { key: 'fl',  labelVi: 'FL · Chiều dài xương đùi',    labelEn: 'FL · Femur length', unit: 'mm' },
+  { key: 'efw', labelVi: 'EFW · Cân nặng thai ước tính', labelEn: 'EFW · Estimated fetal weight', unit: 'g' },
 ];
 
 const DUE_DATE = Date.UTC(2026, 8, 22);
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS_VI = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const pad = (value: number) => String(value).padStart(2, '0');
 
 function parseDate(value: string): Date | null {
@@ -73,6 +78,8 @@ function getGestationalAge(date: Date | null) {
 }
 
 export default function ManualResultEntryScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [examDate, setExamDate] = useState('05/06/2026');
   const [autoAge, setAutoAge] = useState(true);
   const [manualAge, setManualAge] = useState({ weeks: '24', days: '3' });
@@ -101,36 +108,51 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
     Number(effectiveDays) <= 6;
 
   const activeWeek = ageValid ? Number(age.weeks) : 24;
-  const stageInfo = getPregnancyStageInfo(activeWeek);
+  const stageInfo = getPregnancyStageInfo(activeWeek, preferences.language);
+  const stageLabelDisplay = isEn
+    ? `Week ${stageInfo.clampedWeek} (Month ${stageInfo.month})`
+    : stageInfo.stageLabel;
 
   const evaluatedMetrics = METRICS_META.map((meta) => {
     const rawVal = values[meta.key].trim();
-    const bounds = getFetalMetricBoundsByWeek(meta.key, activeWeek, meta.unit);
+    const bounds = getFetalMetricBoundsByWeek(
+      meta.key,
+      activeWeek,
+      meta.unit,
+      preferences.language
+    );
     const num = Number(rawVal.replace(',', '.'));
     const isValidNumber =
       Boolean(rawVal) && /^\d+(?:[.,]\d+)?$/.test(rawVal) && Number.isFinite(num) && num > 0;
 
     if (!isValidNumber) {
       return {
-        meta,
+        meta: { ...meta, label: isEn ? meta.labelEn : meta.labelVi },
         bounds,
         isValidNumber: false,
         status: 'danger' as SeverityLevel,
-        badgeText: !rawVal ? 'Chưa nhập' : 'Sai định dạng',
-        message: 'Vui lòng nhập một số lớn hơn 0.',
+        badgeText: !rawVal
+          ? (isEn ? 'Required' : 'Chưa nhập')
+          : (isEn ? 'Invalid format' : 'Sai định dạng'),
+        message: isEn ? 'Please enter a number greater than 0.' : 'Vui lòng nhập một số lớn hơn 0.',
       };
     }
 
-    const evalRes = evaluateMetricByWeek(meta.key, rawVal, activeWeek);
+    const evalRes = evaluateMetricByWeek(
+      meta.key,
+      rawVal,
+      activeWeek,
+      preferences.language
+    );
     const badgeText =
       evalRes.severity === 'danger'
-        ? 'Nguy hiểm (Đỏ)'
+        ? (isEn ? 'High Risk (Red)' : 'Nguy hiểm (Đỏ)')
         : evalRes.severity === 'warning'
-        ? 'Cần theo dõi (Vàng)'
-        : 'Đạt chuẩn tuần ' + bounds.clampedWeek;
+        ? (isEn ? 'Monitor (Yellow)' : 'Cần theo dõi (Vàng)')
+        : (isEn ? `Normal Week ${bounds.clampedWeek}` : `Đạt chuẩn tuần ${bounds.clampedWeek}`);
 
     return {
-      meta,
+      meta: { ...meta, label: isEn ? meta.labelEn : meta.labelVi },
       bounds,
       isValidNumber: true,
       status: evalRes.severity,
@@ -196,21 +218,30 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
 
       const summaryState = summarizeAnalysisState(
         builtMetrics,
-        `Phiếu khám ngày ${examDate}`,
-        activeWeek
+        isEn ? `Checkup report on ${examDate}` : `Phiếu khám ngày ${examDate}`,
+        activeWeek,
+        preferences.language
       );
 
       const newManualRecord = {
         id: String(Date.now()),
-        name: `Phiếu siêu âm thủ công (${examDate})`,
-        time: `Ngày khám: ${examDate} · ${stageInfo.stageLabel}`,
+        name: isEn
+          ? `Manual Ultrasound Report (${examDate})`
+          : `Phiếu siêu âm thủ công (${examDate})`,
+        time: isEn
+          ? `Exam date: ${examDate} · ${stageInfo.stageLabel}`
+          : `Ngày khám: ${examDate} · ${stageInfo.stageLabel}`,
         status: 'done',
         analysis: {
-          recordType: `Kết quả siêu âm (${age.weeks.trim()} tuần ${effectiveDays} ngày · Tháng thứ ${stageInfo.month})`,
+          recordType: isEn
+            ? `Ultrasound Results (${age.weeks.trim()}w ${effectiveDays}d · Month ${stageInfo.month})`
+            : `Kết quả siêu âm (${age.weeks.trim()} tuần ${effectiveDays} ngày · Tháng thứ ${stageInfo.month})`,
           gestationalWeek: activeWeek,
           gestationalDays: Number(effectiveDays) || 0,
           gestationalAge: stageInfo.stageLabel,
-          summary: `Đã đối chiếu chuẩn sinh trắc học theo ${stageInfo.stageLabel}.`,
+          summary: isEn
+            ? `Matched against biometry standards for ${stageInfo.stageLabel}.`
+            : `Đã đối chiếu chuẩn sinh trắc học theo ${stageInfo.stageLabel}.`,
           doctorConclusion: summaryState.doctorConclusion,
           overallSeverity: summaryState.overallSeverity,
           savedToProfile: true,
@@ -224,29 +255,25 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
       Keyboard.dismiss();
       navigation.navigate('UploadHome');
     } catch {
-      Alert.alert('Lỗi', 'Không thể lưu kết quả vào bộ nhớ máy.');
+      Alert.alert(
+        isEn ? 'Error' : 'Lỗi',
+        isEn ? 'Unable to save result to device memory.' : 'Không thể lưu kết quả vào bộ nhớ máy.',
+      );
     }
   };
 
+  const weekdays = isEn ? WEEKDAYS_EN : WEEKDAYS_VI;
+
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <StatusBar style="dark" />
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Quay lại"
-          onPress={() => navigation.goBack()}
-          hitSlop={8}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-        >
-          <Ionicons name="arrow-back" size={20} color="#475569" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Nhập kết quả thủ công</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Manual Result Entry' : 'Nhập kết quả thủ công'}
+        onBack={() => navigation.goBack()}
+      />
 
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: theme.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
@@ -255,114 +282,151 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Text style={styles.title}>Kết quả khám thai theo tuần</Text>
-          <Text style={styles.subtitle}>
-            Mỗi tuần và tháng thai kỳ có ngưỡng chuẩn khác nhau. Khi bạn đổi ngày khám hoặc số tuần, bảng chuẩn dưới đây sẽ tự động cập nhật theo.
+          <Text style={[styles.title, fontStyle(18.5, { min: 17, max: 22 }), { color: theme.text }]}>
+            {isEn ? 'Weekly Ultrasound Results' : 'Kết quả khám thai theo tuần'}
+          </Text>
+          <Text style={[styles.subtitle, fontStyle(14, { lineHeight: 21, min: 13 }), { color: theme.muted }]}>
+            {isEn
+              ? 'Each gestational week has different reference thresholds. When you change the exam date or week, normal ranges update automatically.'
+              : 'Mỗi tuần và tháng thai kỳ có ngưỡng chuẩn khác nhau. Khi bạn đổi ngày khám hoặc số tuần, bảng chuẩn dưới đây sẽ tự động cập nhật theo.'}
           </Text>
 
-          <View style={styles.card}>
-            <Text style={styles.fieldLabel}>Ngày khám</Text>
-            <View style={[styles.inputBox, !parsedDate && styles.inputBoxDanger, { marginTop: 4 }]}>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.fieldLabel, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.text }]}>
+              {isEn ? 'Checkup date' : 'Ngày khám'}
+            </Text>
+            <View
+              style={[
+                styles.inputBox,
+                { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                !parsedDate && { borderColor: theme.danger, borderWidth: 1.5 },
+                { marginTop: 4 },
+              ]}
+            >
               <TextInput
-                accessibilityLabel="Ngày khám, định dạng ngày tháng năm"
+                accessibilityLabel={isEn ? 'Checkup date DD/MM/YYYY' : 'Ngày khám, định dạng ngày tháng năm'}
                 value={examDate}
                 onChangeText={setExamDate}
                 placeholder="DD/MM/YYYY"
-                placeholderTextColor={colors.textLight}
+                placeholderTextColor={theme.muted}
                 keyboardType="numbers-and-punctuation"
                 maxLength={10}
-                style={styles.inputText}
+                style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
               />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Chọn ngày khám"
+                accessibilityLabel={isEn ? 'Select checkup date' : 'Chọn ngày khám'}
                 onPress={openCalendar}
                 hitSlop={10}
               >
-                <Ionicons name="calendar-outline" size={19} color="#334155" />
+                <Ionicons name="calendar-outline" size={19} color={theme.text} />
               </Pressable>
             </View>
             {!parsedDate && (
-              <Text style={styles.dangerErrorText}>
-                Nhập ngày hợp lệ theo định dạng DD/MM/YYYY.
+              <Text style={[styles.dangerErrorText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.danger }]}>
+                {isEn ? 'Enter a valid date in DD/MM/YYYY format.' : 'Nhập ngày hợp lệ theo định dạng DD/MM/YYYY.'}
               </Text>
             )}
 
             <View style={styles.ageLabelRow}>
-              <Text style={styles.ageLabel}>Tuổi thai tại ngày khám (12 – 41 tuần)</Text>
+              <Text style={[styles.ageLabel, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Gestational age at checkup (12–41 weeks)' : 'Tuổi thai tại ngày khám (12 – 41 tuần)'}
+              </Text>
               <View style={styles.autoAgeControl}>
-                <Text style={styles.autoAgeText}>Tự tính</Text>
+                <Text style={[styles.autoAgeText, fontStyle(13, { min: 12 }), { color: theme.tealText }]}>
+                  {isEn ? 'Auto' : 'Tự tính'}
+                </Text>
                 <Switch
-                  accessibilityLabel="Tự tính tuổi thai theo ngày dự sinh"
+                  accessibilityLabel={isEn ? 'Auto-calculate gestational age' : 'Tự tính tuổi thai theo ngày dự sinh'}
                   value={autoAge}
                   onValueChange={toggleAutoAge}
-                  trackColor={{ false: '#CBD5E1', true: colors.primary }}
+                  trackColor={{ false: theme.switchTrack, true: colors.primary }}
                   thumbColor={colors.white}
-                  ios_backgroundColor="#CBD5E1"
+                  ios_backgroundColor={theme.switchTrack}
                   style={styles.ageSwitch}
                 />
               </View>
             </View>
             <View style={styles.fieldRow}>
               <View style={styles.halfField}>
-                <View style={[styles.inputBox, styles.ageInput, autoAge && styles.readOnlyInput]}>
+                <View
+                  style={[
+                    styles.inputBox,
+                    styles.ageInput,
+                    { backgroundColor: autoAge ? theme.surfaceAlt : theme.surface, borderColor: theme.border },
+                  ]}
+                >
                   <TextInput
-                    accessibilityLabel="Tuổi thai, số tuần"
+                    accessibilityLabel={isEn ? 'Gestational age, weeks' : 'Tuổi thai, số tuần'}
                     value={age.weeks}
                     onChangeText={(weeks) => setManualAge((prev) => ({ ...prev, weeks }))}
                     editable={!autoAge}
                     keyboardType="number-pad"
                     maxLength={2}
                     selectTextOnFocus
-                    style={styles.inputText}
+                    style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
                   />
-                  <Text style={styles.unit}>tuần</Text>
+                  <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+                    {isEn ? 'wks' : 'tuần'}
+                  </Text>
                 </View>
               </View>
               <View style={styles.halfField}>
-                <View style={[styles.inputBox, styles.ageInput, autoAge && styles.readOnlyInput]}>
+                <View
+                  style={[
+                    styles.inputBox,
+                    styles.ageInput,
+                    { backgroundColor: autoAge ? theme.surfaceAlt : theme.surface, borderColor: theme.border },
+                  ]}
+                >
                   <TextInput
-                    accessibilityLabel="Tuổi thai, số ngày"
+                    accessibilityLabel={isEn ? 'Gestational age, days' : 'Tuổi thai, số ngày'}
                     value={age.days}
                     onChangeText={(days) => setManualAge((prev) => ({ ...prev, days }))}
                     editable={!autoAge}
                     placeholder="0"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.muted}
                     keyboardType="number-pad"
                     maxLength={1}
                     selectTextOnFocus
-                    style={styles.inputText}
+                    style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
                   />
-                  <Text style={styles.unit}>ngày</Text>
+                  <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+                    {isEn ? 'days' : 'ngày'}
+                  </Text>
                 </View>
               </View>
             </View>
             {!ageValid && (
-              <Text style={styles.dangerErrorText}>
+              <Text style={[styles.dangerErrorText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.danger }]}>
                 {autoAge
-                  ? 'Ngày khám không khớp tuổi thai 12–41 tuần. Hãy tắt “Tự tính” để nhập số tuần trực tiếp.'
-                  : 'Vui lòng nhập tuần thai từ 12–41 (ô ngày từ 0–6, nếu để trống sẽ tính là 0 ngày).'}
+                  ? (isEn
+                      ? 'Date is outside 12–41 weeks. Turn off Auto to enter weeks manually.'
+                      : 'Ngày khám không khớp tuổi thai 12–41 tuần. Hãy tắt “Tự tính” để nhập số tuần trực tiếp.')
+                  : (isEn
+                      ? 'Enter weeks between 12 and 41 (days 0–6).'
+                      : 'Vui lòng nhập tuần thai từ 12–41 (ô ngày từ 0–6, nếu để trống sẽ tính là 0 ngày).')}
               </Text>
             )}
 
-            <View style={styles.stageBanner}>
-              <Ionicons name="analytics-outline" size={16} color="#0F766E" />
-              <Text style={styles.stageBannerText}>
-                Đang so sánh theo chuẩn: {stageInfo.stageLabel}
+            <View style={[styles.stageBanner, { backgroundColor: theme.tealSoft }]}>
+              <Ionicons name="analytics-outline" size={16} color={theme.tealText} />
+              <Text style={[styles.stageBannerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.tealText }]}>
+                {isEn ? `Comparing against reference: ${stageLabelDisplay}` : `Đang so sánh theo chuẩn: ${stageLabelDisplay}`}
               </Text>
             </View>
           </View>
 
           <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>
-              Chỉ số siêu âm (Chuẩn Tuần {stageInfo.clampedWeek})
+            <Text style={[styles.sectionTitle, fontStyle(15.5, { min: 14.5 }), { color: theme.text }]}>
+              {isEn ? `Ultrasound Metrics (Week ${stageInfo.clampedWeek})` : `Chỉ số siêu âm (Chuẩn Tuần ${stageInfo.clampedWeek})`}
             </Text>
             {(dangerCount > 0 || warningCount > 0) && (
-              <View style={[styles.warningBadge, dangerCount > 0 && styles.dangerBadge]}>
-                <Text style={[styles.warningBadgeText, dangerCount > 0 && styles.dangerBadgeText]}>
+              <View style={[styles.warningBadge, { backgroundColor: dangerCount > 0 ? theme.dangerBackground : theme.badgeWarnBg }]}>
+                <Text style={[styles.warningBadgeText, fontStyle(12, { min: 11, max: 14 }), { color: dangerCount > 0 ? theme.danger : theme.badgeWarnText }]}>
                   {dangerCount > 0
-                    ? `${dangerCount} chỉ số báo ĐỎ`
-                    : `${warningCount} chỉ số báo VÀNG`}
+                    ? (isEn ? `${dangerCount} RED alert(s)` : `${dangerCount} chỉ số báo ĐỎ`)
+                    : (isEn ? `${warningCount} YELLOW alert(s)` : `${warningCount} chỉ số báo VÀNG`)}
                 </Text>
               </View>
             )}
@@ -370,45 +434,58 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
 
           <View style={styles.metricsList}>
             {evaluatedMetrics.map(({ meta, bounds, status, badgeText, message }) => {
-              const frameStyle =
+              const frameBg =
                 status === 'danger'
-                  ? styles.metricFrameDanger
+                  ? theme.dangerBackground
                   : status === 'warning'
-                  ? styles.metricFrameWarning
-                  : styles.metricFrameNormal;
+                    ? (preferences.darkMode ? '#2E2411' : '#FEFCE8')
+                    : theme.surface;
+              const frameBorder =
+                status === 'danger'
+                  ? theme.danger
+                  : status === 'warning'
+                    ? '#FACC15'
+                    : theme.border;
 
               const pillStyle =
                 status === 'danger'
-                  ? styles.pillDanger
+                  ? { backgroundColor: theme.dangerBackground }
                   : status === 'warning'
-                  ? styles.pillWarning
-                  : styles.pillNormal;
+                  ? { backgroundColor: theme.badgeWarnBg }
+                  : { backgroundColor: theme.badgeGreenBg };
 
               const pillTextStyle =
                 status === 'danger'
-                  ? styles.pillTextDanger
+                  ? { color: theme.danger }
                   : status === 'warning'
-                  ? styles.pillTextWarning
-                  : styles.pillTextNormal;
+                  ? { color: theme.badgeWarnText }
+                  : { color: theme.badgeGreenText };
 
               return (
-                <View key={meta.key} style={[styles.metricFrame, frameStyle]}>
+                <View key={meta.key} style={[styles.metricFrame, { backgroundColor: frameBg, borderColor: frameBorder }]}>
                   <View style={styles.metricHeaderRow}>
-                    <Text style={styles.fieldLabel}>{meta.label}</Text>
+                    <Text style={[styles.fieldLabel, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.text }]}>
+                      {meta.label}
+                    </Text>
                     <View style={[styles.statusPill, pillStyle]}>
-                      <Text style={[styles.statusPillText, pillTextStyle]}>{badgeText}</Text>
+                      <Text style={[styles.statusPillText, fontStyle(11.5, { min: 10.5, max: 13 }), pillTextStyle]}>
+                        {badgeText}
+                      </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.rangeHintText}>
-                    Chuẩn Tuần {bounds.clampedWeek} (Tháng {stageInfo.month}): {bounds.minNormal} – {bounds.maxNormal} {meta.unit} · Báo đỏ khi {'<'} {bounds.dangerLow} hoặc {'>'} {bounds.dangerHigh} {meta.unit}
+                  <Text style={[styles.rangeHintText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                    {isEn
+                      ? `Week ${bounds.clampedWeek} (Month ${stageInfo.month}): ${bounds.minNormal}–${bounds.maxNormal} ${meta.unit} · Red if < ${bounds.dangerLow} or > ${bounds.dangerHigh} ${meta.unit}`
+                      : `Chuẩn Tuần ${bounds.clampedWeek} (Tháng ${stageInfo.month}): ${bounds.minNormal} – ${bounds.maxNormal} ${meta.unit} · Báo đỏ khi < ${bounds.dangerLow} hoặc > ${bounds.dangerHigh} ${meta.unit}`}
                   </Text>
 
                   <View
                     style={[
                       styles.inputBox,
-                      status === 'danger' && styles.inputBoxDanger,
-                      status === 'warning' && styles.inputBoxWarning,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                      status === 'danger' && { borderColor: theme.danger, borderWidth: 1.5 },
+                      status === 'warning' && { borderColor: '#F59E0B', borderWidth: 1.5 },
                     ]}
                   >
                     <TextInput
@@ -418,20 +495,22 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                       keyboardType="decimal-pad"
                       maxLength={8}
                       selectTextOnFocus
-                      placeholder="Nhập chỉ số..."
-                      placeholderTextColor="#94A3B8"
+                      placeholder={isEn ? 'Enter value...' : 'Nhập chỉ số...'}
+                      placeholderTextColor={theme.muted}
                       style={[
                         styles.inputText,
-                        status === 'danger' && styles.dangerInputText,
+                        fontStyle(16, { min: 15 }),
+                        { color: theme.text },
+                        status === 'danger' && { color: theme.danger, fontWeight: '800' },
                         status === 'warning' && styles.warningInputText,
                       ]}
                     />
-                    <Text style={styles.unit}>{meta.unit}</Text>
+                    <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>{meta.unit}</Text>
                     {status !== 'normal' && (
                       <Ionicons
                         name={status === 'danger' ? 'alert-circle' : 'warning'}
                         size={18}
-                        color={status === 'danger' ? '#DC2626' : WARNING_COLOR}
+                        color={status === 'danger' ? theme.danger : WARNING_COLOR}
                         style={styles.inputWarningIcon}
                       />
                     )}
@@ -440,8 +519,8 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                   <Text
                     style={[
                       styles.evalNoteText,
-                      status === 'warning' && styles.warningErrorText,
-                      status === 'danger' && styles.dangerErrorText,
+                      fontStyle(13, { lineHeight: 19, min: 12 }),
+                      { color: status === 'danger' ? theme.danger : status === 'warning' ? WARNING_COLOR : theme.tealText },
                     ]}
                   >
                     {message}
@@ -452,11 +531,15 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
           </View>
         </ScrollView>
 
-        <View style={styles.footer}>
-          <Text style={styles.saveHint}>
+        <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+          <Text style={[styles.saveHint, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.textSecondary }]}>
             {canSave
-              ? `Đã đối chiếu theo ${stageInfo.stageLabel}. Bấm Lưu để chuyển sang trang Tải lên.`
-              : 'Vui lòng nhập đầy đủ tuổi thai (12–41 tuần) và các chỉ số lớn hơn 0.'}
+              ? (isEn
+                  ? `Compared against ${stageLabelDisplay}. Tap Save to view on Upload screen.`
+                  : `Đã đối chiếu theo ${stageLabelDisplay}. Bấm Lưu để chuyển sang trang Tải lên.`)
+              : (isEn
+                  ? 'Please enter valid gestational age (12–41 weeks) and values greater than 0.'
+                  : 'Vui lòng nhập đầy đủ tuổi thai (12–41 tuần) và các chỉ số lớn hơn 0.')}
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -465,17 +548,17 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
             onPress={handleSaveManualResult}
             style={({ pressed }) => [
               styles.saveButton,
-              !canSave && styles.saveButtonDisabled,
+              !canSave && { backgroundColor: theme.surfaceAlt },
               pressed && styles.pressed,
             ]}
           >
             <Ionicons
               name={canSave ? 'save-outline' : 'lock-closed-outline'}
               size={18}
-              color={canSave ? colors.white : '#7C8FA8'}
+              color={canSave ? colors.white : theme.muted}
             />
-            <Text style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}>
-              Lưu kết quả & Xem trên trang Tải lên
+            <Text style={[styles.saveButtonText, fontStyle(15, { min: 14, max: 17 }), !canSave && { color: theme.muted }]}>
+              {isEn ? 'Save & View on Upload' : 'Lưu kết quả & Xem trên trang Tải lên'}
             </Text>
           </Pressable>
         </View>
@@ -487,49 +570,53 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
         animationType="fade"
         onRequestClose={() => setCalendarOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setCalendarOpen(false)}
             accessibilityRole="button"
-            accessibilityLabel="Đóng lịch"
+            accessibilityLabel={isEn ? 'Close calendar' : 'Đóng lịch'}
           />
-          <View style={styles.calendarCard} accessibilityViewIsModal>
+          <View style={[styles.calendarCard, { backgroundColor: theme.surface }]} accessibilityViewIsModal>
             <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Chọn ngày khám</Text>
+              <Text style={[styles.calendarTitle, fontStyle(17, { max: 20 }), { color: theme.text }]}>
+                {isEn ? 'Select checkup date' : 'Chọn ngày khám'}
+              </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Đóng lịch"
+                accessibilityLabel={isEn ? 'Close calendar' : 'Đóng lịch'}
                 onPress={() => setCalendarOpen(false)}
                 hitSlop={10}
               >
-                <Ionicons name="close" size={22} color={colors.textMuted} />
+                <Ionicons name="close" size={22} color={theme.muted} />
               </Pressable>
             </View>
             <View style={styles.calendarMonthRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Tháng trước"
+                accessibilityLabel={isEn ? 'Previous month' : 'Tháng trước'}
                 onPress={() => changeMonth(-1)}
                 style={styles.monthButton}
               >
-                <Ionicons name="chevron-back" size={20} color={colors.navy} />
+                <Ionicons name="chevron-back" size={20} color={theme.text} />
               </Pressable>
-              <Text style={styles.calendarMonth}>
-                Tháng {calendarMonth.month + 1}, {calendarMonth.year}
+              <Text style={[styles.calendarMonth, fontStyle(15, { min: 14, max: 17.5 }), { color: theme.text }]}>
+                {isEn
+                  ? `${MONTH_NAMES_EN[calendarMonth.month]} ${calendarMonth.year}`
+                  : `Tháng ${calendarMonth.month + 1}, ${calendarMonth.year}`}
               </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Tháng sau"
+                accessibilityLabel={isEn ? 'Next month' : 'Tháng sau'}
                 onPress={() => changeMonth(1)}
                 style={styles.monthButton}
               >
-                <Ionicons name="chevron-forward" size={20} color={colors.navy} />
+                <Ionicons name="chevron-forward" size={20} color={theme.text} />
               </Pressable>
             </View>
             <View style={styles.calendarGrid}>
-              {WEEKDAYS.map((day) => (
-                <Text key={day} style={styles.calendarWeekday}>
+              {weekdays.map((day) => (
+                <Text key={day} style={[styles.calendarWeekday, fontStyle(12.5, { min: 11.5, max: 14 }), { color: theme.muted }]}>
                   {day}
                 </Text>
               ))}
@@ -557,6 +644,8 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                         <Text
                           style={[
                             styles.calendarDayText,
+                            fontStyle(14, { min: 12.5, max: 16 }),
+                            { color: theme.text },
                             selected && styles.calendarDayTextSelected,
                           ]}
                         >
@@ -591,15 +680,15 @@ const styles = StyleSheet.create({
     borderBottomColor: BORDER_COLOR,
   },
   backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F7F9FC',
   },
-  headerSpacer: { width: 32 },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: colors.navy },
+  headerSpacer: { width: 40 },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16.5, fontWeight: '700', color: colors.navy },
   pressed: { opacity: 0.75 },
   scrollContent: { padding: 18, paddingBottom: 24 },
   title: { fontSize: 18, fontWeight: '700', color: colors.navy },
