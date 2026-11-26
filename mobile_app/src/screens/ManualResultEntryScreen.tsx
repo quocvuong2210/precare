@@ -328,61 +328,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
               </Text>
             )}
 
+            <View style={styles.ageLabelRow}>
+              <Text style={[styles.ageLabel, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Gestational age at checkup (12–41 weeks)' : 'Tuổi thai tại ngày khám (12 – 41 tuần)'}
+              </Text>
+              <View style={styles.autoAgeControl}>
+                <Text style={[styles.autoAgeText, fontStyle(13, { min: 12 }), { color: theme.tealText }]}>
+                  {isEn ? 'Auto' : 'Tự tính'}
+                </Text>
+                <Switch
+                  accessibilityLabel={isEn ? 'Auto-calculate gestational age' : 'Tự tính tuổi thai theo ngày dự sinh'}
+                  value={autoAge}
+                  onValueChange={toggleAutoAge}
+                  trackColor={{ false: theme.switchTrack, true: colors.primary }}
+                  thumbColor={colors.white}
+                  ios_backgroundColor={theme.switchTrack}
+                  style={styles.ageSwitch}
+                />
+              </View>
+            </View>
+            <View style={styles.fieldRow}>
+              <View style={styles.halfField}>
+                <View
+                  style={[
+                    styles.inputBox,
+                    styles.ageInput,
+                    { backgroundColor: autoAge ? theme.surfaceAlt : theme.surface, borderColor: theme.border },
+                  ]}
+                >
+                  <TextInput
+                    accessibilityLabel={isEn ? 'Gestational age, weeks' : 'Tuổi thai, số tuần'}
+                    value={age.weeks}
+                    onChangeText={(weeks) => setManualAge((prev) => ({ ...prev, weeks }))}
+                    editable={!autoAge}
                     keyboardType="number-pad"
-                    maxLength={1}
+                    maxLength={2}
                     selectTextOnFocus
-                    style={styles.inputText}
+                    style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
                   />
-                  <Text style={styles.unit}>ngày</Text>
+                  <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+                    {isEn ? 'wks' : 'tuần'}
+                  </Text>
                 </View>
               </View>
-            </View>
-            {!ageValid && (
-              <Text style={styles.dangerErrorText}>
-                {autoAge
-                  ? 'Ngày khám không khớp tuổi thai 12–41 tuần. Hãy tắt “Tự tính” để nhập số tuần trực tiếp.'
-                  : 'Vui lòng nhập tuần thai từ 12–41 (ô ngày từ 0–6, nếu để trống sẽ tính là 0 ngày).'}
-              </Text>
-            )}
-
-            <View style={styles.stageBanner}>
-              <Ionicons name="analytics-outline" size={16} color="#0F766E" />
-              <Text style={styles.stageBannerText}>
-                Đang so sánh theo chuẩn: {stageInfo.stageLabel}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>
-              Chỉ số siêu âm (Chuẩn Tuần {stageInfo.clampedWeek})
-            </Text>
-            {(dangerCount > 0 || warningCount > 0) && (
-              <View style={[styles.warningBadge, dangerCount > 0 && styles.dangerBadge]}>
-                <Text style={[styles.warningBadgeText, dangerCount > 0 && styles.dangerBadgeText]}>
-                  {dangerCount > 0
-                    ? `${dangerCount} chỉ số báo ĐỎ`
-                    : `${warningCount} chỉ số báo VÀNG`}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.metricsList}>
-            {evaluatedMetrics.map(({ meta, bounds, status, badgeText, message }) => {
-              const frameStyle =
-                status === 'danger'
-                  ? styles.metricFrameDanger
-                  : status === 'warning'
-                  ? styles.metricFrameWarning
-                  : styles.metricFrameNormal;
-
-              const pillStyle =
-                status === 'danger'
-                  ? styles.pillDanger
-                  : status === 'warning'
-                  ? styles.pillWarning
-                  : styles.pillNormal;
+              <View style={styles.halfField}>
+                <View
+                  style={[
+                    styles.inputBox,
+                    styles.ageInput,
+                    { backgroundColor: autoAge ? theme.surfaceAlt : theme.surface, borderColor: theme.border },
+                  ]}
+                >
+                  <TextInput
+                    accessibilityLabel={isEn ? 'Gestational age, days' : 'Tuổi thai, số ngày'}
+                    value={age.days}
+                    onChangeText={(days) => setManualAge((prev) => ({ ...prev, days }))}
 
               const pillTextStyle =
                 status === 'danger'
