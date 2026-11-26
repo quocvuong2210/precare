@@ -328,61 +328,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
                   size={14}
                   color={theme.danger}
                 />
+                <Text style={[styles.errorText, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.danger }]}>
+                  {copy.mismatchInline}
+                </Text>
+              </View>
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.footer}
-              onPress={() => navigation.navigate('Login')}
-              disabled={loading}
+            <View
+              style={[
+                styles.strengthCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
             >
-              <Text style={styles.footerText}>
-                Quay lại đăng nhập
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
+              <View style={styles.strengthHeader}>
+                <Text
+                  style={[styles.strengthTitle, fontStyle(13.5, { min: 12.5 }), { color: theme.textSecondary }]}
+                >
+                  {copy.strengthTitle}
+                </Text>
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F9FC',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  progressArea: {
-    marginBottom: 25,
-  },
-  progressTrack: {
-    flexDirection: 'row',
-    height: 3,
-    gap: 4,
-  },
-  progressDone: {
-    flex: 1,
-    backgroundColor: '#438F87',
-    borderRadius: 3,
-  },
-  progressActive: {
-    flex: 1,
-    backgroundColor: '#258D83',
-    borderRadius: 3,
-  },
-  progressText: {
-    color: '#64748B',
-    fontSize: 10,
-    marginTop: 9,
-  },
-  title: {
+                <Text
+                  style={[
+                    styles.strengthLabel,
+                    fontStyle(13, { min: 12 }),
+                    { color: theme.muted },
+                    strengthCount >= 3 && styles.strengthStrong,
+                    strengthCount <= 1 && newPassword.length > 0
+                      ? [styles.strengthWeak, { color: theme.danger }]
+                      : null,
+                  ]}
+                >
+                  {strengthLabel}
+                </Text>
+              </View>
+
+              <View style={styles.strengthBars}>
+                {[0, 1, 2, 3].map((index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.strengthBar,
+                      { backgroundColor: theme.divider },
+                      index < strengthCount && {
+                        backgroundColor:
+                          strengthCount <= 1
+                            ? '#EF4444'
+                            : strengthCount === 2
+                              ? '#F59E0B'
+                              : '#22B981',
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {renderRequirement(hasMinLength, copy.reqMinLength)}
     color: '#172033',
     fontSize: 23,
     fontWeight: '800',
