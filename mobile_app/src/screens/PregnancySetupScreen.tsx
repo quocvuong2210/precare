@@ -84,16 +84,6 @@ export default function PregnancySetupScreen({ navigation }: Props) {
   const { preferences, theme, fontStyle } = useAppSettings();
   const isEn = preferences.language === 'en';
 
-function todayIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
-function displayDate(value: string): string {
-  return value ? value.slice(0, 10).split('-').reverse().join('/') : '';
-}
-
-export default function PregnancySetupScreen({ navigation }: Props) {
   const [method, setMethod] = useState<PregnancyCalculationMethod>('lmp');
   const [lmp, setLmp] = useState('');
   const [ultrasoundDate, setUltrasoundDate] = useState('');
@@ -105,42 +95,81 @@ export default function PregnancySetupScreen({ navigation }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const methodDescription = useMemo(() => METHODS.find((item) => item.id === method)?.description || '', [method]);
+  const methodDescription = useMemo(() => {
+    const found = METHODS.find((item) => item.id === method);
+    return found ? (isEn ? found.descEn : found.descVi) : '';
+  }, [isEn, method]);
 
-  const makePayload = (): PregnancyCalculateRequest & { calculation_method: PregnancyCalculationMethod } | null => {
+  const makePayload = (): (PregnancyCalculateRequest & { calculation_method: PregnancyCalculationMethod }) | null => {
     const payload: PregnancyCalculateRequest & { calculation_method: PregnancyCalculationMethod } = {
-      target_date: todayIso(),
+      target_date: getTodayISO(),
       calculation_method: method,
     };
     if (method === 'lmp') {
-      const parsed = toIsoDate(lmp);
-      if (!parsed) { setError('Mẹ nhập ngày kinh cuối theo dạng ngày/tháng/năm, ví dụ 12/05/2026.'); return null; }
+      const parsed = parseStrictDmyToIso(lmp);
+      if (!parsed) {
+        setError(
+          isEn
+            ? 'Please enter LMP in DD/MM/YYYY format, e.g. 12/05/2026.'
+            : 'Mẹ nhập ngày kinh cuối đúng định dạng DD/MM/YYYY, ví dụ 12/05/2026.',
+        );
+        return null;
+      }
       payload.lmp = parsed;
     } else if (method === 'q1_ultrasound' || method === 'crl') {
-      const parsed = toIsoDate(ultrasoundDate);
-      if (!parsed) { setError('Mẹ nhập ngày siêu âm theo dạng ngày/tháng/năm, ví dụ 12/05/2026.'); return null; }
+      const parsed = parseStrictDmyToIso(ultrasoundDate);
+      if (!parsed) {
+        setError(
+          isEn
+            ? 'Please enter scan date in DD/MM/YYYY format, e.g. 12/05/2026.'
+            : 'Mẹ nhập ngày siêu âm đúng định dạng DD/MM/YYYY, ví dụ 12/05/2026.',
+        );
+        return null;
+      }
       payload.q1_ultrasound_date = parsed;
       if (method === 'q1_ultrasound') {
         const gestationalWeeks = Number(weeks);
         const gestationalDays = Number(days || '0');
         if (!Number.isInteger(gestationalWeeks) || gestationalWeeks < 6 || gestationalWeeks > 14) {
-          setError('Tuổi thai trên phiếu siêu âm quý 1 thường từ 6 đến 14 tuần.'); return null;
+          setError(
+            isEn
+              ? 'First-trimester scan weeks are typically between 6 and 14.'
+              : 'Tuần thai trên phiếu siêu âm quý 1 thường từ 6 đến 14 tuần.',
+          );
+          return null;
         }
         if (!Number.isInteger(gestationalDays) || gestationalDays < 0 || gestationalDays > 6) {
-          setError('Số ngày lẻ cần nằm trong khoảng 0 đến 6.'); return null;
+          setError(
+            isEn
+              ? 'Remaining days must be between 0 and 6.'
+              : 'Số ngày lẻ cần nằm trong khoảng 0 đến 6.',
+          );
+          return null;
         }
         payload.q1_gestational_weeks = gestationalWeeks;
         payload.q1_gestational_days = gestationalDays;
       } else {
         const crlMm = Number(crl);
         if (!Number.isFinite(crlMm) || crlMm < 10 || crlMm > 84) {
-          setError('CRL cần nằm trong khoảng 10 đến 84 mm theo phạm vi hỗ trợ hiện tại.'); return null;
+          setError(
+            isEn
+              ? 'CRL must be between 10 and 84 mm.'
+              : 'CRL cần nằm trong khoảng 10 đến 84 mm theo phạm vi hỗ trợ hiện tại.',
+          );
+          return null;
         }
         payload.crl_mm = crlMm;
       }
     } else {
-      const parsed = toIsoDate(edd);
-      if (!parsed) { setError('Mẹ nhập ngày dự sinh theo dạng ngày/tháng/năm, ví dụ 12/02/2027.'); return null; }
+      const parsed = parseStrictDmyToIso(edd);
+      if (!parsed) {
+        setError(
+          isEn
+            ? 'Please enter due date in DD/MM/YYYY format, e.g. 12/02/2027.'
+            : 'Mẹ nhập ngày dự sinh đúng định dạng DD/MM/YYYY, ví dụ 12/02/2027.',
+        );
+        return null;
+      }
       payload.override_edd = parsed;
     }
     return payload;
@@ -157,16 +186,25 @@ export default function PregnancySetupScreen({ navigation }: Props) {
       const data = result?.data || result;
       const age = data?.gestational_age;
       if (age?.weeks === undefined || !data?.calculated_edd) {
-        throw new Error('Máy chủ chưa trả đủ kết quả tuổi thai. Mẹ thử lại giúp mình nhé.');
+        throw new Error(
+          isEn
+            ? 'Server did not return gestational age. Please try again.'
+            : 'Máy chủ chưa trả đủ kết quả tuổi thai. Mẹ thử lại giúp mình nhé.',
+        );
       }
       setPreview({
         weeks: age.weeks,
         days: age.remaining_days ?? 0,
         edd: String(data.calculated_edd).slice(0, 10),
+        trimesterNum: age.trimester,
         trimester: age.trimester_name,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Chưa tính được tuổi thai. Mẹ kiểm tra thông tin rồi thử lại nhé.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : (isEn ? 'Unable to calculate gestational age. Please check your inputs.' : 'Chưa tính được tuổi thai. Mẹ kiểm tra thông tin rồi thử lại nhé.'),
+      );
     } finally {
       setLoading(false);
     }
@@ -178,26 +216,11 @@ export default function PregnancySetupScreen({ navigation }: Props) {
     if (!payload) return;
     setLoading(true);
     try {
-      // 1. Thử lưu lên Backend Database
-      try {
-        await savePregnancyProfileToDB({ ...payload, edd: preview?.edd });
-      } catch (backendError) {
-        console.log('Lỗi lưu backend profile (sẽ lưu bộ nhớ máy):', backendError);
-      }
+      await savePregnancyProfileToDB({ ...payload, edd: preview?.edd });
 
-      // 2. Luôn lưu vào AsyncStorage để đảm bảo thông tin hiển thị liền mạch trên máy
       const account = currentUserProfile || (await restoreSession());
       const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
       const savedProfile = {
-        name: account?.full_name || '',
-        email: account?.email || '',
-        phone: account?.phone_number || '',
-        birthday: account?.birthday || '',
-        blood: '',
-        allergies: '',
-        conditions: '',
-        obstetricHistory: '',
-        target_date: todayIso(),
         lmp: payload.lmp || '',
         q1_ultrasound_date: payload.q1_ultrasound_date || '',
         q1_gestational_weeks: payload.q1_gestational_weeks === undefined ? '' : String(payload.q1_gestational_weeks),
@@ -209,14 +232,16 @@ export default function PregnancySetupScreen({ navigation }: Props) {
         profile: savedProfile,
         trimester: preview?.trimester || '',
         gestationalAge: `${preview?.weeks ?? 0} tuần ${preview?.days ?? 0} ngày`,
-        dueDate: displayDate(preview?.edd || ''),
-        contacts: [],
+        dueDate: formatIsoToDmy(preview?.edd || ''),
       }));
 
-      // 3. Hoàn tất và vào màn hình chính
       navigation.replace('Main');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Chưa lưu được hồ sơ. Mẹ thử lại nhé.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : (isEn ? 'Unable to save profile. Please try again.' : 'Chưa lưu được hồ sơ. Mẹ thử lại nhé.'),
+      );
     } finally {
       setLoading(false);
     }
@@ -224,20 +249,24 @@ export default function PregnancySetupScreen({ navigation }: Props) {
 
   const dateField = (label: string, value: string, onChangeText: (text: string) => void, hint: string) => (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrap}>
-        <Ionicons name="calendar-outline" size={19} color={colors.textMuted} />
+      <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>{label}</Text>
+      <View style={[styles.inputWrap, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+        <Ionicons name="calendar-outline" size={19} color={theme.muted} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, fontStyle(15.5, { min: 14.5 }), { color: theme.text }]}
           value={value}
-          onChangeText={(text) => { onChangeText(text); setPreview(null); setError(''); }}
+          onChangeText={(text) => {
+            onChangeText(formatDmyInput(text, value));
+            setPreview(null);
+            setError('');
+          }}
           placeholder="DD/MM/YYYY"
-          placeholderTextColor={colors.textLight}
+          placeholderTextColor={theme.muted}
           keyboardType="numbers-and-punctuation"
           maxLength={10}
         />
       </View>
-      <Text style={styles.hint}>{hint}</Text>
+      <Text style={[styles.hint, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>{hint}</Text>
     </View>
   );
 
