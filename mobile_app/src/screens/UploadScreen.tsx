@@ -1703,61 +1703,61 @@ export default function UploadScreen({ navigation }: Props) {
       if (fileId) {
         const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
         fileDetail = detailRes?.data || detailRes;
-            <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
-          </View>
+      }
 
-          <Text style={styles.dropTitle}>Chụp ảnh hoặc tải lên phiếu khám (PDF/Ảnh)</Text>
-          <Text style={styles.dropSub}>
-            Hỗ trợ tải đơn lẻ hoặc tải hàng loạt (Batch Upload) • Đồng bộ trực tiếp vào Database
-          </Text>
+      const analyzedItem: UploadItem = {
+        ...newItem,
+        fileId,
+        taskId,
+        checkupId,
+        profileId: validPid,
+        presignedUrl: fileDetail?.presigned_view_url,
+        status: 'pending',
+        analysis:
+          parseBackendIngestResult(fileDetail || resData, name, profileWeek, activeLang) ||
+          buildDefaultExtractedAnalysis(name, profileWeek, activeLang),
+      };
 
-          <View style={styles.uploadBtnRow}>
-            <Pressable style={styles.chooseButton} onPress={openChooser}>
-              <Ionicons name="document-attach-outline" size={15} color={colors.white} />
-              <Text style={styles.chooseText}>Tải lên đơn lẻ</Text>
-            </Pressable>
+      updateItemsAndPersist((prev) =>
+        prev.map((it) => (it.id === newItemId ? analyzedItem : it))
+      );
+      openVerificationModal(analyzedItem, false);
+    } catch (err: any) {
+      updateItemsAndPersist((prev) =>
+        prev.map((item) =>
+          item.id === newItemId
+            ? {
+                ...item,
+                status: 'failed',
+                canRetry: true,
+                errorMessage: err?.message || activeCopy.uploadServerFail,
+              }
+            : item
+        )
+      );
+      Alert.alert(activeCopy.uploadErrorTitle, err?.message || activeCopy.uploadServerFail);
+    }
+  };
 
-            <Pressable style={styles.batchButton} onPress={pickAndUploadBatch}>
-              <Ionicons name="documents-outline" size={15} color={colors.primaryDark} />
-              <Text style={styles.batchButtonText}>Tải hàng loạt (Batch)</Text>
-            </Pressable>
-          </View>
-        </Pressable>
+  /* =========================================================================
+     API 2 & 4: POST /api/v1/ingest/upload-batch & GET /batches/{batch_id}/status
+     ========================================================================= */
+  const pickAndUploadBatch = async () => {
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
+    try {
+      isPickingFileRef.current = true;
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
 
-        {!!batchProgressText && (
-          <View style={styles.batchBanner}>
-            <ActivityIndicator size="small" color="#0F766E" />
-            <Text style={styles.batchBannerText}>{batchProgressText}</Text>
-          </View>
-        )}
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
 
-        <Text style={styles.sectionTitle}>
-          Tài liệu & Kết quả đã lưu ({items.length})
-        </Text>
-
-        {loadingStorage ? (
-          <View style={styles.emptyBox}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.emptyText}>Đang đồng bộ danh sách tài liệu từ Database...</Text>
-          </View>
-        ) : items.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Ionicons name="document-outline" size={32} color="#94A3B8" />
-            <Text style={styles.emptyText}>
-              Chưa có phiếu khám nào. Hãy chụp ảnh phiếu khám, tải file PDF hoặc bấm "Nhập kết quả thủ công".
-            </Text>
-          </View>
-        ) : (
-          items.map((item) => {
-            const s = STATUS_STYLE[item.status];
-            const isPdf = item.name.toLowerCase().endsWith('.pdf');
-            const previewSourceUri = item.presignedUrl || item.uri;
-            const hasImagePreview = Boolean(previewSourceUri) && isImageItem(item);
-
-            return (
-              <View key={item.id} style={styles.itemCard}>
-                <View style={styles.itemHeaderRow}>
-                  <View style={[styles.fileIcon, isPdf && { backgroundColor: '#FEF2F2' }]}>
+      const batchNow = Date.now();
+      const resolveMime = (fName: string, rawMime?: string | null) => {
+        if (rawMime && rawMime !== 'application/octet-stream') return rawMime;
                     <Ionicons
                       name={
                         hasImagePreview
