@@ -428,35 +428,119 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
             accessibilityLabel={isEn ? 'Maternal avatar' : 'Ảnh đại diện mẹ bầu'}
           />
           <View style={styles.identityText}>
-            <Text style={styles.name}>{profile.name || 'Chưa cập nhật'}</Text>
-            <Text style={styles.subtitle}>Hồ sơ của mẹ trên PreCare</Text>
+            <Text style={[styles.name, fontStyle(20, { min: 18, max: 24 }), { color: theme.text }]}>
+              {account?.full_name || notUpdatedText}
+            </Text>
           </View>
         </View>
-        <OutlineButton title="Chỉnh sửa hồ sơ" icon="create-outline" onPress={() => openEditor('personal')} />
 
-        <View style={styles.pregnancyCard}>
+        {!!loadError && (
+          <View
+            style={[
+              styles.loadErrorBox,
+              { backgroundColor: theme.dangerBackground, borderColor: theme.dangerBorder },
+            ]}
+          >
+            <Ionicons name="alert-circle-outline" size={18} color={theme.danger} />
+            <Text style={[styles.loadErrorText, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.danger }]}>
+              {loadError}
+            </Text>
+            <Pressable onPress={() => void loadFromDatabase()} hitSlop={8}>
+              <Text style={[styles.retryLink, fontStyle(13.5, { min: 12.5 }), { color: theme.tealText }]}>
+                {isEn ? 'Retry' : 'Tải lại'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        <OutlineButton
+          title={isEn ? 'Edit account' : 'Chỉnh sửa tài khoản'}
+          icon="person-outline"
+          disabled={loadingData}
+          onPress={openAccountEditor}
+        />
+
+        <View
+          style={[
+            styles.pregnancyCard,
+            { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+          ]}
+        >
           <View style={styles.between}>
-            <Text style={styles.pregnancyLabel}>Thai kỳ hiện tại</Text>
-            <Text style={styles.trimester}>{trimester}</Text>
+            <Text style={[styles.pregnancyLabel, fontStyle(13.5, { min: 12.5 }), { color: theme.tealText }]}>
+              {isEn ? 'Current pregnancy' : 'Thai kỳ hiện tại'}
+            </Text>
+            {loadingData ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[styles.trimester, fontStyle(12.5, { min: 11.5, max: 15 }), { color: theme.tealText }]}>
+                {formatTrimester(trimesterNum, trimesterVi, isEn)}
+              </Text>
+            )}
           </View>
-          <Text style={styles.gestationalAge}>{gestationalAge}</Text>
-          <View style={styles.dueRow}>
-            <Text style={styles.label}>Ngày dự sinh</Text>
-            <Text style={styles.value}>{dueDate}</Text>
+          <Text style={[styles.gestationalAge, fontStyle(26, { lineHeight: 35, min: 23, max: 31 }), { color: theme.tealText }]}>
+            {gestationalAgeText}
+          </Text>
+          <View style={[styles.dueRow, { borderTopColor: theme.tealBorder }]}>
+            <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.muted }]}>
+              {isEn ? 'Estimated due date (EDD)' : 'Ngày dự sinh (EDD)'}
+            </Text>
+            <Text style={[styles.value, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+              {pregnancy.edd || notUpdatedText}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
-        <View style={styles.card}>
-          <InfoRow label="Ngày sinh" value={profile.birthday} />
-          <InfoRow label="Số điện thoại" value={profile.phone ? `${profile.phone.slice(0, 4)} *** ${profile.phone.slice(-2)}` : ''} />
-          <InfoRow label="Email" value={profile.email} last />
+        <Text style={[styles.sectionTitle, styles.standaloneSectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+          {isEn ? 'Saved pregnancy metrics' : 'Chỉ số thai kỳ đã lưu'}
+        </Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <InfoRow
+            label={isEn ? 'Last menstrual period (LMP)' : 'Ngày kinh cuối (LMP)'}
+            value={pregnancy.lmp}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? '1st trimester ultrasound date' : 'Ngày siêu âm Quý 1'}
+            value={pregnancy.q1_ultrasound_date}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Gestational age at Q1 scan' : 'Tuổi thai siêu âm Q1'}
+            value={q1AgeText}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Crown-rump length (CRL)' : 'Chiều dài đầu mông (CRL)'}
+            value={pregnancy.crl_mm ? `${pregnancy.crl_mm} mm` : ''}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Estimated due date' : 'Ngày dự sinh'}
+            value={pregnancy.edd}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Primary doctor' : 'Bác sĩ phụ trách'}
+            value={doctorName || (isEn ? 'Unassigned' : 'Chưa phân công')}
+            emptyText={notUpdatedText}
+          />
+          <InfoRow
+            label={isEn ? 'Profile status' : 'Trạng thái hồ sơ'}
+            value={formatStatus(rawStatus, isEn)}
+            emptyText={notUpdatedText}
+            last
+          />
         </View>
 
-        <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Thông tin y tế</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cập nhật thông tin y tế" hitSlop={10} onPress={() => openEditor('medical')}>
-            <Text style={styles.actionText}>Cập nhật</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}>
+            {isEn ? 'Account information' : 'Thông tin tài khoản'}
+          </Text>
+          <Pressable onPress={openAccountEditor} disabled={loadingData} hitSlop={8}>
+            <Text style={[styles.sectionEditLink, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]}>
+              {isEn ? 'Edit' : 'Chỉnh sửa'}
+            </Text>
           </Pressable>
         </View>
         <View style={styles.card}>
