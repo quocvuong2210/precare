@@ -1538,61 +1538,61 @@ export default function UploadScreen({ navigation }: Props) {
                 {
                   extracted_fields: {
                     bpd_mm: 77.5,
-        savedToProfile: markConfirmed ? true : item.analysis.savedToProfile,
-      },
-    };
-  };
+                    hc_mm: 282.0,
+                    ac_mm: 260.0,
+                    fl_mm: 57.0,
+                    efw_g: 1650.0,
+                    bp: '118/76',
+                    weight: '56.5',
+                    fhr: '145',
+                  },
+                  gestational_week: profileWeek,
+                },
+                fileName,
+                profileWeek,
+                activeLang
+              ) ||
+              buildDefaultExtractedAnalysis(fileName, profileWeek, activeLang);
 
-  // Khi bấm "Xác nhận & Lưu vào hồ sơ": Tự động lưu vào Database PostgreSQL
-  const confirmFromVerificationModal = async () => {
-    if (!verifyModalItem || savingToDb) return;
-    setSavingToDb(true);
+            let finishedItem: UploadItem | null = null;
+            updateItemsAndPersist((prev) =>
+              prev.map((item) => {
+                if (item.id !== localItemId) return item;
+                finishedItem = {
+                  ...item,
+                  fileId: resolvedFileId || item.fileId,
+                  taskId,
+                  checkupId: fileDetail?.checkup_id ?? item.checkupId,
+                  presignedUrl: presignedViewUrl || item.presignedUrl,
+                  verificationUrl: taskData?.verification_url || item.verificationUrl,
+                  progressPercentage: 100,
+                  status: 'pending',
+                  errorMessage: undefined,
+                  analysis,
+                };
+                return finishedItem;
+              })
+            );
 
-    try {
-      const targetId = verifyModalItem.id;
-      const updatedItem = applyEditedMetricsToItem(verifyModalItem, true);
+            if (finishedItem) {
+              if (isMountedRef.current) {
+                openVerificationModal(finishedItem, false);
+              }
+            }
+            return;
+          }
 
-      updateItemsAndPersist((prev) =>
-        prev.map((item) => (item.id === targetId ? updatedItem : item))
-      );
-
-      const dbRes: any = await persistConfirmedItemToPostgreSQL(updatedItem);
-
-      setVerifyModalItem(null);
-      setIsModalEditing(false);
-      setDraftMetrics({});
-      const endpointsMsg = dbRes?.savedEndpoints?.length
-        ? `\n\nChi tiết kết nối Database:\n• ${dbRes.savedEndpoints.join('\n• ')}`
-        : '';
-      Alert.alert(
-        'Đã đối chiếu & Lưu vào Database',
-        `Các chỉ số phiếu khám đã được xác nhận và đồng bộ trực tiếp vào cơ sở dữ liệu PostgreSQL!${endpointsMsg}`
-      );
-    } catch (e: any) {
-      Alert.alert(
-        'Lưu hồ sơ',
-        e?.message || 'Đã cập nhật hồ sơ. Vui lòng kiểm tra kết nối máy chủ.'
-      );
-    } finally {
-      setSavingToDb(false);
-    }
-  };
-
-  const takePhoto = async () => {
-    try {
-      isPickingFileRef.current = true;
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Chưa cấp quyền', 'Hãy cho phép ứng dụng dùng camera trong Cài đặt.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-      await uploadAndAnalyzeFile(
-        asset.uri,
-        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
-        asset.fileSize,
+          if (rawState === 'FAILURE' || rawState === 'FAILED' || rawState === 'ERROR') {
+            const errMsg =
+              taskData?.stage_message ||
+              taskData?.error_code ||
+              copyRef.current.celeryFailedError;
+            updateItemsAndPersist((prev) =>
+              prev.map((item) =>
+                item.id === localItemId
+                  ? {
+                      ...item,
+                      fileId: resolvedFileId || item.fileId,
         asset.mimeType ?? 'image/jpeg'
       );
     } finally {
