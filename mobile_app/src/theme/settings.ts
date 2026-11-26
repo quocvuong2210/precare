@@ -50,3 +50,50 @@ export const settingsThemes = {
     overlay: 'rgba(2, 6, 23, 0.72)',
   },
 };
+
+export type TextSizeMode = 'small' | 'default' | 'large';
+
+export const TEXT_SIZE_SCALES: Record<TextSizeMode, number> = {
+  small: 0.94,
+  default: 1,
+  large: 1.18,
+};
+
+export type ScaleFontOptions = {
+  min?: number;
+  max?: number;
+  lineHeight?: number;
+};
+
+export function getFontScale(textSize: TextSizeMode): number {
+  return TEXT_SIZE_SCALES[textSize] ?? 1;
+}
+
+export function scaleFont(
+  baseSize: number,
+  fontScale: number,
+  options?: Pick<ScaleFontOptions, 'min' | 'max'>,
+): number {
+  const scaled = baseSize * fontScale;
+  const withMin = options?.min !== undefined ? Math.max(options.min, scaled) : scaled;
+  const clamped = options?.max !== undefined ? Math.min(options.max, withMin) : withMin;
+  return Math.round(clamped * 2) / 2;
+}
+
+export function scaledFontStyle(
+  baseSize: number,
+  fontScale: number,
+  options?: ScaleFontOptions,
+): { fontSize: number; lineHeight?: number } {
+  const fontSize = scaleFont(baseSize, fontScale, options);
+  if (options?.lineHeight !== undefined) {
+    const ratio = baseSize > 0 ? options.lineHeight / baseSize : 1.4;
+    return {
+      fontSize,
+      lineHeight: Math.round(fontSize * ratio),
+    };
+  }
+  return { fontSize };
+}
+
+export type AppTheme = typeof settingsThemes.light;
