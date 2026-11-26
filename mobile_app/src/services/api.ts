@@ -1911,4 +1911,61 @@ export async function saveVerifiedRecordToDatabase(
     } else {
       const errText = await checkupRes.text().catch(() => '');
       console.log(`Lỗi lưu checkups (${checkupRes.status}):`, errText);
+    }
+  } catch (err: any) {
+    console.log('Lỗi kết nối lưu checkup:', err?.message || err);
+  }
+
+  // 3. Nếu có chỉ số CRL hoặc tuần thai siêu âm Q1, cập nhật bảng pregnancy_profiles qua PUT /pregnancy-profiles/{id}
+  if (crl !== null && crl > 0) {
+    try {
+      const profileUpdateBody: Record<string, any> = {
+        crl_mm: crl,
+        recalculate_edd: false,
+      };
+      const putRes = await fetch(`${API_BASE_URL}/pregnancy-profiles/${validProfileId}`, {
+        method: 'PUT',
+        headers: userHeaders,
+        body: JSON.stringify(profileUpdateBody),
+      });
+      if (putRes.ok) {
+        savedEndpoints.push(`PUT /api/v1/pregnancy-profiles/${validProfileId} (CRL: ${crl}mm)`);
+      }
+    } catch (e) {
+      console.log('Lỗi cập nhật pregnancy_profiles:', e);
+    }
+  }
+
+  // 4. Gọi Service Phân tích Hadlock + Safety Fusion (analysis_service trên cổng 8001)
+  const rootUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  const analysisServiceUrl = rootUrl.replace(':8000', ':8001');
+  try {
+    const analysisReqBody: Record<string, any> = {
+      gestational_age_days: totalGestationalDays,
+      ...(bpd !== null ? { bpd } : {}),
+      ...(hc !== null ? { hc } : {}),
+      ...(ac !== null ? { ac } : {}),
+      ...(fl !== null ? { fl } : {}),
+      ...(efw !== null ? { efw } : {}),
+    };
+
+    const predRes = await fetch(`${analysisServiceUrl}/api/v1/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(analysisReqBody),
+    });
+
+    if (predRes.ok) {
+      savedEndpoints.push(`POST ${analysisServiceUrl}/api/v1/predict (Hadlock & RACA-Net Fusion)`);
+    }
+  } catch {
+    // analysis_service tuỳ chọn
+  }
+
+  return {
+    savedEndpoints,
+    profileId: validProfileId,
+    checkupId: lastCreatedCheckupId,
+    biometricId: lastCreatedBiometricId,
+  };
 }
