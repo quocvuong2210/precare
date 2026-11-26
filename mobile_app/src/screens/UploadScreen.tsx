@@ -2033,61 +2033,61 @@ export default function UploadScreen({ navigation }: Props) {
     return {
       ...item,
       status: markConfirmed ? 'done' : item.status,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={activeModalTheme.icon}
-                      size={18}
-                      color={
-                        activeModalSummary.overallSeverity === 'normal'
-                          ? '#059669'
-                          : activeModalTheme.valueColor
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.doctorBannerText,
-                        {
-                          color:
-                            activeModalSummary.overallSeverity === 'normal'
-                              ? '#065F46'
-                              : activeModalTheme.valueColor,
-                        },
-                      ]}
-                    >
-                      {activeModalSummary.doctorConclusion}
-                    </Text>
-                  </View>
-                )}
+      analysis: {
+        ...item.analysis,
+        gestationalWeek: weekToUse,
+        gestationalAge: stageLabel,
+        metrics: updatedMetrics,
+        overallSeverity: summaryState.overallSeverity,
+        doctorConclusion: summaryState.doctorConclusion,
+        savedToProfile: markConfirmed ? true : item.analysis.savedToProfile,
+      },
+    };
+  };
 
-                <View style={styles.fixedDisclaimerBox}>
-                  <Ionicons name="shield-checkmark-outline" size={14} color="#475569" />
-                  <Text style={styles.fixedDisclaimerText}>
-                    Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.
-                  </Text>
-                </View>
+  // Khi bấm "Xác nhận & Lưu vào hồ sơ": Tự động lưu vào Database PostgreSQL
+  const confirmFromVerificationModal = async () => {
+    if (!verifyModalItem || savingToDb) return;
+    setSavingToDb(true);
+    const activeCopy = copyRef.current;
 
-                <View style={styles.weekEditorRow}>
-                  <Text style={styles.weekEditorLabel}>
-                    Mốc đối chiếu: {getPregnancyStageInfo(activeModalWeek).stageLabel}
-                  </Text>
-                  {isModalEditing && (
-                    <View style={styles.weekStepper}>
-                      <Pressable
-                        style={styles.weekStepBtn}
-                        onPress={() =>
-                          setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
-                        }
-                      >
-                        <Ionicons name="remove" size={16} color={colors.navy} />
-                      </Pressable>
-                      <TextInput
-                        style={styles.weekInput}
-                        value={draftWeek}
-                        onChangeText={setDraftWeek}
-                        keyboardType="number-pad"
-                        maxLength={2}
+    try {
+      const targetId = verifyModalItem.id;
+      const updatedItem = applyEditedMetricsToItem(verifyModalItem, true);
+
+      updateItemsAndPersist((prev) =>
+        prev.map((item) => (item.id === targetId ? updatedItem : item))
+      );
+
+      const dbRes: any = await persistConfirmedItemToPostgreSQL(updatedItem);
+
+      setVerifyModalItem(null);
+      setIsModalEditing(false);
+      setDraftMetrics({});
+      const endpointsMsg = dbRes?.savedEndpoints?.length
+        ? `\n\n${activeCopy.savedDbEndpointsLabel}\n• ${dbRes.savedEndpoints.join('\n• ')}`
+        : '';
+      Alert.alert(
+        activeCopy.savedDbTitle,
+        `${activeCopy.savedDbBody}${endpointsMsg}`
+      );
+    } catch (e: any) {
+      Alert.alert(
+        activeCopy.saveProfileErrorTitle,
+        e?.message || activeCopy.saveProfileFallback
+      );
+    } finally {
+      setSavingToDb(false);
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      isPickingFileRef.current = true;
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(copy.permissionDeniedTitle, copy.cameraPermissionBody);
+        return;
                       />
                       <Pressable
                         style={styles.weekStepBtn}
