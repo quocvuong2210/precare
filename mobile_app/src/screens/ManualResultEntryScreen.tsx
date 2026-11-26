@@ -273,61 +273,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
       />
 
       <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: theme.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <Text style={[styles.title, fontStyle(18.5, { min: 17, max: 22 }), { color: theme.text }]}>
+            {isEn ? 'Weekly Ultrasound Results' : 'Kết quả khám thai theo tuần'}
+          </Text>
+          <Text style={[styles.subtitle, fontStyle(14, { lineHeight: 21, min: 13 }), { color: theme.muted }]}>
+            {isEn
+              ? 'Each gestational week has different reference thresholds. When you change the exam date or week, normal ranges update automatically.'
+              : 'Mỗi tuần và tháng thai kỳ có ngưỡng chuẩn khác nhau. Khi bạn đổi ngày khám hoặc số tuần, bảng chuẩn dưới đây sẽ tự động cập nhật theo.'}
+          </Text>
+
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.fieldLabel, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.text }]}>
+              {isEn ? 'Checkup date' : 'Ngày khám'}
+            </Text>
+            <View
+              style={[
+                styles.inputBox,
+                { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+                !parsedDate && { borderColor: theme.danger, borderWidth: 1.5 },
+                { marginTop: 4 },
+              ]}
+            >
+              <TextInput
+                accessibilityLabel={isEn ? 'Checkup date DD/MM/YYYY' : 'Ngày khám, định dạng ngày tháng năm'}
+                value={examDate}
+                onChangeText={setExamDate}
+                placeholder="DD/MM/YYYY"
+                placeholderTextColor={theme.muted}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+                style={[styles.inputText, fontStyle(16, { min: 15 }), { color: theme.text }]}
+              />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Chọn ngày khám"
+                accessibilityLabel={isEn ? 'Select checkup date' : 'Chọn ngày khám'}
                 onPress={openCalendar}
                 hitSlop={10}
               >
-                <Ionicons name="calendar-outline" size={19} color="#334155" />
+                <Ionicons name="calendar-outline" size={19} color={theme.text} />
               </Pressable>
             </View>
             {!parsedDate && (
-              <Text style={styles.dangerErrorText}>
-                Nhập ngày hợp lệ theo định dạng DD/MM/YYYY.
+              <Text style={[styles.dangerErrorText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.danger }]}>
+                {isEn ? 'Enter a valid date in DD/MM/YYYY format.' : 'Nhập ngày hợp lệ theo định dạng DD/MM/YYYY.'}
               </Text>
             )}
 
-            <View style={styles.ageLabelRow}>
-              <Text style={styles.ageLabel}>Tuổi thai tại ngày khám (12 – 41 tuần)</Text>
-              <View style={styles.autoAgeControl}>
-                <Text style={styles.autoAgeText}>Tự tính</Text>
-                <Switch
-                  accessibilityLabel="Tự tính tuổi thai theo ngày dự sinh"
-                  value={autoAge}
-                  onValueChange={toggleAutoAge}
-                  trackColor={{ false: '#CBD5E1', true: colors.primary }}
-                  thumbColor={colors.white}
-                  ios_backgroundColor="#CBD5E1"
-                  style={styles.ageSwitch}
-                />
-              </View>
-            </View>
-            <View style={styles.fieldRow}>
-              <View style={styles.halfField}>
-                <View style={[styles.inputBox, styles.ageInput, autoAge && styles.readOnlyInput]}>
-                  <TextInput
-                    accessibilityLabel="Tuổi thai, số tuần"
-                    value={age.weeks}
-                    onChangeText={(weeks) => setManualAge((prev) => ({ ...prev, weeks }))}
-                    editable={!autoAge}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    selectTextOnFocus
-                    style={styles.inputText}
-                  />
-                  <Text style={styles.unit}>tuần</Text>
-                </View>
-              </View>
-              <View style={styles.halfField}>
-                <View style={[styles.inputBox, styles.ageInput, autoAge && styles.readOnlyInput]}>
-                  <TextInput
-                    accessibilityLabel="Tuổi thai, số ngày"
-                    value={age.days}
-                    onChangeText={(days) => setManualAge((prev) => ({ ...prev, days }))}
-                    editable={!autoAge}
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
                     keyboardType="number-pad"
                     maxLength={1}
                     selectTextOnFocus
