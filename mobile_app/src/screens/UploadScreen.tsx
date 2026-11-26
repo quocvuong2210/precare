@@ -2693,61 +2693,61 @@ export default function UploadScreen({ navigation }: Props) {
                     >
                       {activeModalSummary.doctorConclusion}
                     </Text>
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  readOnlyValueText: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  verifyInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  verifyInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '800',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  verifyUnitText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-    marginLeft: 8,
-  },
-  refRangeText: { fontSize: 10.5, color: '#0F766E', fontWeight: '700', marginTop: 3 },
-  clinicalNoteText: { fontSize: 11, color: '#475569', marginTop: 3, lineHeight: 15 },
-  modalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  toggleEditModalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 10,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
+                  </View>
+                )}
+
+                <View
+                  style={[
+                    styles.fixedDisclaimerBox,
+                    {
+                      backgroundColor: theme.surfaceAlt,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={14} color={theme.muted} />
+                  <Text style={[styles.fixedDisclaimerText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.textSecondary }]}>
+                    {copy.disclaimerTitle} {copy.disclaimerBody}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.weekEditorRow,
+                    {
+                      backgroundColor: theme.tealSoft,
+                      borderColor: theme.tealBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.weekEditorLabel, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+                    {copy.weekEditorPrefix} {getPregnancyStageInfo(activeModalWeek, lang).stageLabel}
+                  </Text>
+                  {isModalEditing && (
+                    <View style={styles.weekStepper}>
+                      <Pressable
+                        style={[
+                          styles.weekStepBtn,
+                          { backgroundColor: theme.surface, borderColor: theme.border },
+                        ]}
+                        onPress={() =>
+                          setDraftWeek((w) => String(Math.max(12, (parseInt(w, 10) || 24) - 1)))
+                        }
+                      >
+                        <Ionicons name="remove" size={16} color={theme.text} />
+                      </Pressable>
+                      <TextInput
+                        style={[
+                          styles.weekInput,
+                          fontStyle(14, { min: 13, max: 16 }),
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.tealBorder,
+                            color: theme.text,
+                          },
+                        ]}
+                        value={draftWeek}
+                        onChangeText={setDraftWeek}
   toggleEditModalBtnActive: {
     backgroundColor: '#0F766E',
     borderColor: '#0F766E',
