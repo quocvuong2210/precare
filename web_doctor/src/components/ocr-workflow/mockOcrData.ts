@@ -44,6 +44,7 @@ export interface DocumentExtractionData {
   presignedViewUrl?: string;
   fileType?: string;
   extractionMethod?: string;
+  isManualEntry?: boolean;
   rawText?: string;
   ocrConfidence: number;
   doctorPerformer: string;
@@ -89,6 +90,176 @@ export const formatFileSize = (bytes: number): string => {
 /**
  * Tạo dữ liệu trích xuất OCR giả lập chân thực chuẩn sản khoa
  */
+/**
+ * Khởi tạo dữ liệu trống cho chế độ nhập tay đầy đủ khi OCR thất bại (Sub-task 4.4.1)
+ */
+export const createBlankManualExtractionData = (
+  fileId: string,
+  fileName: string = 'Tai_lieu_kham.pdf',
+  fileSizeFormatted: string = '—',
+  patientName: string = 'Thai phụ'
+): DocumentExtractionData => {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return {
+    fileId,
+    fileName,
+    fileSizeFormatted,
+    extractionMethod: 'manual_entry',
+    isManualEntry: true,
+    ocrConfidence: 0,
+    doctorPerformer: '',
+    doctorApprover: '',
+    department: 'Khoa Sản',
+    visitDate: todayIso,
+    gestationalAgeFormatted: '',
+    groupingOption: 'merge_existing',
+
+    vitals: {
+      bloodPressureSystolic: 0,
+      bloodPressureDiastolic: 0,
+      weightKg: 0,
+      heartRateBpm: 0,
+      temperatureC: 0,
+      bmi: 0,
+    },
+
+    biometrics: [
+      {
+        code: 'FHR',
+        label: 'Tim thai (FHR)',
+        value: 0,
+        unit: 'bpm',
+        standardRange: '120 - 160 bpm',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+      {
+        code: 'BPD',
+        label: 'Đường kính lưỡng đỉnh (BPD)',
+        value: 0,
+        unit: 'mm',
+        standardRange: '10 - 120 mm',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+      {
+        code: 'FL',
+        label: 'Chiều dài xương đùi (FL)',
+        value: 0,
+        unit: 'mm',
+        standardRange: '5 - 95 mm',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+      {
+        code: 'AC',
+        label: 'Chu vi bụng (AC)',
+        value: 0,
+        unit: 'mm',
+        standardRange: '50 - 450 mm',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+      {
+        code: 'EFW',
+        label: 'Cân nặng thai ước tính (EFW)',
+        value: 0,
+        unit: 'g',
+        standardRange: '50 - 6,000 g',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+      {
+        code: 'AFI',
+        label: 'Chỉ số ối (AFI)',
+        value: 0,
+        unit: 'cm',
+        standardRange: '5 - 24 cm',
+        percentile: 'Nhập tay',
+        assessment: 'Chờ nhập',
+        confidence: 0,
+      },
+    ],
+
+    labs: [
+      {
+        code: 'HB',
+        label: 'Hemoglobin (HGB)',
+        sublabel: 'Huyết sắc tố',
+        value: '',
+        unit: 'g/dL',
+        normalRange: '11.0 - 14.5',
+        status: 'Chờ nhập',
+        isAbnormal: false,
+        confidence: 0,
+      },
+      {
+        code: 'WBC',
+        label: 'Bạch cầu (WBC)',
+        sublabel: 'Số lượng bạch cầu',
+        value: '',
+        unit: 'G/L',
+        normalRange: '4.0 - 11.0',
+        status: 'Chờ nhập',
+        isAbnormal: false,
+        confidence: 0,
+      },
+      {
+        code: 'PLT',
+        label: 'Tiểu cầu (PLT)',
+        sublabel: 'Số lượng tiểu cầu',
+        value: '',
+        unit: 'G/L',
+        normalRange: '150 - 400',
+        status: 'Chờ nhập',
+        isAbnormal: false,
+        confidence: 0,
+      },
+      {
+        code: 'GLU',
+        label: 'Glucose máu đói',
+        sublabel: 'Đường huyết lúc đói',
+        value: '',
+        unit: 'mmol/L',
+        normalRange: '3.9 - 5.1',
+        status: 'Chờ nhập',
+        isAbnormal: false,
+        confidence: 0,
+      },
+      {
+        code: 'URINE_PRO',
+        label: 'Protein niệu',
+        sublabel: 'Tổng phân tích nước tiểu',
+        value: '',
+        unit: '-',
+        normalRange: 'Âm tính',
+        status: 'Chờ nhập',
+        isAbnormal: false,
+        confidence: 0,
+      },
+    ],
+
+    conclusions: {
+      fetalCondition: '',
+      maternalNotes: '',
+      followUpAdvice: '',
+    },
+
+    racaNetAlert: {
+      level: 'yellow',
+      levelName: 'NHẬP THỦ CÔNG KHI OCR THẤT BẠI',
+      summary: `Hệ thống OCR không trích xuất được tự động tài liệu cho thai phụ ${patientName}. Bác sĩ vui lòng đối chiếu trực tiếp tài liệu gốc bên trái và nhập đầy đủ các chỉ số.`,
+      recommendation: 'Đề xuất bác sĩ kiểm tra kỹ các chỉ số sinh trắc học (BPD, HC, AC, FL, EFW) và sinh hiệu trước khi lưu vào bệnh án điện tử.',
+      disclaimer: '*Dữ liệu nhập tay sẽ được đánh dấu xác thực bởi bác sĩ phụ trách.',
+    },
+  };
+};
+
 export const createDefaultExtractionData = (
   fileId: string,
   fileName: string = 'Phieu_kham_thai_32W.pdf',
