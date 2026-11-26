@@ -878,61 +878,61 @@ export function evaluateMetricByWeek(
           : 'Số lượng bạch cầu bình thường (4.5–11.0 G/L)',
       };
 
-            (it) =>
-              it.fileId === fId ||
-              it.id === fId ||
-              decodeFileName(it.name) === fName
-          );
-
-          const rawStatus = String(rf.status || '').toLowerCase();
-          const mappedStatus: Status =
-            rawStatus === 'failed' || rawStatus === 'failure' || rawStatus === 'error'
-              ? 'failed'
-              : rawStatus === 'processing' || rawStatus === 'queued' || rawStatus === 'started'
-              ? 'processing'
-              : rawStatus === 'confirmed' || rawStatus === 'done' || rawStatus === 'completed'
-              ? 'done'
-              : 'pending';
-
-          const parsedAnalysis =
-            parseBackendIngestResult(rf, fName, safeWeek) ||
-            existing?.analysis ||
-            buildDefaultExtractedAnalysis(fName, safeWeek);
-
-          syncedItems.push({
-            id: fId, // Đồng bộ ID dùng chính UUID của PostgreSQL
-            fileId: fId,
-            profileId: realProfileId,
-            checkupId: rf.checkup_id || existing?.checkupId || null,
-            name: fName,
-            time: rf.created_at
-              ? new Date(rf.created_at).toLocaleDateString('vi-VN')
-              : existing?.time || nowLabel(),
-            status: existing?.status === 'done' ? 'done' : mappedStatus,
-            uri: existing?.uri,
-            presignedUrl: existing?.presignedUrl,
-            mimeType: rf.file_type || existing?.mimeType,
-            analysis: parsedAnalysis,
-          });
-        }
-
-        // Giữ lại các item local đang trong trạng thái tải lên thật (processing)
-        for (const localIt of localList) {
-          const lId = localIt.fileId || localIt.id;
-          if (localIt.status === 'processing' && !remoteIdSet.has(lId)) {
-            syncedItems.unshift(localIt);
-          }
-        }
-
-        setItems(syncedItems);
-        await AsyncStorage.setItem(storageKey, JSON.stringify(syncedItems));
+    case 'ph':
+      if (num < 4.5 || num > 8.0) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Urine pH outside 5.0–7.5 range'
+            : 'Độ pH nước tiểu lệch ngưỡng 5.0–7.5',
+        };
       }
-    } catch (e: any) {
-      console.log('Đồng bộ hồ sơ từ DB:', e?.message || e);
-    } finally {
-      if (isMountedRef.current) {
-        setLoadingStorage(false);
-      }
+      return {
+        severity: 'normal',
+        clinicalNote: isEn
+          ? 'Normal urine pH (5.0–7.5)'
+          : 'Độ pH nước tiểu bình thường (5.0–7.5)',
+      };
+
+    default:
+      return {
+        severity: 'normal',
+        clinicalNote: isEn ? 'Stable for gestational age' : 'Ổn định theo tuổi thai',
+      };
+  }
+}
+
+export function summarizeAnalysisState(
+  metrics: MedicalMetric[],
+  fileName: string,
+  gestationalWeek: number = 24,
+  lang: AppLang = 'vi'
+) {
+  const { stageLabel } = getPregnancyStageInfo(gestationalWeek, lang);
+  const dangerList = metrics.filter((m) => m.severity === 'danger');
+  const warningList = metrics.filter((m) => m.severity === 'warning');
+  const isEn = lang === 'en';
+
+  if (dangerList.length > 0) {
+    const details = dangerList
+      .map((m) => `${localizeMetricLabel(m.key, m.label, lang)}: ${m.value} ${m.unit}`)
+      .join('; ');
+    return {
+      overallSeverity: 'danger' as SeverityLevel,
+      doctorConclusion: isEn
+        ? `[${stageLabel}] — RED: Detected ${dangerList.length} metric(s) outside safe bounds [${details}]${
+            warningList.length > 0 ? ` and ${warningList.length} metric(s) to monitor` : ''
+          }. Please visit your obstetrician promptly for direct evaluation.`
+        : `[Đối chiếu chuẩn ${stageLabel}] — MỨC ĐỎ: Phát hiện ${dangerList.length} chỉ số nằm ngoài ngưỡng an toàn [${details}]${
+            warningList.length > 0 ? ` và ${warningList.length} chỉ số cần theo dõi` : ''
+          }. Mẹ nên sớm đến cơ sở y tế để bác sĩ chuyên khoa trực tiếp kiểm tra và tư vấn nhé.`,
+    };
+  }
+
+  if (warningList.length > 0) {
+    const details = warningList
+      .map((m) => `${localizeMetricLabel(m.key, m.label, lang)}: ${m.value} ${m.unit}`)
+      .join('; ');
     }
   }, []);
 
