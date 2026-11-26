@@ -2143,61 +2143,61 @@ export default function UploadScreen({ navigation }: Props) {
         else mime = 'application/pdf';
       }
 
-                            placeholderTextColor="#94A3B8"
-                          />
-                          {!!m.unit && <Text style={styles.verifyUnitText}>{m.unit}</Text>}
-                        </View>
-                      ) : (
-                        <View style={styles.readOnlyValueBox}>
-                          <Text style={[styles.readOnlyValueText, { color: mTheme.valueColor }]}>
-                            {currentVal} {m.unit}
-                          </Text>
-                        </View>
-                      )}
+      await uploadAndAnalyzeFile(
+        asset.uri,
+        asset.name,
+        asset.size,
+        mime
+      );
+    } finally {
+      isPickingFileRef.current = false;
+    }
+  };
 
-                      <Text style={styles.refRangeText}>
-                        Ngưỡng chuẩn: {liveEval.refRange || m.refRange}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.clinicalNoteText,
-                          liveEval.severity !== 'normal' && {
-                            color: mTheme.valueColor,
-                            fontWeight: '700',
-                          },
-                        ]}
-                      >
-                        {liveEval.clinicalNote}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </ScrollView>
+  const openChooser = () => {
+    Alert.alert(copy.chooserTitle, copy.chooserSub, [
+      { text: copy.chooserTakePhoto, onPress: takePhoto },
+      { text: copy.chooserPickImage, onPress: pickImage },
+      { text: copy.chooserPickPdf, onPress: pickPdf },
+      { text: copy.chooserBatch, onPress: pickAndUploadBatch },
+      { text: copy.cancelBtn, style: 'cancel' },
+    ]);
+  };
 
-              <View style={styles.modalFooter}>
-                <Pressable
-                  style={[
-                    styles.toggleEditModalBtn,
-                    isModalEditing && styles.toggleEditModalBtnActive,
-                  ]}
-                  onPress={() => setIsModalEditing((prev) => !prev)}
-                >
-                  <Ionicons
-                    name={isModalEditing ? 'checkmark-outline' : 'create-outline'}
-                    size={18}
-                    color={isModalEditing ? colors.white : colors.primaryDark}
-                  />
-                  <Text
-                    style={[
-                      styles.toggleEditModalBtnText,
-                      isModalEditing && { color: colors.white },
-                    ]}
-                  >
-                    {isModalEditing ? 'Xong chỉnh sửa' : 'Chỉnh sửa'}
-                  </Text>
-                </Pressable>
+  const activeModalWeek =
+    parseInt(draftWeek, 10) || verifyModalItem?.analysis?.gestationalWeek || 24;
+  const activeModalMetrics: MedicalMetric[] = verifyModalItem?.analysis
+    ? verifyModalItem.analysis.metrics.map((m) => {
+        const val = draftMetrics[m.key] ?? m.value;
+        const ev = evaluateMetricByWeek(m.key, val, activeModalWeek, lang);
+        return {
+          ...m,
+          label: localizeMetricLabel(m.key, m.label, lang),
+          value: val,
+          refRange: ev.refRange || m.refRange,
+          severity: ev.severity,
+          clinicalNote: ev.clinicalNote,
+        };
+      })
+    : [];
 
-                <Pressable
+  const activeModalSummary = verifyModalItem?.analysis
+    ? summarizeAnalysisState(activeModalMetrics, verifyModalItem.name, activeModalWeek, lang)
+    : null;
+  const activeModalTheme = activeModalSummary
+    ? severityTheme[activeModalSummary.overallSeverity]
+    : severityTheme.normal;
+
+  return (
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      <ScreenHeader
+        title={copy.screenTitle}
+        onBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
                   style={[styles.confirmModalBtn, savingToDb && { opacity: 0.7 }]}
                   disabled={savingToDb}
                   onPress={confirmFromVerificationModal}
