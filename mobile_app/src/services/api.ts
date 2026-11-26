@@ -1318,61 +1318,61 @@ async function getIngestAuthHeaders(isJson = false): Promise<Record<string, stri
   };
   if (isJson) {
     headers['Content-Type'] = 'application/json';
-export async function getIngestFileDetail(
-  fileId: string
-): Promise<{ success: boolean; data: IngestFileDetailData }> {
-  console.log(
-    `[API 5/8] Đang lấy chi tiết file & Presigned URL: ${fileId} (GET /api/v1/ingest/files/${fileId})...`
-  );
-  const headers = await getIngestAuthHeaders(false);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/files/${encodeURIComponent(fileId)}`,
-    {
-      method: 'GET',
-      headers,
-    }
-  );
-
-  const data: any = await handleResponse(response);
-  console.log(`Lấy chi tiết file & Presigned URL (${fileId}) thành công!`);
-  return data;
+  }
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+  return headers;
 }
 
-// 6. DELETE /api/v1/ingest/files/{file_id} — Xóa tài liệu tải lên nhầm (khi status là pending hoặc failed)
-export async function deleteIngestFile(
-  fileId: string
-): Promise<{ success: boolean; message: string; data?: any }> {
-  const trimmedId = (fileId || '').trim();
-  if (!isUuid(trimmedId)) {
-    throw new Error(`Định danh file "${fileId}" không hợp lệ (cần mã UUID). Không thể gửi yêu cầu xoá lên Database.`);
-  }
+/**
+ * Tải file lên Backend bằng XMLHttpRequest thuần túy của React Native.
+ * Bỏ qua hoàn toàn WinterCG expo/fetch để không bị lỗi "Unsupported FormDataPart implementation"
+ * trên Expo SDK 52+ / 57 và React Native New Architecture.
+ */
+export async function uploadMultipartViaXHR<T = any>(
+  url: string,
+  formData: FormData,
+  token?: string
+): Promise<T> {
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
 
-  console.log(`[API 6/8] Đang xoá tài liệu: ${trimmedId} (DELETE /api/v1/ingest/files/${trimmedId})...`);
-  const headers = await getIngestAuthHeaders(false);
-  const response = await fetch(
-    `${API_BASE_URL}/ingest/files/${encodeURIComponent(trimmedId)}`,
-    {
-      method: 'DELETE',
-      headers,
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (authToken) {
+      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
     }
-  );
+    // LƯU Ý: Không set thủ công Content-Type để React Native tự động gán boundary chính xác
 
-  if (response.status === 204) {
-    console.log(`Xoá tài liệu (${trimmedId}) thành công!`);
-    return { success: true, message: 'Đã xóa tài liệu khỏi Database.', data: trimmedId };
-  }
-  const data: any = await handleResponse(response);
-  console.log(`Xoá tài liệu (${trimmedId}) thành công!`);
-  return data;
-}
+    xhr.onload = () => {
+      try {
+        const text = xhr.responseText;
+        let json: any = {};
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = { message: text };
+        }
 
-// 7. GET /api/v1/ingest/profiles/{profile_id}/files — Danh sách tài liệu đã tải lên của hồ sơ thai kỳ
-export async function getProfileIngestFiles(
-  profileId?: string,
-  params?: { status?: string; document_type?: string; page?: number; page_size?: number }
-): Promise<any> {
-  const validProfileId =
-    profileId && profileId !== 'profile_demo_01'
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(json);
+        } else {
+          const detailMsg =
+            json?.detail?.message ||
+            (typeof json?.detail === 'string' ? json.detail : null) ||
+            json?.message ||
+            `HTTP ${xhr.status}: ${xhr.statusText || 'Yêu cầu tải lên thất bại'}`;
+          reject(new Error(detailMsg));
+        }
+      } catch (err: any) {
+        reject(new Error(err?.message || 'Lỗi xử lý phản hồi từ máy chủ.'));
+      }
+    };
+
+    xhr.onerror = () => {
       ? profileId
       : await ensureActivePregnancyProfileId();
 
