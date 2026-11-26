@@ -108,61 +108,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
   const [resendCount, setResendCount] = useState(0);
   const [resending, setResending] = useState(false);
 
-    if (resending) {
+  const inputRefs = useRef<Array<TextInput | null>>([]);
+
+  // Đếm ngược thời hạn OTP và thời gian chờ gửi lại.
+  useEffect(() => {
+    if (otpExpiresIn === 0 && resendCooldown === 0) {
       return;
     }
 
-    if (resendCount >= MAX_RESEND_COUNT) {
-      Alert.alert(
-        'Thông báo',
-        'Bạn đã sử dụng hết 3 lượt gửi lại OTP.',
-      );
-      return;
-    }
+    const timer = setInterval(() => {
+      setOtpExpiresIn((prev) => Math.max(0, prev - 1));
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
 
-    if (resendCooldown > 0) {
-      Alert.alert(
-        'Vui lòng chờ',
-        `Bạn có thể gửi lại mã sau ${formatTime(resendCooldown)}.`,
-      );
-      return;
-    }
+    return () => clearInterval(timer);
+  }, [otpExpiresIn, resendCooldown]);
 
-    try {
-      setResending(true);
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
 
-      // Sử dụng lại API gửi OTP hiện có.
-      await forgotPassword(email);
-
-      // Chỉ cập nhật thời gian khi API gửi mã thành công.
-      setOtp('');
-      setOtpExpiresIn(OTP_VALID_SECONDS);
-      setResendCooldown(RESEND_WAIT_SECONDS);
-      setResendCount((prev) => prev + 1);
-
-      Alert.alert(
-        'Gửi mã thành công',
-        'OTP mới đã được gửi đến email của bạn. Mã có hiệu lực trong 15 phút.',
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Không thể gửi mã',
-        error?.message || 'Vui lòng thử lại sau.',
-      );
-    } finally {
-      setResending(false);
-    }
+    return `${String(minutes).padStart(2, '0')}:${String(
+      remainingSeconds,
+    ).padStart(2, '0')}`;
   };
 
-  const handleContinue = () => {
+  const maskedEmail = (value: string) => {
+    const parts = value.split('@');
+
+    if (parts.length !== 2) {
+      return value;
+    }
+
+    const username = parts[0];
+    const visible = username.slice(0, Math.min(3, username.length));
+
+    return `${visible}***@${parts[1]}`;
+  };
+
+  const handleOtpChange = (value: string, index: number) => {
     if (otpExpiresIn === 0) {
-      Alert.alert(
-        'OTP đã hết hạn',
-        'Mã xác thực đã hết hạn. Vui lòng gửi lại mã mới.',
-      );
       return;
     }
 
+    // Hỗ trợ nhập nhanh hoặc dán mã OTP 6 số.
+    const digits = value.replace(/[^0-9]/g, '');
+
+    if (digits.length > 1) {
+      const nextOtp = digits.slice(0, 6);
+      setOtp(nextOtp);
+
+      if (nextOtp.length === 6) {
+        inputRefs.current[5]?.focus();
+        Keyboard.dismiss();
+      } else {
+        inputRefs.current[nextOtp.length]?.focus();
     if (!/^\d{6}$/.test(otp)) {
       Alert.alert('Thông báo', 'Vui lòng nhập đủ 6 chữ số OTP.');
       return;
