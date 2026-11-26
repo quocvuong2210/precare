@@ -273,61 +273,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
 
             <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
               {copy.stepText}
-                ]}
-              >
-                {isOtpExpired
-                  ? 'Mã OTP đã hết hạn'
-                  : `Mã có hiệu lực trong ${formatTime(otpExpiresIn)}`}
-              </Text>
-            </View>
+            </Text>
+          </View>
+
+          <Text style={[styles.title, fontStyle(23, { lineHeight: 30, min: 21, max: 27 }), { color: theme.text }]}>
+            {copy.title}
+          </Text>
+
+          <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
+            {copy.description}
+          </Text>
+
+          <View style={styles.emailRow}>
+            <Text style={[styles.emailText, fontStyle(14, { min: 13 }), { color: theme.text }]}>
+              {maskedEmail(email)}
+            </Text>
 
             <TouchableOpacity
-              style={styles.resendButton}
-              onPress={handleResendOtp}
-              disabled={!canResend}
-              activeOpacity={0.7}
+              style={styles.linkTouch}
+              onPress={() => navigation.navigate('ForgotPassword')}
             >
-              <Text
-                style={[
-                  styles.resendText,
-                  !canResend && styles.resendDisabled,
-                ]}
-              >
-                {resending
-                  ? 'Đang gửi mã...'
-                  : resendCount >= MAX_RESEND_COUNT
-                    ? 'Đã hết 3 lượt gửi lại'
-                    : resendCooldown > 0
-                      ? `Gửi lại mã sau ${formatTime(resendCooldown)}`
-                      : 'Chưa nhận được mã? Gửi lại mã'}
+              <Text style={[styles.changeEmail, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {copy.change}
               </Text>
             </TouchableOpacity>
-
-            <Text style={styles.statusText}>
-              {resendCount > 0
-                ? `Đã gửi lại ${resendCount}/${MAX_RESEND_COUNT} lượt`
-                : 'Mã OTP đã được gửi đến email của bạn'}
-            </Text>
           </View>
 
-          <View style={styles.infoBox}>
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={16}
-              color="#21877F"
-            />
-            <Text style={styles.infoText}>
-              Không chia sẻ mã OTP với bất kỳ ai, kể cả người
-              tự xưng là nhân viên PreCare.
-            </Text>
-          </View>
+          <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+            {copy.otpLabel}
+          </Text>
 
-          <View style={styles.bottomArea}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                (otp.length !== 6 || isOtpExpired) &&
-                  styles.buttonDisabled,
+          <View style={styles.otpRow}>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => {
+                  inputRefs.current[index] = ref;
+                }}
+                style={[
+                  styles.otpInput,
+                  fontStyle(21, { min: 19, max: 24 }),
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
+                  otp[index]
+                    ? [styles.otpFilled, { borderColor: theme.tealText }]
+                    : null,
+                  index === otp.length && otp.length < 6
+                    ? [styles.otpFocused, { borderColor: theme.tealText }]
+                    : null,
+                  isOtpExpired && [
+                    styles.otpExpired,
+                    { borderColor: theme.danger },
+                  ],
               ]}
               onPress={handleContinue}
               disabled={otp.length !== 6 || isOtpExpired}
