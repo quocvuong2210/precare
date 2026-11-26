@@ -337,10 +337,11 @@ class OcrPipelineExtractor:
             round(sum(page_confs) / len(page_confs), 2) if page_confs else 0.90
         )
 
-        # Bóc tách các chỉ số sinh trắc học sản khoa
+        # Bóc tách các chỉ số sinh trắc học sản khoa & mục lâm sàng (Sub-task 4.2.3)
         extracted_fields, confidence_scores = pdf_extractor.parse_ultrasound_biometrics(
             combined_raw_text
         )
+        clinical_sections = pdf_extractor.parse_clinical_sections(combined_raw_text)
 
         # Kết hợp điểm tin cậy quang học với điểm tin cậy Regex
         for k, v in confidence_scores.items():
@@ -354,6 +355,7 @@ class OcrPipelineExtractor:
             "extraction_method": "ocr_pipeline_slow_path",
             "is_digital_pdf": False,
             "extracted_fields": extracted_fields,
+            "clinical_sections": clinical_sections,
             "raw_text": combined_raw_text,
             "confidence_scores": confidence_scores,
             "metadata": {

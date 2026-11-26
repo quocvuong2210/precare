@@ -35,6 +35,7 @@ def process_ocr_task(self, uploaded_file_id_str: str):
     Celery Task xử lý trích xuất tài liệu cận lâm sàng (Story 4.1 & Story 4.2).
     - Sub-task 4.2.1: Fast Path đọc trực tiếp text layer PDF (Digital PDF).
     - Sub-task 4.2.2: Fallback OCR Pipeline cho tài liệu ảnh / scan.
+    - Sub-task 4.2.3: Regex & heuristic parser nhận dạng tên chỉ số, giá trị, đơn vị.
     """
     db = SessionLocal()
     uploaded_file = None
