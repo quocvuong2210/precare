@@ -1428,61 +1428,61 @@ export async function uploadParaclinicalFile<T = any>(
 
     const resJson: any = await safeParseJson(res);
     if (res.ok) {
-  profileId?: string;
-  checkupId?: string | null;
-  verificationUrl?: string;
-  checkupDate?: string;
-  gestationalWeek: number;
-  gestationalDays?: number;
-  overallSeverity: 'normal' | 'warning' | 'danger';
-  percentile?: number;
-  explanationDoctor: string;
-  explanationPatient: string;
-  disclaimerText: string;
-  ruleVersion: string;
-  modelVersion: string;
-  metrics: {
-    key: string;
-    label: string;
-    value: string;
-    originalValue?: string;
-    unit: string;
-    percentile?: number;
-    severity: 'normal' | 'warning' | 'danger';
-  }[];
+      return resJson;
+    }
+    const errMsg =
+      resJson?.detail?.message ||
+      (typeof resJson?.detail === 'string' ? resJson.detail : null) ||
+      resJson?.message ||
+      `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  } catch (err: any) {
+    if (
+      err?.message?.includes('Unsupported FormDataPart') ||
+      err?.message?.includes('Network request failed')
+    ) {
+      console.log('[Upload] Fallback sang native XMLHttpRequest...');
+      return await uploadMultipartViaXHR(url, formData, authToken);
+    }
+    throw err;
+  }
 }
 
-// Lấy dữ liệu bóc tách OCR từ verification_url sau khi Celery hoàn tất
-export async function fetchVerificationDataFromUrl(
-  verificationUrl?: string,
-  fileId?: string
-): Promise<any> {
-  const headers = await getIngestAuthHeaders(false);
-  const rootUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
-  const urlsToTry: string[] = [];
+// 1. POST /api/v1/ingest/upload — Tải lên đơn lẻ phiếu khám cận lâm sàng & sinh task Celery
+export async function ingestUploadSingle(
+  file: IngestFilePayload,
+  profileId?: string,
+  options?: { checkupId?: string | null; documentType?: string }
+): Promise<{ success: boolean; data: IngestUploadResponseData; message: string }> {
+  const validProfileId =
+    profileId && profileId !== 'profile_demo_01'
+      ? profileId
+      : await ensureActivePregnancyProfileId();
 
-  if (verificationUrl) {
-    urlsToTry.push(
-      verificationUrl.startsWith('http') ? verificationUrl : `${rootUrl}${verificationUrl}`
-    );
+  console.log(
+    `[API 1/8] Đang tải lên file đơn lẻ: "${file.name}" (pregnancy_profile_id=${validProfileId})...`
+  );
+
+  const formData = new FormData();
+  formData.append('file', {
+    uri: file.uri,
+    name: file.name,
+    type: file.type || 'application/pdf',
+  } as any);
+  formData.append('pregnancy_profile_id', validProfileId);
+
+  if (options?.checkupId) {
+    formData.append('checkup_id', options.checkupId);
   }
-  if (fileId && isUuid(fileId)) {
-    urlsToTry.push(
-      `${API_BASE_URL}/ingest/files/${encodeURIComponent(fileId)}/verification`,
-      `${API_BASE_URL}/verification/files/${encodeURIComponent(fileId)}`,
-      `${API_BASE_URL}/mapping-verification/file/${encodeURIComponent(fileId)}`
-    );
+  if (options?.documentType) {
+    formData.append('document_type', options.documentType);
   }
 
-  for (const url of urlsToTry) {
-    try {
-      const res = await fetch(url, { method: 'GET', headers });
-      if (res.ok) {
-        const json: any = await safeParseJson(res);
-        return json?.data || json;
-      }
-    } catch {
-      // Thử URL tiếp theo
+  const data: any = await uploadParaclinicalFile(
+    `${API_BASE_URL}/ingest/upload`,
+    formData
+  );
+
     }
   }
   return null;
