@@ -2834,4 +2834,114 @@ export default function UploadScreen({ navigation }: Props) {
                             {currentVal} {m.unit}
                           </Text>
                         </View>
+                      )}
+
+                      <Text style={[styles.refRangeText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                        {copy.refRangePrefix} {liveEval.refRange || m.refRange}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.clinicalNoteText,
+                          fontStyle(13.5, { lineHeight: 20, min: 12.5 }),
+                          { color: theme.textSecondary },
+                          liveEval.severity !== 'normal' && {
+                            color: mTheme.valueColor,
+                            fontWeight: '700',
+                          },
+                        ]}
+                      >
+                        {liveEval.clinicalNote}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View
+                style={[
+                  styles.modalFooter,
+                  { backgroundColor: theme.surface, borderTopColor: theme.border },
+                ]}
+              >
+                <Pressable
+                  style={[
+                    styles.toggleEditModalBtn,
+                    { backgroundColor: theme.tealSoft },
+                    isModalEditing && styles.toggleEditModalBtnActive,
+                  ]}
+                  onPress={() => setIsModalEditing((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={isModalEditing ? 'checkmark-outline' : 'create-outline'}
+                    size={18}
+                    color={isModalEditing ? colors.white : theme.tealText}
+                  />
+                  <Text
+                    style={[
+                      styles.toggleEditModalBtnText,
+                      fontStyle(14, { min: 13, max: 16.5 }),
+                      { color: theme.tealText },
+                      isModalEditing && { color: colors.white },
+                    ]}
+                  >
+                    {isModalEditing ? copy.finishEditBtn : copy.editBtn}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.confirmModalBtn, savingToDb && { opacity: 0.7 }]}
+                  disabled={savingToDb}
+                  onPress={confirmFromVerificationModal}
+                >
+                  {savingToDb ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="checkmark-done-circle" size={20} color={colors.white} />
+                  )}
+                  <Text style={[styles.confirmModalBtnText, fontStyle(14, { min: 13, max: 16.5 })]}>
+                    {savingToDb ? copy.savingDbBtn : copy.confirmSaveBtn}
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          )}
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: '#F5F8FA' },
+  header: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', color: colors.navy, marginHorizontal: 8 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 },
+  dropZone: {
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+  },
+  cameraCircle: {
 });
