@@ -1098,61 +1098,61 @@ export async function fetchPregnancyProfileFromDB(
   }
   return null;
 }
-        try {
-          json = JSON.parse(text);
-        } catch {
-          json = { message: text };
-        }
 
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(json);
-        } else {
-          const detailMsg =
-            json?.detail?.message ||
-            (typeof json?.detail === 'string' ? json.detail : null) ||
-            json?.message ||
-            `HTTP ${xhr.status}: ${xhr.statusText || 'Yêu cầu tải lên thất bại'}`;
-          reject(new Error(detailMsg));
-        }
-      } catch (err: any) {
-        reject(new Error(err?.message || 'Lỗi xử lý phản hồi từ máy chủ.'));
-      }
-    };
-
-    xhr.onerror = () => {
-      console.log(`[XHR Error Event] status=${xhr.status}, response=${xhr.responseText}`);
-      if (xhr.status > 0) {
-        try {
-          const json = JSON.parse(xhr.responseText);
-          const msg =
-            json?.detail?.message ||
-            (typeof json?.detail === 'string' ? json.detail : null) ||
-            json?.message;
-          if (msg) {
-            reject(new Error(msg));
-            return;
-          }
-        } catch {}
-      }
-      reject(
-        new Error(
-          'Lỗi kết nối mạng khi tải tài liệu lên máy chủ. Vui lòng kiểm tra kết nối mạng hoặc máy chủ Backend.'
-        )
-      );
-    };
-
-    xhr.ontimeout = () => {
-      reject(new Error('Hết thời gian chờ kết nối đến máy chủ PreCare (Timeout 60s).'));
-    };
-
-    xhr.timeout = 60000;
-    xhr.send(formData);
-  });
+export interface CheckupRecordFromDB {
+  id: string;
+  pregnancy_profile_id: string;
+  doctor: {
+    id: string;
+    full_name: string;
+  };
+  checkup_date: string;
+  gestational_age: {
+    days: number;
+    weeks: number;
+    remaining_days: number;
+    formatted: string;
+    trimester: number;
+  };
+  vitals: {
+    weight_kg: number | null;
+    blood_pressure_systolic: number | null;
+    blood_pressure_diastolic: number | null;
+    blood_pressure_status: string;
+  };
+  notes: string | null;
+  biometric_data: {
+    id: string;
+    bpd: number | null;
+    hc: number | null;
+    ac: number | null;
+    fl: number | null;
+    efw: number | null;
+    status: string;
+  } | null;
+  created_at: string;
 }
 
-/**
- * Hàm điều phối tải tài liệu cận lâm sàng:
- * Thử tải qua Fetch trước (khi đã kích hoạt EXPO_PUBLIC_USE_RN_FETCH=1),
+// Lấy danh sách lần khám & chỉ số sinh trắc thật từ bảng checkups & biometric_data
+export async function fetchCheckupHistoryFromDB(
+  pregnancyProfileId: string,
+  token?: string
+): Promise<CheckupRecordFromDB[]> {
+  if (!isUuid(pregnancyProfileId)) return [];
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
+
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/checkups/pregnancy-profile/${encodeURIComponent(pregnancyProfileId.trim())}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
  * nếu môi trường gặp sự cố FormDataPart sẽ tự động Fallback sang native XMLHttpRequest.
  */
 export async function uploadParaclinicalFile<T = any>(
