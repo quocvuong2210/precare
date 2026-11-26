@@ -493,61 +493,61 @@ const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
   37: { bpd: [88, 96], hc: [314, 344], ac: [313, 354], fl: [68, 75], efw: [2740, 3540] },
   38: { bpd: [89, 97], hc: [319, 349], ac: [321, 362], fl: [70, 76], efw: [2920, 3760] },
   39: { bpd: [90, 98], hc: [323, 353], ac: [329, 370], fl: [71, 78], efw: [3080, 3950] },
+  40: { bpd: [91, 99], hc: [327, 357], ac: [336, 378], fl: [72, 79], efw: [3220, 4100] },
+  41: { bpd: [91, 100], hc: [328, 360], ac: [340, 382], fl: [73, 80], efw: [3300, 4200] },
+};
 
-export function summarizeAnalysisState(
-  metrics: MedicalMetric[],
-  fileName: string,
-  gestationalWeek: number = 24
-) {
-  const { stageLabel } = getPregnancyStageInfo(gestationalWeek);
-  const dangerList = metrics.filter((m) => m.severity === 'danger');
-  const warningList = metrics.filter((m) => m.severity === 'warning');
-
-  if (dangerList.length > 0) {
-    const details = dangerList.map((m) => `${m.label}: ${m.value} ${m.unit}`).join('; ');
-    return {
-      overallSeverity: 'danger' as SeverityLevel,
-      doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC ĐỎ: Phát hiện ${dangerList.length} chỉ số nằm ngoài ngưỡng an toàn [${details}]${
-        warningList.length > 0 ? ` và ${warningList.length} chỉ số cần theo dõi` : ''
-      }. Mẹ nên sớm đến cơ sở y tế để bác sĩ chuyên khoa trực tiếp kiểm tra và tư vấn nhé.`,
-    };
-  }
-
-  if (warningList.length > 0) {
-    const details = warningList.map((m) => `${m.label}: ${m.value} ${m.unit}`).join('; ');
-    return {
-      overallSeverity: 'warning' as SeverityLevel,
-      doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC VÀNG: Có ${warningList.length} chỉ số cần lưu ý theo dõi thêm [${details}]. Mẹ hãy giữ tinh thần thoải mái, ăn uống nghỉ ngơi điều độ và trao đổi với bác sĩ trong kỳ khám tới nhé.`,
-    };
-  }
-
+export function getPregnancyStageInfo(week: number, lang: AppLang = 'vi') {
+  const clampedWeek = Math.max(12, Math.min(41, Math.round(week || 24)));
+  const month = Math.min(9, Math.max(3, Math.ceil(clampedWeek / 4.3)));
+  const trimester = clampedWeek <= 13 ? 1 : clampedWeek <= 27 ? 2 : 3;
   return {
-    overallSeverity: 'normal' as SeverityLevel,
-    doctorConclusion: `[Đối chiếu chuẩn ${stageLabel}] — MỨC XANH: Tất cả ${metrics.length} chỉ số từ "${fileName}" đều nằm trong khoảng chuẩn của tuần thai hiện tại. Mẹ và bé đang phát triển rất tốt!`,
+    clampedWeek,
+    month,
+    trimester,
+    stageLabel:
+      lang === 'en'
+        ? `Week ${clampedWeek} · Month ${month} (Trimester ${trimester})`
+        : `Tuần ${clampedWeek} · Tháng thứ ${month} (Tam cá nguyệt ${trimester})`,
   };
 }
 
-function buildMetricByWeek(
-  key: string,
-  label: string,
-  value: string,
+export function getFetalMetricBoundsByWeek(
+  key: 'bpd' | 'hc' | 'ac' | 'fl' | 'efw',
+  week: number,
   unit: string,
-  defaultRefRange: string,
-  gestationalWeek: number
-): MedicalMetric {
-  const evalResult = evaluateMetricByWeek(key, value, gestationalWeek);
+  lang: AppLang = 'vi'
+) {
+  const { clampedWeek } = getPregnancyStageInfo(week, lang);
+  const std = FETAL_GROWTH_BY_WEEK[clampedWeek] || FETAL_GROWTH_BY_WEEK[24];
+  const [minNormal, maxNormal] = std[key];
+  const span = Math.max(4, maxNormal - minNormal);
+  const margin = key === 'efw' ? Math.round(span * 0.55) : Math.max(3, Math.round(span * 0.5));
+  const dangerLow = Math.max(1, minNormal - margin);
+  const dangerHigh = maxNormal + margin;
+
   return {
-    key,
-    label,
-    value,
-    unit,
-    refRange: evalResult.refRange || defaultRefRange,
-    severity: evalResult.severity,
-    clinicalNote: evalResult.clinicalNote,
+    clampedWeek,
+    minNormal,
+    maxNormal,
+    dangerLow,
+    dangerHigh,
+    refRange:
+      lang === 'en'
+        ? `${minNormal} – ${maxNormal} ${unit} (Week ${clampedWeek} standard)`
+        : `${minNormal} – ${maxNormal} ${unit} (Chuẩn tuần ${clampedWeek})`,
   };
 }
 
-function detectWeekFromFileName(fileName: string): number {
+export async function resolveAccountStorageKey(): Promise<string> {
+  if (currentUserProfile?.email) {
+    return `precare_uploaded_records_${currentUserProfile.email.trim().toLowerCase()}`;
+  }
+  const restored = await restoreSession();
+  if (restored?.email) {
+    return `precare_uploaded_records_${restored.email.trim().toLowerCase()}`;
+  }
+  return 'precare_uploaded_records_guest_account';
   const lower = fileName.toLowerCase();
   const match =
     lower.match(/(?:tuan|tuần|week|w)[_\-\s]*(\d{2})/i) ||
