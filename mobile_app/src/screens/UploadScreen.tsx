@@ -2363,61 +2363,61 @@ export default function UploadScreen({ navigation }: Props) {
                   )}
                 </View>
 
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  processingText: { fontSize: 12, color: '#A16207', fontWeight: '600', flex: 1 },
-  failedBox: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  failedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  failedTitle: {
-    flex: 1,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#991B1B',
-  },
-  failedActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  retryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#DC2626',
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  retryBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  removeFailedBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  removeFailedBtnText: {
-    fontSize: 11.5,
+                {item.status === 'processing' && (
+                  <View
+                    style={[
+                      styles.processingBox,
+                      { borderTopColor: theme.divider },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={theme.tealText} />
+                    <Text
+                      style={[
+                        styles.processingText,
+                        fontStyle(13.5, { lineHeight: 19, min: 12.5 }),
+                        { color: isDark ? '#FDE047' : '#A16207' },
+                      ]}
+                    >
+                      {item.stageMessage
+                        ? `${item.stageMessage} (${item.progressPercentage ?? 0}%)`
+                        : copy.analyzingQueue}
+                    </Text>
+                  </View>
+                )}
+
+                {item.status === 'failed' && (
+                  <View
+                    style={[
+                      styles.failedBox,
+                      {
+                        backgroundColor: theme.dangerBackground,
+                        borderColor: theme.dangerBorder,
+                      },
+                    ]}
+                  >
+                    <View style={styles.failedHeader}>
+                      <Ionicons name="alert-circle" size={18} color={theme.danger} />
+                      <Text style={[styles.failedTitle, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.danger }]}>
+                        {item.errorMessage || copy.extractFailedDefault}
+                      </Text>
+                    </View>
+                    <View style={styles.failedActionRow}>
+                      <Pressable
+                        style={styles.retryBtn}
+                        onPress={() => retryFailedFile(item)}
+                      >
+                        <Ionicons name="refresh" size={15} color={colors.white} />
+                        <Text style={[styles.retryBtnText, fontStyle(13, { min: 12 })]}>
+                          {copy.retryExtractBtn}
+                        </Text>
+                      </Pressable>
+
+                      {deletingFileId === item.id ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={theme.danger}
+                          style={{ marginHorizontal: 16 }}
+                        />
     fontWeight: '700',
     color: '#DC2626',
   },
