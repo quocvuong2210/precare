@@ -360,28 +360,126 @@ export default function PregnancySetupScreen({ navigation }: Props) {
             {methodDescription}
           </Text>
 
-          <View style={styles.formCard}>
-            {method === 'lmp' && dateField('Ngày đầu kỳ kinh cuối cùng', lmp, setLmp, 'Nếu mẹ không nhớ chính xác, hãy chọn phương pháp siêu âm.')}
-            {method === 'q1_ultrasound' && <>
-              {dateField('Ngày siêu âm', ultrasoundDate, setUltrasoundDate, 'Ngày ghi trên phiếu siêu âm quý 1.')}
-              <View style={styles.twoColumns}>
-                <View style={[styles.field, styles.column]}><Text style={styles.label}>Tuần thai trên phiếu</Text><TextInput style={styles.simpleInput} value={weeks} onChangeText={(value) => { setWeeks(value); setPreview(null); setError(''); }} placeholder="Ví dụ: 8" placeholderTextColor={colors.textLight} keyboardType="number-pad" /></View>
-                <View style={[styles.field, styles.column]}><Text style={styles.label}>Ngày lẻ</Text><TextInput style={styles.simpleInput} value={days} onChangeText={(value) => { setDays(value); setPreview(null); setError(''); }} placeholder="0–6" placeholderTextColor={colors.textLight} keyboardType="number-pad" /></View>
-              </View>
-            </>}
-            {method === 'crl' && <>
-              {dateField('Ngày siêu âm', ultrasoundDate, setUltrasoundDate, 'Ngày ghi trên phiếu có chỉ số CRL.')}
-              <View style={styles.field}><Text style={styles.label}>Chiều dài đầu mông (CRL)</Text><View style={styles.inputWrap}><TextInput style={styles.input} value={crl} onChangeText={(value) => { setCrl(value); setPreview(null); setError(''); }} placeholder="Ví dụ: 24" placeholderTextColor={colors.textLight} keyboardType="decimal-pad" /><Text style={styles.unit}>mm</Text></View><Text style={styles.hint}>Mẹ có thể tìm chỉ số CRL trên phiếu siêu âm.</Text></View>
-            </>}
-            {method === 'direct_edd' && dateField('Ngày dự sinh bác sĩ đã xác định', edd, setEdd, 'Nhập ngày dự sinh trên giấy khám hoặc theo hướng dẫn của bác sĩ.')}
+          <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            {method === 'lmp' &&
+              dateField(
+                isEn ? 'First day of last menstrual period' : 'Ngày đầu kỳ kinh cuối cùng',
+                lmp,
+                setLmp,
+                isEn
+                  ? 'If you do not remember the exact date, choose an ultrasound method.'
+                  : 'Nếu mẹ không nhớ chính xác, hãy chọn phương pháp siêu âm.',
+              )}
+            {method === 'q1_ultrasound' && (
+              <>
+                {dateField(
+                  isEn ? 'Ultrasound date' : 'Ngày siêu âm',
+                  ultrasoundDate,
+                  setUltrasoundDate,
+                  isEn ? 'Date printed on your Q1 scan report.' : 'Ngày ghi trên phiếu siêu âm quý 1.',
+                )}
+                <View style={styles.twoColumns}>
+                  <View style={[styles.field, styles.column]}>
+                    <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                      {isEn ? 'Gestational weeks' : 'Tuần thai trên phiếu'}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.simpleInput,
+                        fontStyle(15.5, { min: 14.5 }),
+                        { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.text },
+                      ]}
+                      value={weeks}
+                      onChangeText={(value) => { setWeeks(value); setPreview(null); setError(''); }}
+                      placeholder={isEn ? 'e.g. 8' : 'Ví dụ: 8'}
+                      placeholderTextColor={theme.muted}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                  <View style={[styles.field, styles.column]}>
+                    <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                      {isEn ? 'Days' : 'Ngày lẻ'}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.simpleInput,
+                        fontStyle(15.5, { min: 14.5 }),
+                        { backgroundColor: theme.surfaceAlt, borderColor: theme.border, color: theme.text },
+                      ]}
+                      value={days}
+                      onChangeText={(value) => { setDays(value); setPreview(null); setError(''); }}
+                      placeholder="0–6"
+                      placeholderTextColor={theme.muted}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+            {method === 'crl' && (
+              <>
+                {dateField(
+                  isEn ? 'Ultrasound date' : 'Ngày siêu âm',
+                  ultrasoundDate,
+                  setUltrasoundDate,
+                  isEn ? 'Date on your CRL scan report.' : 'Ngày ghi trên phiếu có chỉ số CRL.',
+                )}
+                <View style={styles.field}>
+                  <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+                    {isEn ? 'Crown-rump length (CRL)' : 'Chiều dài đầu mông (CRL)'}
+                  </Text>
+                  <View style={[styles.inputWrap, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+                    <TextInput
+                      style={[styles.input, fontStyle(15.5, { min: 14.5 }), { color: theme.text }]}
+                      value={crl}
+                      onChangeText={(value) => { setCrl(value); setPreview(null); setError(''); }}
+                      placeholder={isEn ? 'e.g. 24' : 'Ví dụ: 24'}
+                      placeholderTextColor={theme.muted}
+                      keyboardType="decimal-pad"
+                    />
+                    <Text style={[styles.unit, fontStyle(14.5, { min: 13.5 }), { color: theme.muted }]}>mm</Text>
+                  </View>
+                  <Text style={[styles.hint, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.muted }]}>
+                    {isEn ? 'Find the CRL measurement on your scan printout.' : 'Mẹ có thể tìm chỉ số CRL trên phiếu siêu âm.'}
+                  </Text>
+                </View>
+              </>
+            )}
+            {method === 'direct_edd' &&
+              dateField(
+                isEn ? 'Doctor-assigned due date' : 'Ngày dự sinh bác sĩ đã xác định',
+                edd,
+                setEdd,
+                isEn ? 'Enter the due date given by your doctor.' : 'Nhập ngày dự sinh trên giấy khám hoặc theo hướng dẫn của bác sĩ.',
+              )}
           </View>
 
-          {!!error && <View style={styles.errorBox}><Ionicons name="alert-circle-outline" size={19} color="#B91C1C" /><Text style={styles.errorText}>{error}</Text></View>}
+          {!!error && (
+            <View style={[styles.errorBox, { backgroundColor: theme.dangerBackground }]}>
+              <Ionicons name="alert-circle-outline" size={19} color={theme.danger} />
+              <Text style={[styles.errorText, fontStyle(14, { lineHeight: 20, min: 13 }), { color: theme.danger }]}>
+                {error}
+              </Text>
+            </View>
+          )}
 
-          {preview && <View style={styles.previewCard}>
-            <View style={styles.previewIcon}><Ionicons name="checkmark" size={20} color="#FFFFFF" /></View>
-            <View style={styles.previewText}><Text style={styles.previewTitle}>Thông tin dự kiến</Text><Text style={styles.previewAge}>{preview.weeks} tuần {preview.days} ngày</Text><Text style={styles.previewMeta}>{preview.trimester ? `${preview.trimester} · ` : ''}Ngày dự sinh: {displayDate(preview.edd)}</Text></View>
-          </View>}
+          {preview && (
+            <View style={[styles.previewCard, { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder }]}>
+              <View style={styles.previewIcon}><Ionicons name="checkmark" size={20} color="#FFFFFF" /></View>
+              <View style={styles.previewText}>
+                <Text style={[styles.previewTitle, fontStyle(13.5, { min: 12.5 }), { color: theme.tealText }]}>
+                  {isEn ? 'Estimated details' : 'Thông tin dự kiến'}
+                </Text>
+                <Text style={[styles.previewAge, fontStyle(21, { min: 19, max: 25 }), { color: theme.text }]}>
+                  {isEn ? `${preview.weeks} weeks ${preview.days} days` : `${preview.weeks} tuần ${preview.days} ngày`}
+                </Text>
+                <Text style={[styles.previewMeta, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.muted }]}>
+                  {previewTrimester ? `${previewTrimester} · ` : ''}
+                  {isEn ? 'Due date:' : 'Ngày dự sinh:'} {formatIsoToDmy(preview.edd)}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {!preview ? (
             <Pressable onPress={calculate} disabled={loading} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]}>
