@@ -173,64 +173,91 @@ export default function HistoryResultsScreen({ navigation }: Props) {
           </Text>
         </Pressable>
 
-        <Text style={styles.headerTitle}>Lịch sử kết quả ({historyList.length})</Text>
-      </View>
-
-      {/* THANH LỌC & TÌM KIẾM */}
-      <View style={styles.toolbar}>
-        <Pressable style={styles.filterButton} onPress={chooseFilter}>
-          <Ionicons name="filter-outline" size={16} color="#008F83" />
-          <Text style={styles.toolbarText}>{filterLabel}</Text>
-        </Pressable>
-
-        <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={17} color="#64748B" />
+        <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Ionicons name="search-outline" size={17} color={theme.muted} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm theo tên phiếu, tuần thai, chỉ số..."
-            placeholderTextColor="#94A3B8"
+            style={[styles.searchInput, fontStyle(15, { min: 14 }), { color: theme.text }]}
+            placeholder={isEn ? 'Search date, doctor, metrics...' : 'Tìm theo ngày, bác sĩ, chỉ số...'}
+            placeholderTextColor={theme.muted}
             value={keyword}
             onChangeText={setKeyword}
             returnKeyType="search"
           />
           {keyword.length > 0 && (
             <Pressable onPress={() => setKeyword('')}>
-              <Ionicons name="close-circle" size={17} color="#64748B" />
+              <Ionicons name="close-circle" size={17} color={theme.muted} />
             </Pressable>
           )}
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="small" color="#008F83" />
-            <Text style={styles.emptyDescription}>Đang tải lịch sử kết quả của bạn...</Text>
+            <ActivityIndicator size="small" color={theme.tealText} />
+            <Text style={[styles.emptyDescription, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {isEn ? 'Loading checkup history...' : 'Đang tải lịch sử khám từ cơ sở dữ liệu...'}
+            </Text>
           </View>
-        ) : historyList.length === 0 ? (
+        ) : loadError ? (
           <View style={styles.emptyState}>
-            <Ionicons name="documents-outline" size={48} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>Chưa có lịch sử kết quả nào</Text>
-            <Text style={styles.emptyDescription}>
-              Tài khoản của bạn chưa có phiếu khám hoặc kết quả siêu âm nào được lưu. Hãy tải phiếu khám PDF/Ảnh hoặc nhập thủ công để hệ thống ghi nhận.
+            <Ionicons name="cloud-offline-outline" size={44} color={theme.danger} />
+            <Text style={[styles.emptyTitle, fontStyle(18, { min: 16.5, max: 21 }), { color: theme.text }]}>
+              {isEn ? 'Unable to load history' : 'Không tải được lịch sử'}
+            </Text>
+            <Text style={[styles.emptyDescription, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {loadError}
+            </Text>
+            <Pressable style={styles.goUploadBtn} onPress={() => void loadDatabaseHistory()}>
+              <Ionicons name="refresh-outline" size={18} color="#FFFFFF" />
+              <Text style={[styles.goUploadBtnText, fontStyle(15, { min: 14 })]}>
+                {isEn ? 'Retry' : 'Thử lại'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : !hasProfile ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-text-outline" size={48} color={theme.muted} />
+            <Text style={[styles.emptyTitle, fontStyle(18, { min: 16.5, max: 21 }), { color: theme.text }]}>
+              {isEn ? 'No active pregnancy profile' : 'Chưa có hồ sơ thai kỳ'}
+            </Text>
+            <Text style={[styles.emptyDescription, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'This account does not have an active pregnancy profile yet to display checkup history.'
+                : 'Tài khoản hiện tại chưa có hồ sơ thai kỳ hoạt động trên hệ thống để hiển thị lịch sử lần khám.'}
+            </Text>
+          </View>
+        ) : totalCount === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="documents-outline" size={48} color={theme.muted} />
+            <Text style={[styles.emptyTitle, fontStyle(18, { min: 16.5, max: 21 }), { color: theme.text }]}>
+              {isEn ? 'No checkup records found' : 'Chưa có lần khám trong Database'}
+            </Text>
+            <Text style={[styles.emptyDescription, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'No antenatal checkups or fetal biometric records have been saved for this account yet.'
+                : 'Tài khoản này chưa có lượt khám thai hay chỉ số sinh trắc nào được lưu trong cơ sở dữ liệu.'}
             </Text>
             <Pressable
               style={styles.goUploadBtn}
-              onPress={() => navigation.navigate('Main', { screen: 'Upload' })}
+              onPress={() => navigation.navigate('Main')}
             >
-              <Ionicons name="cloud-upload-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.goUploadBtnText}>Tải lên phiếu khám ngay</Text>
+              <Ionicons name="home-outline" size={18} color="#FFFFFF" />
+              <Text style={[styles.goUploadBtnText, fontStyle(15, { min: 14 })]}>
+                {isEn ? 'Back to Home' : 'Quay lại trang chính'}
+              </Text>
             </Pressable>
           </View>
-        ) : filteredResults.length === 0 ? (
+        ) : visibleCount === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={42} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>Không tìm thấy kết quả phù hợp</Text>
-            <Text style={styles.emptyDescription}>
-              Thử từ khóa khác hoặc bấm chọn lại bộ lọc "Tất cả".
+            <Ionicons name="search-outline" size={42} color={theme.muted} />
+            <Text style={[styles.emptyTitle, fontStyle(18, { min: 16.5, max: 21 }), { color: theme.text }]}>
+              {isEn ? 'No matching results' : 'Không tìm thấy kết quả phù hợp'}
+            </Text>
+            <Text style={[styles.emptyDescription, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Try another keyword or switch back to "All checkups".'
+                : 'Thử từ khóa khác hoặc bấm chọn lại bộ lọc "Tất cả lần khám".'}
             </Text>
           </View>
         ) : (
