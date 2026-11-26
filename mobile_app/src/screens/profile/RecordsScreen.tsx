@@ -282,80 +282,42 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
     setLoadingData(true);
     setLoadError('');
     try {
-      const account = currentUserProfile || (await restoreSession());
-      const storageKey = getStorageKey(account?.email || nextProfile.email, account?.id);
-      const payload: SavedAccountRecord = {
-        profile: nextProfile,
-        trimester: nextTrimester,
-        gestationalAge: nextGestationalAge,
-        dueDate: nextDueDate,
-        contacts: nextContacts,
-      };
-      await AsyncStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch (e) {
-      console.log('Lỗi lưu dữ liệu tài khoản:', e);
+      const restored = currentUserProfile || (await restoreSession());
+      const freshUser = (await fetchCurrentUserFromDB()) || restored;
+      setAccount(freshUser);
+
+      const dbRecord = await fetchPregnancyProfileFromDB(undefined, { throwOnError: true });
+      if (dbRecord?.patient && typeof dbRecord.patient === 'object') {
+        const syncedUser = await mergeLocalAccountOverride({
+          id: dbRecord.patient.id || freshUser?.id || '',
+          full_name: dbRecord.patient.full_name || freshUser?.full_name || '',
+          email: String(dbRecord.patient.email || freshUser?.email || '').trim().toLowerCase(),
+          phone_number: dbRecord.patient.phone_number || freshUser?.phone_number || '',
+        });
+        setAccount(syncedUser);
+        await applyDbRecordToState(dbRecord, syncedUser);
+        return syncedUser;
+      }
+      await applyDbRecordToState(dbRecord, freshUser);
+      return freshUser;
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Không thể tải dữ liệu hồ sơ từ máy chủ.';
+      setLoadError(msg);
+      return currentUserProfile;
+    } finally {
+      setLoadingData(false);
     }
-  };
+  }, [applyDbRecordToState]);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function loadCurrentAccountData() {
-        const today = getTodayISO();
-        const account = currentUserProfile || (await restoreSession());
-        const storageKey = getStorageKey(account?.email, account?.id);
-
-        let loadedProfile = createEmptyProfile(account);
-        let loadedTrimester = 'Chưa cập nhật';
-        let loadedAge = '--';
-        let loadedDue = 'Chưa cập nhật';
-        let loadedContacts: EmergencyContact[] = [];
-
-        try {
-          const raw = await AsyncStorage.getItem(storageKey);
-          if (raw) {
-            const parsed: SavedAccountRecord = JSON.parse(raw);
-            if (parsed.profile) {
-              loadedProfile = {
-                ...loadedProfile,
-                ...parsed.profile,
-                name: parsed.profile.name || account?.full_name || '',
-                email: parsed.profile.email || account?.email || '',
-                phone: parsed.profile.phone || account?.phone_number || '',
-                birthday: parsed.profile.birthday || account?.birthday || '',
-                target_date: today,
-              };
-            }
-            if (parsed.trimester) loadedTrimester = parsed.trimester;
-            if (parsed.gestationalAge) loadedAge = parsed.gestationalAge;
-            if (parsed.dueDate) loadedDue = parsed.dueDate;
-            if (Array.isArray(parsed.contacts)) loadedContacts = parsed.contacts;
-          }
-        } catch (e) {
-          console.log('Lỗi đọc dữ liệu tài khoản:', e);
-        }
-
-        const dbRecord = await fetchPregnancyProfileFromDB();
-        if (dbRecord && typeof dbRecord === 'object') {
-          if (dbRecord.lmp) loadedProfile.lmp = String(dbRecord.lmp).slice(0, 10);
-          if (dbRecord.q1_ultrasound_date) {
-            loadedProfile.q1_ultrasound_date = String(dbRecord.q1_ultrasound_date).slice(0, 10);
-          }
-          if (dbRecord.q1_gestational_weeks !== undefined && dbRecord.q1_gestational_weeks !== null) {
-            loadedProfile.q1_gestational_weeks = String(dbRecord.q1_gestational_weeks);
-          }
-          if (dbRecord.q1_gestational_days !== undefined && dbRecord.q1_gestational_days !== null) {
-            loadedProfile.q1_gestational_days = String(dbRecord.q1_gestational_days);
-          }
-          if (dbRecord.crl_mm !== undefined && dbRecord.crl_mm !== null) {
-            loadedProfile.crl_mm = String(dbRecord.crl_mm);
-          }
-          if (dbRecord.edd && loadedDue === 'Chưa cập nhật') {
-            loadedDue = String(dbRecord.edd).slice(0, 10).split('-').reverse().join('/');
-          }
-        }
-
+      async function runFocusLoad() {
+        const loadedUser = await loadFromDatabase();
         const hasPregnancyInput =
           loadedProfile.lmp ||
           loadedProfile.q1_ultrasound_date ||
