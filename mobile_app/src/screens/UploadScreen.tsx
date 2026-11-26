@@ -273,61 +273,61 @@ function localizeUploadTime(rawTime: string, lang: AppLang): string {
     .replace(/^Today,/, 'Hôm nay,')
     .replace(/^Exam date:/, 'Ngày khám:');
 }
-): {
-  severity: SeverityLevel;
-  clinicalNote: string;
-  refRange?: string;
-} {
-  const clean = rawValue.trim();
-  const lower = clean.toLowerCase();
-  const { clampedWeek, month, trimester } = getPregnancyStageInfo(gestationalWeek);
 
-  if (key === 'bpd' || key === 'hc' || key === 'ac' || key === 'fl' || key === 'efw') {
-    const unit = key === 'efw' ? 'g' : 'mm';
-    const bounds = getFetalMetricBoundsByWeek(key, clampedWeek, unit);
-    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
-    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-
-    if (isNaN(num) || num <= 0) {
-      return {
-        severity: 'danger',
-        clinicalNote: 'Giá trị không hợp lệ',
-        refRange: bounds.refRange,
-      };
-    }
-
-    if (num < bounds.dangerLow) {
-      return {
-        severity: 'danger',
-        clinicalNote: `Mức Đỏ (< 3rd): Thấp hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên đi khám để bác sĩ kiểm tra kỹ hơn cho bé nhé.`,
-        refRange: bounds.refRange,
-      };
-    }
-
-    if (num > bounds.dangerHigh) {
-      return {
-        severity: 'danger',
-        clinicalNote: `Mức Đỏ (> 97th): Cao hơn nhiều so với chuẩn Tuần ${clampedWeek} - Tháng ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ nên trao đổi trực tiếp với bác sĩ nhé.`,
-        refRange: bounds.refRange,
-      };
-    }
-
-    if (num < bounds.minNormal) {
-      return {
-        severity: 'warning',
-        clinicalNote: `Mức Vàng (3rd–10th): Hơi thấp nhẹ so với chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ chú ý dinh dưỡng và theo dõi kỳ khám tới nhé.`,
-        refRange: bounds.refRange,
-      };
-    }
-
-    if (num > bounds.maxNormal) {
-      return {
-        severity: 'warning',
-        clinicalNote: `Mức Vàng (90th–97th): Nhỉnh hơn chuẩn Tuần ${clampedWeek} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Mẹ lưu ý theo dõi thêm cùng bác sĩ nhé.`,
-        refRange: bounds.refRange,
-      };
-    }
-
+const UPLOAD_COPY = {
+  vi: {
+    defaultFileName: 'Tài liệu phiếu khám',
+    todayPrefix: 'Hôm nay',
+    screenTitle: 'Tải lên & Đối chiếu phiếu khám',
+    dropTitle: 'Chụp ảnh hoặc tải lên phiếu khám (PDF/Ảnh)',
+    uploadSingle: 'Tải lên đơn lẻ',
+    uploadBatch: 'Tải hàng loạt (Batch)',
+    savedSectionTitle: (count: number) => `Tài liệu & Kết quả đã lưu (${count})`,
+    syncingText: 'Đang đồng bộ danh sách tài liệu từ Database...',
+    emptyText:
+      'Chưa có phiếu khám nào. Hãy chụp ảnh phiếu khám, tải file PDF hoặc bấm "Nhập kết quả thủ công".',
+    taskPrefix: 'Task',
+    analyzingQueue: 'Đang phân tích trên Celery Queue...',
+    extractFailedDefault: 'Quá trình trích xuất Celery bị gián đoạn.',
+    retryExtractBtn: 'Thử lại trích xuất (Retry)',
+    removeFileBtn: 'Xoá file',
+    slipImageHeader: 'Ảnh chụp phiếu khám gốc',
+    slipDocHeader: 'Tài liệu phiếu khám gốc',
+    compareBtn: 'Mở màn hình Đối chiếu',
+    overlayHint: 'Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu',
+    pdfSlipHint:
+      'Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database',
+    savedTagPrefix: (stage: string) =>
+      `Đã đối chiếu & lưu vào Database (${stage})`,
+    manualEntryBtn: 'Nhập kết quả thủ công',
+    modalHeaderTitle: 'Đối chiếu & Xác nhận dữ liệu',
+    modalHeaderSubEdit: 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch',
+    modalHeaderSubView:
+      'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi',
+    originalPrefix: 'Bản gốc',
+    zoomOut: 'Thu nhỏ ảnh',
+    zoomIn: 'Phóng to ảnh',
+    modalPdfHintEdit:
+      'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.',
+    modalPdfHintView:
+      'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.',
+    disclaimerBody:
+      'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
+    disclaimerTitle: 'Tuyên bố giới hạn:',
+    weekEditorPrefix: 'Mốc đối chiếu:',
+    modalSectionLabel: (count: number) =>
+      `Các chỉ số đã phân tích từ file (${count} chỉ số):`,
+    enterValuePlaceholder: 'Nhập giá trị...',
+    refRangePrefix: 'Ngưỡng chuẩn:',
+    finishEditBtn: 'Xong chỉnh sửa',
+    editBtn: 'Chỉnh sửa',
+    savingDbBtn: 'Đang lưu Database...',
+    confirmSaveBtn: 'Xác nhận & Lưu vào hồ sơ',
+    celeryFailedError: 'Quá trình trích xuất Celery bị lỗi. Vui lòng bấm Thử lại.',
+    fileTooLargeTitle: 'File quá lớn',
+    fileTooLargeBody: 'Vui lòng chọn file tối đa 10MB.',
+    uploadServerFail: 'Không thể tải tài liệu lên máy chủ.',
+    uploadErrorTitle: 'Lỗi tải lên',
     return {
       severity: 'normal',
       clinicalNote: `Mức Xanh (10th–90th): Đạt chuẩn Tuần ${clampedWeek} · Tháng thứ ${month} (${bounds.minNormal}–${bounds.maxNormal} ${unit}). Thai phát triển tương xứng tuổi thai.`,
