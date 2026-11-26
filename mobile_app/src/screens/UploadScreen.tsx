@@ -1978,61 +1978,61 @@ export default function UploadScreen({ navigation }: Props) {
                   e?.message || copyRef.current.cannotDeleteBody
                 );
                 return; // QUAN TRỌNG: Không xoá local nếu DB xoá thất bại, tránh lỗi reload bị hiện lại!
-                  )}
-                </View>
+              } finally {
+                setDeletingFileId(null);
+              }
+            } else {
+              console.log('[Xoá Local] Tài liệu chỉ tồn tại cục bộ, chưa lưu lên Database.');
+            }
 
-                {(verifyModalItem.presignedUrl || verifyModalItem.uri) &&
-                isImageItem(verifyModalItem) ? (
-                  <ScrollView
-                    maximumZoomScale={3}
-                    minimumZoomScale={1}
-                    contentContainerStyle={styles.slipImageScroll}
-                  >
-                    <Image
-                      source={{ uri: verifyModalItem.presignedUrl || verifyModalItem.uri }}
-                      style={[
-                        styles.modalSlipImage,
-                        zoomSlipImage && { height: 320 },
-                      ]}
-                      resizeMode="contain"
-                    />
-                  </ScrollView>
-                ) : (
-                  <View style={styles.modalPdfSummaryPane}>
-                    <Ionicons name="document-attach" size={28} color="#F87171" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.modalPdfTitle} numberOfLines={1}>
-                        {decodeFileName(verifyModalItem.name)}
-                      </Text>
-                      <Text style={styles.modalPdfHint}>
-                        {isModalEditing
-                          ? 'Bạn đang bật chế độ Chỉnh sửa. Chạm vào ô chỉ số bất kỳ bên dưới để sửa lại.'
-                          : 'Dưới đây là các chỉ số đã phân tích từ phiếu khám. Nếu có sai lệch, hãy bấm nút "Chỉnh sửa" ở góc dưới.'}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </View>
+            // 3. Xoá hoàn toàn khỏi State và AsyncStorage
+            const storageKey = await resolveAccountStorageKey();
+            setItems((prev) => {
+              const updated = prev.filter(
+                (it) =>
+                  it.id !== item.id &&
+                  (!targetFileId || (it.fileId !== targetFileId && it.id !== targetFileId))
+              );
+              AsyncStorage.setItem(storageKey, JSON.stringify(updated)).catch((err) =>
+                console.log('Lỗi lưu AsyncStorage sau khi xoá:', err)
+              );
+              return updated;
+            });
 
-              <ScrollView
-                style={styles.flex}
-                contentContainerStyle={styles.modalScrollContent}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* HỘP CẢNH BÁO HIỂN THỊ NGAY BÊN TRONG MÀN HÌNH ĐỐI CHIẾU */}
-                {activeModalSummary && (
-                  <View
-                    style={[
-                      styles.doctorBanner,
-                      {
-                        backgroundColor:
-                          activeModalSummary.overallSeverity === 'normal'
-                            ? '#ECFDF5'
-                            : activeModalTheme.cardBg,
-                        borderColor:
-                          activeModalSummary.overallSeverity === 'normal'
-                            ? '#10B981'
-                            : activeModalTheme.border,
+            Alert.alert(copyRef.current.successTitle, copyRef.current.deleteSuccessBody);
+          },
+        },
+      ]
+    );
+  };
+
+  const applyEditedMetricsToItem = (item: UploadItem, markConfirmed: boolean = false): UploadItem => {
+    if (!item.analysis) return item;
+    const activeLang = langRef.current;
+    const parsedWeek = parseInt(draftWeek, 10);
+    const weekToUse = !isNaN(parsedWeek)
+      ? Math.max(12, Math.min(41, parsedWeek))
+      : item.analysis.gestationalWeek || 24;
+    const { stageLabel } = getPregnancyStageInfo(weekToUse, activeLang);
+
+    const updatedMetrics = item.analysis.metrics.map((m) => {
+      const newVal = draftMetrics[m.key] !== undefined ? draftMetrics[m.key].trim() : m.value;
+      const reEval = evaluateMetricByWeek(m.key, newVal, weekToUse, activeLang);
+      return {
+        ...m,
+        label: localizeMetricLabel(m.key, m.label, activeLang),
+        value: newVal,
+        refRange: reEval.refRange || m.refRange,
+        severity: reEval.severity,
+        clinicalNote: reEval.clinicalNote,
+      };
+    });
+
+    const summaryState = summarizeAnalysisState(updatedMetrics, item.name, weekToUse, activeLang);
+
+    return {
+      ...item,
+      status: markConfirmed ? 'done' : item.status,
                       },
                     ]}
                   >
