@@ -60,51 +60,109 @@ function GrowthChart({ metric, selected, onSelect }: { metric: Metric; selected:
   const x = (index: number) => 48 + (index / (weeks.length - 1)) * plotWidth;
   const y = (value: number) => 16 + plotHeight * (1 - value / metric.max);
   return (
-    <View style={s.chart} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      {width > 54 && <>
-        <View style={[s.range, { left: 40, width: width - 50, top: y(metric.range[1]), height: y(metric.range[0]) - y(metric.range[1]) }]} />
-        {metric.ticks.map((tick) => (
-          <React.Fragment key={tick}>
-            <Text style={[s.yLabel, { top: y(tick) - 5 }]}>{tick}{metric.unit}</Text>
-            <View style={[s.gridline, { top: y(tick), left: 40, width: width - 50 }]} />
-          </React.Fragment>
-        ))}
-        {metric.values.slice(0, -1).map((value, index) => {
-          const dx = x(index + 1) - x(index);
-          const dy = y(metric.values[index + 1]) - y(value);
-          const length = Math.hypot(dx, dy);
-          return <View key={weeks[index]} pointerEvents="none" style={[s.segment, {
-            left: (x(index) + x(index + 1)) / 2 - length / 2,
-            top: (y(value) + y(metric.values[index + 1])) / 2 - 1,
-            width: length, backgroundColor: index < selected ? colors.primary : '#FB7185',
-            transform: [{ rotate: `${Math.atan2(dy, dx)}rad` }],
-          }]} />;
-        })}
-        {metric.values.map((value, index) => (
-          <Pressable key={weeks[index]} accessibilityRole="button"
-            accessibilityLabel={`Tuần ${weeks[index]}, ${value} ${metric.unit}`}
-            accessibilityState={{ selected: index === selected }}
-            onPress={() => onSelect(index)} style={[s.pointTarget, { left: x(index) - 20, top: y(value) - 20 }]}>
-            <View style={[s.dot, index === selected && s.selectedDot]} />
-          </Pressable>
-        ))}
-        {weeks.map((week, index) => (
-          <Pressable key={week} accessibilityRole="button" accessibilityLabel={`Xem tuần ${week}`} onPress={() => onSelect(index)}
-            style={[s.weekTarget, { left: x(index) - 20 }]}>
-            <Text style={[s.week, selected === index && s.selectedWeek]}>W{week}</Text>
-          </Pressable>
-        ))}
-      </>}
+    <View
+      style={[s.chart, { backgroundColor: theme.surfaceAlt }]}
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {width > 58 && (
+        <>
+          <View
+            style={[
+              s.range,
+              {
+                backgroundColor: theme.tealSoft,
+                left: 44,
+                width: width - 54,
+                top: y(metric.range[1]),
+                height: y(metric.range[0]) - y(metric.range[1]),
+              },
+            ]}
+          />
+          {metric.ticks.map((tick) => (
+            <React.Fragment key={tick}>
+              <Text
+                style={[
+                  s.yLabel,
+                  {
+                    color: theme.muted,
+                    top: y(tick) - 6,
+                    fontSize: scaleText(10.5, { min: 10, max: 12 }),
+                  },
+                ]}
+              >
+                {tick}{metric.unit}
+              </Text>
+              <View style={[s.gridline, { backgroundColor: theme.tealBorder, top: y(tick), left: 44, width: width - 54 }]} />
+            </React.Fragment>
+          ))}
+          {metric.values.slice(0, -1).map((value, index) => {
+            const dx = x(index + 1) - x(index);
+            const dy = y(metric.values[index + 1]) - y(value);
+            const length = Math.hypot(dx, dy);
+            return (
+              <View
+                key={weeks[index]}
+                pointerEvents="none"
+                style={[
+                  s.segment,
+                  {
+                    left: (x(index) + x(index + 1)) / 2 - length / 2,
+                    top: (y(value) + y(metric.values[index + 1])) / 2 - 1,
+                    width: length,
+                    backgroundColor: index < selected ? colors.primary : '#FB7185',
+                    transform: [{ rotate: `${Math.atan2(dy, dx)}rad` }],
+                  },
+                ]}
+              />
+            );
+          })}
+          {metric.values.map((value, index) => (
+            <Pressable
+              key={weeks[index]}
+              accessibilityRole="button"
+              accessibilityLabel={`${isEn ? 'Week' : 'Tuần'} ${weeks[index]}, ${value} ${metric.unit}`}
+              accessibilityState={{ selected: index === selected }}
+              onPress={() => onSelect(index)}
+              style={[s.pointTarget, { left: x(index) - 20, top: y(value) - 20 }]}
+            >
+              <View style={[s.dot, index === selected && s.selectedDot]} />
+            </Pressable>
+          ))}
+          {weeks.map((week, index) => (
+            <Pressable
+              key={week}
+              accessibilityRole="button"
+              accessibilityLabel={`${isEn ? 'View week' : 'Xem tuần'} ${week}`}
+              onPress={() => onSelect(index)}
+              style={[s.weekTarget, { left: x(index) - 20 }]}
+            >
+              <Text
+                style={[
+                  s.week,
+                  { color: theme.muted, fontSize: scaleText(11.5, { min: 10.5, max: 13 }) },
+                  selected === index && { color: theme.tealText, fontWeight: '700' },
+                ]}
+              >
+                W{week}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      )}
     </View>
   );
 }
 
 export default function ChartsScreen({ navigation }: BottomTabScreenProps<MainTabParamList, 'Charts'>) {
-  const [metric, setMetric] = useState<Metric>(metrics[0]);
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+  const [metric, setMetric] = useState<Metric>(METRIC_ITEMS[0]);
   const [selected, setSelected] = useState(3);
   const [expanded, setExpanded] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const value = metric.values[selected].toLocaleString('en-US');
+  const metricLabel = isEn ? metric.labelEn : metric.labelVi;
+  const metricTitle = isEn ? metric.titleEn : metric.titleVi;
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
