@@ -108,6 +108,9 @@ export type MedicalAnalysisResult = {
   model_version?: string;
   overallSeverity: SeverityLevel;
   metrics: MedicalMetric[];
+  savedToProfile: boolean;
+};
+
 export type UploadItem = {
   id: string;
   fileId?: string;
@@ -133,36 +136,33 @@ const MAX_SIZE = 10 * 1024 * 1024;
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 25;
 
-const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
-  processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
-  pending:    { label: 'Chờ đối chiếu',     bg: '#DBEAFE', color: '#1D4ED8' },
-  done:       { label: 'Đã lưu Database',   bg: '#CCFBF1', color: colors.primaryDark },
-  failed:     { label: 'Trích xuất lỗi',    bg: '#FEE2E2', color: '#DC2626' },
-};
+type AppLang = 'vi' | 'en';
 
-const SEVERITY_THEME: Record<
-  SeverityLevel,
-  {
-    cardBg: string;
-    border: string;
-    valueColor: string;
-    badgeBg: string;
-    badgeColor: string;
-    badgeLabel: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }
-> = {
-  normal: {
-    cardBg: '#FFFFFF',
-    border: '#E2E8F0',
-    valueColor: '#0F172A',
-    badgeBg: '#DCFCE7',
-    badgeColor: '#15803D',
-    badgeLabel: 'Mức Xanh (10th–90th)',
-    icon: 'checkmark-circle',
-  },
-  warning: {
-    cardBg: '#FEFCE8',
+function getStatusStyle(
+  lang: AppLang,
+  isDark: boolean
+): Record<Status, { label: string; bg: string; color: string }> {
+  if (lang === 'en') {
+    return {
+      processing: {
+        label: 'Analyzing...',
+        bg: isDark ? '#422006' : '#FEF9C3',
+        color: isDark ? '#FDE047' : '#A16207',
+      },
+      pending: {
+        label: 'Pending review',
+        bg: isDark ? '#1E3A5F' : '#DBEAFE',
+        color: isDark ? '#93C5FD' : '#1D4ED8',
+      },
+      done: {
+        label: 'Saved to DB',
+        bg: isDark ? '#134E4A' : '#CCFBF1',
+        color: isDark ? '#5EEAD4' : colors.primaryDark,
+      },
+      failed: {
+        label: 'Extraction failed',
+        bg: isDark ? '#7F1D1D' : '#FEE2E2',
+        color: isDark ? '#FCA5A5' : '#DC2626',
     border: '#FACC15',
     valueColor: '#A16207',
     badgeBg: '#FEF08A',
