@@ -102,102 +102,75 @@ export default function HistoryResultsScreen({ navigation }: Props) {
     }, [loadDatabaseHistory]),
   );
 
-  // Xoá 1 bản ghi lịch sử nếu người dùng muốn dọn dẹp
-  const handleDeleteRecord = (id: string, title: string) => {
-    Alert.alert(
-      'Xoá lịch sử kết quả',
-      `Bạn có chắc chắn muốn xoá "${title}" khỏi lịch sử không?`,
-      [
-        { text: 'Huỷ', style: 'cancel' },
-        {
-          text: 'Xoá',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const storageKey = await resolveAccountStorageKey();
-              const raw = await AsyncStorage.getItem(storageKey);
-              if (raw) {
-                const list: UploadItem[] = JSON.parse(raw);
-                const next = list.filter((i) => i.id !== id);
-                await AsyncStorage.setItem(storageKey, JSON.stringify(next));
-              }
-              setHistoryList((prev) => prev.filter((i) => i.id !== id));
-            } catch (e) {
-              console.log('Lỗi xoá lịch sử:', e);
-            }
-          },
-        },
+  const normalizedQuery = keyword.trim().toLowerCase();
+
+  const filteredCheckups = useMemo(() => {
+    return checkups.filter((c) => {
+      const bioStatus = c.biometric_data?.status;
+      if (filter === 'verified' && bioStatus !== 'verified') return false;
+      if (filter === 'pending' && bioStatus === 'verified') return false;
+      if (!normalizedQuery) return true;
+      const haystack = [
+        formatIsoToDmy(c.checkup_date),
+        c.gestational_age.formatted,
+        `tuần ${c.gestational_age.weeks}`,
+        `week ${c.gestational_age.weeks}`,
+        c.doctor?.full_name || '',
+        c.notes || '',
+        c.biometric_data?.bpd ?? '',
+        c.biometric_data?.hc ?? '',
+        c.biometric_data?.ac ?? '',
+        c.biometric_data?.fl ?? '',
+        c.biometric_data?.efw ?? '',
       ]
-    );
-  };
-
-  const filteredResults = useMemo(() => {
-    return historyList.filter((item) => {
-      const q = keyword.trim().toLowerCase();
-      const matchesKeyword =
-        !q ||
-        item.title.toLowerCase().includes(q) ||
-        item.fileName.toLowerCase().includes(q) ||
-        item.valueSummary.toLowerCase().includes(q) ||
-        item.week.toLowerCase().includes(q);
-
-      const matchesFilter =
-        filter === 'all' ||
-        (filter === 'normal' && item.severity === 'normal') ||
-        (filter === 'follow' && item.severity === 'warning') ||
-        (filter === 'danger' && item.severity === 'danger');
-
-      return matchesKeyword && matchesFilter;
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
     });
-  }, [historyList, keyword, filter]);
+  }, [checkups, filter, normalizedQuery]);
 
-  const groupedResults = useMemo(() => {
-    const groups: { date: string; week: string; items: HistoryItem[] }[] = [];
-
-    filteredResults.forEach((item) => {
-      let group = groups.find((g) => g.date === item.date && g.week === item.week);
-      if (!group) {
-        group = { date: item.date, week: item.week, items: [] };
-        groups.push(group);
-      }
-      group.items.push(item);
-    });
-
-    return groups;
-  }, [filteredResults]);
+  const totalCount = checkups.length;
+  const visibleCount = filteredCheckups.length;
 
   const chooseFilter = () => {
-    Alert.alert('Lọc kết quả', 'Chọn trạng thái kết quả cần xem', [
-      { text: 'Tất cả', onPress: () => setFilter('all') },
-      { text: 'Bình thường (Xanh)', onPress: () => setFilter('normal') },
-      { text: 'Cần theo dõi (Vàng)', onPress: () => setFilter('follow') },
-      { text: 'Nguy hiểm / Bất thường (Đỏ)', onPress: () => setFilter('danger') },
-      { text: 'Hủy', style: 'cancel' },
-    ]);
+    Alert.alert(
+      isEn ? 'Filter checkups' : 'Lọc lần khám',
+      isEn ? 'Select result status to display' : 'Chọn trạng thái kết quả muốn hiển thị',
+      [
+        { text: isEn ? 'All checkups' : 'Tất cả lần khám', onPress: () => setFilter('all') },
+        { text: isEn ? 'Verified' : 'Đã xác thực', onPress: () => setFilter('verified') },
+        { text: isEn ? 'Pending' : 'Chờ duyệt', onPress: () => setFilter('pending') },
+        { text: isEn ? 'Cancel' : 'Hủy', style: 'cancel' },
+      ],
+    );
   };
 
   const filterLabel =
     filter === 'all'
-      ? 'Lọc: Tất cả'
-      : filter === 'normal'
-      ? 'Bình thường'
-      : filter === 'follow'
-      ? 'Cần theo dõi'
-      : 'Nguy hiểm';
+      ? (isEn ? 'Filter: All' : 'Lọc: Tất cả')
+      : filter === 'verified'
+        ? (isEn ? 'Verified' : 'Đã xác thực')
+        : (isEn ? 'Pending' : 'Chờ duyệt');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
 
-      {/* HEADER TRANG RIÊNG */}
-      <View style={styles.header}>
+      <ScreenHeader
+        title={isEn ? `Result History (${totalCount})` : `Lịch sử kết quả (${totalCount})`}
+        onBack={() => navigation.goBack()}
+      />
+
+      <View style={[styles.flexOne, { backgroundColor: theme.background }]}>
+      <View style={styles.toolbar}>
         <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          accessibilityLabel="Quay lại"
-          accessibilityRole="button"
+          style={[styles.filterButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+          onPress={chooseFilter}
         >
-          <Ionicons name="arrow-back" size={20} color="#334155" />
+          <Ionicons name="filter-outline" size={16} color={theme.tealText} />
+          <Text style={[styles.toolbarText, fontStyle(14, { min: 13, max: 16.5 }), { color: theme.text }]}>
+            {filterLabel}
+          </Text>
         </Pressable>
 
         <Text style={styles.headerTitle}>Lịch sử kết quả ({historyList.length})</Text>
