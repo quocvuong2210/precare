@@ -383,61 +383,61 @@ const UPLOAD_COPY = {
     removeFileBtn: 'Delete file',
     slipImageHeader: 'Original report photo',
     slipDocHeader: 'Original report document',
-      };
-    }
-    if (lower.includes('++') || lower.includes('+++')) {
-      return { severity: 'danger', clinicalNote: 'Mức Đỏ: Đạm niệu cao — Mẹ nên đi khám sớm nhé.' };
-    }
-    if (lower.includes('vết') || lower.includes('trace') || lower.includes('+')) {
-      return { severity: 'warning', clinicalNote: 'Mức Vàng: Có vết Protein niệu — Cần theo dõi và kiểm tra lại.' };
-    }
-    return { severity: 'normal', clinicalNote: 'Âm tính (Negative) — Bình thường' };
-  }
-
-  if (key === 'glu') {
-    const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
-    const num = numMatch ? parseFloat(numMatch[0]) : NaN;
-    if (!isNaN(num)) {
-      if (num >= 5.6) {
-        return {
-          severity: 'danger',
-          clinicalNote: `Mức Đỏ: Đường huyết lúc đói cao (${num} ≥ 5.6 mmol/L) ở tuần ${clampedWeek} — Mẹ nên đến gặp bác sĩ để kiểm tra chuyên sâu hơn nhé.`,
-        };
-      }
-      if (num >= 5.1) {
-        return {
-          severity: 'warning',
-          clinicalNote: `Mức Vàng: Đường huyết lúc đói vượt nhẹ ngưỡng chuẩn (${num} ≥ 5.1 mmol/L) — Mẹ nên hạn chế tinh bột/đường và trao đổi với bác sĩ nhé.`,
-        };
-      }
-      if (num < 3.3) {
-        return {
-          severity: 'warning',
-          clinicalNote: `Đường huyết lúc đói thấp (${num} < 3.3 mmol/L) — Mẹ lưu ý ăn uống đầy đủ nhé.`,
-        };
-      }
-      return {
-        severity: 'normal',
-        clinicalNote: `Đường huyết lúc đói ổn định (${num} < 5.1 mmol/L).`,
-      };
-    }
-  }
-
-  if (key === 'bp') {
-    const parts = clean.split('/');
-    const sys = parseFloat(parts[0]);
-    const dia = parseFloat(parts[1] || '0');
-    if (!isNaN(sys) && !isNaN(dia)) {
-      if (sys >= 140 || dia >= 90 || sys < 90) {
-        return {
-          severity: 'danger',
-          clinicalNote: `Mức Đỏ: Huyết áp (${clean} mmHg) nằm ngoài khoảng ổn định — Mẹ hãy nghỉ ngơi và sớm đến gặp bác sĩ nhé.`,
-        };
-      }
-      if (sys >= 130 || dia >= 85) {
-        return {
-          severity: 'warning',
-          clinicalNote: `Mức Vàng: Huyết áp chớm cao (${clean} mmHg) — Mẹ nên nghỉ ngơi, ăn nhạt và đo lại hàng ngày nhé.`,
+    compareBtn: 'Open Verification',
+    overlayHint: 'Tap to inspect warnings, compare & confirm data',
+    pdfSlipHint:
+      'Tap to review extracted metrics, compare & confirm saving to database',
+    savedTagPrefix: (stage: string) =>
+      `Verified & saved to Database (${stage})`,
+    manualEntryBtn: 'Enter results manually',
+    modalHeaderTitle: 'Compare & Verify Data',
+    modalHeaderSubEdit: 'Edit mode active — Correct any mismatched values',
+    modalHeaderSubView:
+      'View mode for extracted metrics — Tap "Edit" to make changes',
+    originalPrefix: 'Original',
+    zoomOut: 'Zoom out',
+    zoomIn: 'Zoom in',
+    modalPdfHintEdit:
+      'Edit mode is enabled. Tap any metric input below to update its value.',
+    modalPdfHintView:
+      'Below are metrics extracted from the report. Tap "Edit" at the bottom if adjustments are needed.',
+    disclaimerBody:
+      'Verification details are for reference only and do not replace a specialist diagnosis.',
+    disclaimerTitle: 'Reference disclaimer:',
+    weekEditorPrefix: 'Reference stage:',
+    modalSectionLabel: (count: number) =>
+      `Extracted report metrics (${count} metrics):`,
+    enterValuePlaceholder: 'Enter value...',
+    refRangePrefix: 'Standard range:',
+    finishEditBtn: 'Done editing',
+    editBtn: 'Edit',
+    savingDbBtn: 'Saving to Database...',
+    confirmSaveBtn: 'Verify & Save to Profile',
+    celeryFailedError: 'Celery extraction failed. Please tap Retry.',
+    fileTooLargeTitle: 'File too large',
+    fileTooLargeBody: 'Please choose a file up to 10MB.',
+    uploadServerFail: 'Could not upload document to the server.',
+    uploadErrorTitle: 'Upload error',
+    batchUploading: (count: number) =>
+      `Uploading batch of ${count} reports...`,
+    batchProcessing: (completed: number, total: number, pct: number) =>
+      `Processing report batch: ${completed}/${total} done (${pct}%)...`,
+    batchDoneTitle: 'Batch upload complete',
+    batchDoneBody: (count: number) =>
+      `Analyzed ${count} reports. Tap "Open Verification" on each item to review and save.`,
+    batchErrorTitle: 'Batch upload error',
+    batchErrorBody: 'Could not upload batch to the server.',
+    retryFailMsg: 'Retry extraction failed.',
+    deleteTitle: 'Delete document',
+    deleteConfirm: (name: string) =>
+      `Are you sure you want to permanently delete "${name}" from the app and database?`,
+    cancelBtn: 'Cancel',
+    deleteForeverBtn: 'Delete permanently',
+    cannotDeleteTitle: 'Cannot delete document',
+    cannotDeleteBody:
+      'Server denied deletion or connection failed. Please try again.',
+    successTitle: 'Success',
+    deleteSuccessBody: 'Document deleted from app and database.',
         };
       }
     }
