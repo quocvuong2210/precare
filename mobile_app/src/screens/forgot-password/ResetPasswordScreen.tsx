@@ -273,61 +273,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
                   color={theme.muted}
                 />
               </TouchableOpacity>
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-
-              {renderRequirement(
-                hasMinLength,
-                'Có ít nhất 8 ký tự',
-              )}
-              {renderRequirement(
-                hasUppercase,
-                'Chứa chữ thường và chữ viết hoa',
-              )}
-              {renderRequirement(
-                hasNumber,
-                'Có ít nhất một chữ số',
-              )}
-              {renderRequirement(
-                hasSpecial,
-                'Có ít nhất một ký tự đặc biệt',
-              )}
             </View>
 
-            <View style={styles.note}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={16}
-                color="#21877F"
-              />
-              <Text style={styles.noteText}>
-                Không chia sẻ mật khẩu của bạn với bất kỳ ai,
-                kể cả người tự xưng là nhân viên PreCare.
-              </Text>
-            </View>
-          </View>
+            <Text style={[styles.labelConfirm, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+              {copy.confirmPasswordLabel}
+              <Text style={styles.required}> *</Text>
+            </Text>
 
-          <View style={styles.bottomArea}>
-            <TouchableOpacity
+            <View
               style={[
-                styles.button,
-                loading && styles.buttonDisabled,
+                styles.inputContainer,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+                passwordsMismatch && [
+                  styles.inputError,
+                  { borderColor: theme.danger },
+                ],
               ]}
-              onPress={handleResetPassword}
-              disabled={loading}
-              activeOpacity={0.85}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  Đổi mật khẩu
-                </Text>
-              )}
-            </TouchableOpacity>
+              <TextInput
+                style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                placeholder={copy.confirmPasswordPlaceholder}
+                placeholderTextColor={theme.muted}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                returnKeyType="done"
+                onSubmitEditing={handleResetPassword}
+              />
+
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
+                disabled={loading}
+              >
+                <Ionicons
+                  name={
+                    showConfirmPassword ? 'eye-outline' : 'eye-off-outline'
+                  }
+                  size={19}
+                  color={theme.muted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {passwordsMismatch ? (
+              <View style={styles.errorRow}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={14}
+                  color={theme.danger}
+                />
 
             <TouchableOpacity
               style={styles.footer}
