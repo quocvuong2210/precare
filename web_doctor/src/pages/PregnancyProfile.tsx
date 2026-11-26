@@ -1158,7 +1158,7 @@ export const PregnancyProfile: React.FC<PregnancyProfileProps> = ({ onSelectPati
                           onClick={() => onSelectPatient(item.id)}
                           className="px-3.5 py-1.5 bg-[#2D6A5D] hover:bg-[#235349] text-white rounded-xl text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
                         >
-                          Xem bệnh án
+                          Xem hồ sơ
                         </button>
                         <button
                           onClick={() => handleOpenEditModal(item)}

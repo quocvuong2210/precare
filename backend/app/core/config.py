@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     EMAILS_FROM_NAME: str = "PreCare - Hệ Thống Y Tế Thai Sản"
 
     MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
+    MINIO_REGION: str = "us-east-1"
     MINIO_ACCESS_KEY: str = "precare_minio"
     MINIO_SECRET_KEY: str = "precare_minio_secret"
     MINIO_BUCKET_NAME: str = "precare-paraclinical-files"

@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Ruler,
   Stethoscope,
+  Upload,
+  Eye,
   X,
 } from 'lucide-react';
 import {
@@ -18,6 +20,14 @@ import {
   createCheckup,
   fetchCheckupHistory,
 } from '../services/checkup.service';
+import { CheckupDetailModal } from './CheckupDetailModal';
+import {
+  ingestService,
+  isValidUuid,
+  mapFileDetailToExtractionData,
+} from '../services/ingest.service';
+import { UploadedFileSummary } from '../types/ingest.types';
+import { DocumentViewer, DocumentExtractionData, formatFileSize } from './ocr-workflow';
 
 type BloodPressureStatus = 'normal' | 'elevated' | 'stage1_hypertension' | 'crisis';
 
@@ -57,8 +67,25 @@ const todayInputValue = () => {
   return localDate.toISOString().slice(0, 10);
 };
 
-export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregnancyProfileId }) => {
+export interface VisitTimelineProps {
+  pregnancyProfileId: string;
+  patientName?: string;
+  onOpenUpload?: () => void;
+  newlyAddedVisits?: CheckupTimelineRecord[];
+}
+
+export const VisitTimeline: React.FC<VisitTimelineProps> = ({
+  pregnancyProfileId,
+  patientName,
+  onOpenUpload,
+  newlyAddedVisits = [],
+}) => {
   const [visits, setVisits] = useState<CheckupTimelineRecord[]>([]);
+  const [selectedVisitForDetail, setSelectedVisitForDetail] = useState<CheckupTimelineRecord | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileSummary[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [previewDocData, setPreviewDocData] = useState<DocumentExtractionData | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -83,16 +110,62 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
     }
   };
 
+  const loadUploadedFiles = async () => {
+    if (!isValidUuid(pregnancyProfileId)) {
+      setUploadedFiles([]);
+      return;
+    }
+    setIsLoadingFiles(true);
+    try {
+      const res = await ingestService.listProfileFiles(pregnancyProfileId, {
+        page: 1,
+        page_size: 50,
+      });
+      setUploadedFiles(res.items || []);
+    } catch {
+      setUploadedFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
   useEffect(() => {
     loadVisits();
+    loadUploadedFiles();
   }, [pregnancyProfileId]);
 
-  // Sắp xếp ở giao diện để mốc tuổi thai/ngày khám mới nhất luôn nằm trên cùng.
+  const handlePreviewUploadedFile = async (fileId: string) => {
+    setIsLoadingPreview(true);
+    try {
+      const detail = await ingestService.getFileDetail(fileId);
+      const mapped = mapFileDetailToExtractionData(
+        detail,
+        patientName || 'Thai phụ'
+      );
+      setPreviewDocData(mapped);
+    } catch (err) {
+      console.error('[VisitTimeline] Không thể tải file gốc:', err);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  // Gộp bản ghi vừa tải lên (nếu có) và sắp xếp mốc tuổi thai/ngày khám mới nhất lên đầu
+  const allVisits = useMemo(() => {
+    const combined = [...newlyAddedVisits, ...visits];
+    const seen = new Set<string>();
+    return combined.filter((v) => {
+      if (seen.has(v.id)) return false;
+      seen.add(v.id);
+      return true;
+    });
+  }, [visits, newlyAddedVisits]);
+
   const sortedVisits = useMemo(
-    () => [...visits].sort(
+    () => [...allVisits].sort(
       (a, b) => b.gestational_age.days - a.gestational_age.days || b.checkup_date.localeCompare(a.checkup_date)
     ),
-    [visits]
+    [allVisits]
   );
 
   const isDemoData = visits.some((visit) => visit.notes?.startsWith('[DỮ LIỆU DEMO TIMELINE]'));
@@ -147,14 +220,25 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
             <p className="mt-1 text-xs text-slate-500">Thông tin được tải trực tiếp từ hồ sơ thai kỳ.</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={loadVisits}
-          disabled={isLoading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Làm mới
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenUpload && (
+            <button
+              type="button"
+              onClick={onOpenUpload}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#275248] px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-[#1f423a] transition-colors cursor-pointer"
+            >
+              <Upload className="h-3.5 w-3.5" /> Tải hồ sơ
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={loadVisits}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Làm mới
+          </button>
+        </div>
       </header>
 
       {isLoading ? (
@@ -180,9 +264,24 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800"><CalendarDays className="h-5 w-5" /></div>
           <p className="mt-3 text-sm font-semibold text-slate-800">Chưa có dữ liệu lần khám nào cho hồ sơ thai kỳ này</p>
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">Ghi nhận lần khám để bắt đầu theo dõi các mốc sức khỏe mẹ và bé.</p>
-          <button type="button" onClick={() => setIsCreateOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-900">
-            <Plus className="h-4 w-4" /> Ghi nhận lần khám đầu tiên
-          </button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            {onOpenUpload && (
+              <button
+                type="button"
+                onClick={onOpenUpload}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#275248] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#1f423a] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Upload className="h-4 w-4" /> Tải hồ sơ đầu tiên
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Ghi nhận lần khám
+            </button>
+          </div>
         </div>
       ) : (
         <div className="px-4 py-3 sm:px-6 sm:py-4">
@@ -242,7 +341,21 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
                       <p className="flex items-center gap-1.5 text-slate-500"><Ruler className="h-3.5 w-3.5 text-slate-400" /><strong className="font-semibold text-slate-700">Thai:</strong> Không có chỉ định siêu âm ở lần khám này.</p>
                     )}
 
-                    {note && <p className="flex items-start gap-1.5"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong className="font-semibold text-slate-700">Ghi chú:</strong> {note}</span></p>}
+                    {note && <p className="flex items-start gap-1.5"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong className="font-semibold text-slate-700">Ghi chú &amp; dặn dò:</strong> {note}</span></p>}
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Mã hồ sơ: {visit.id.slice(0, 14)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVisitForDetail(visit)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#275248] bg-teal-50 hover:bg-teal-100/80 border border-teal-200/80 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Xem chi tiết hồ sơ &amp; dặn dò</span>
+                    </button>
                   </div>
                 </div>
               </article>
@@ -281,6 +394,143 @@ export const VisitTimeline: React.FC<{ pregnancyProfileId: string }> = ({ pregna
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedVisitForDetail && (
+        <CheckupDetailModal
+          visit={selectedVisitForDetail}
+          onClose={() => setSelectedVisitForDetail(null)}
+          patientName={patientName}
+        />
+      )}
+
+      {/* Danh sách Hồ sơ & Tài liệu đã đẩy lên của thai phụ */}
+      <div className="border-t border-slate-200 bg-slate-50/40 px-5 py-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-emerald-700" />
+              Hồ sơ &amp; Tài liệu cận lâm sàng đã đẩy lên ({uploadedFiles.length})
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Toàn bộ phiếu siêu âm và xét nghiệm đã tải lên lưu trữ bảo mật cho thai phụ này.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadUploadedFiles}
+            disabled={isLoadingFiles}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoadingFiles ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        </div>
+
+        {isLoadingFiles ? (
+          <div className="flex items-center justify-center py-6 text-xs text-slate-500 gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />
+            <span>Đang tải danh sách tài liệu đã đẩy lên...</span>
+          </div>
+        ) : uploadedFiles.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
+            Chưa có tài liệu cận lâm sàng nào được đẩy lên cho hồ sơ này.
+          </div>
+        ) : (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {uploadedFiles.map((file) => {
+              const statusBadge =
+                file.status === 'verified'
+                  ? { text: 'Đã xác nhận', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                  : file.status === 'extracted'
+                  ? { text: 'Chờ bác sĩ duyệt', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
+                  : file.status === 'failed'
+                  ? { text: 'Lỗi xử lý', cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+                  : { text: 'Đang xử lý OCR', cls: 'bg-sky-50 text-sky-700 border-sky-200' };
+
+              return (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800 truncate">
+                        {file.file_name || 'Tai_lieu_kham.pdf'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${statusBadge.cls}`}>
+                        {statusBadge.text}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-2">
+                      <span>{file.file_size_bytes ? formatFileSize(file.file_size_bytes) : '—'}</span>
+                      <span>•</span>
+                      <span>{formatDateTime(file.created_at)}</span>
+                      {file.uploaded_by_name && (
+                        <>
+                          <span>•</span>
+                          <span>Tải lên: {file.uploaded_by_name}</span>
+                        </>
+                      )}
+                      {file.verified_by_name && (
+                        <>
+                          <span>•</span>
+                          <span className="text-emerald-700 font-semibold">
+                            Đã duyệt: {file.verified_by_name}
+                            {file.verified_at && ` (${formatDateTime(file.verified_at)})`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePreviewUploadedFile(file.id)}
+                    disabled={isLoadingPreview}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Xem file</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal xem trực tiếp File gốc từ MinIO */}
+      {previewDocData && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-4xl h-[88vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Xem tài liệu gốc: {previewDocData.fileName}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Thai phụ: {patientName || '—'} • Độ tin cậy trích xuất: {previewDocData.ocrConfidence}%
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDocData(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 p-3 bg-slate-100">
+              <DocumentViewer
+                data={previewDocData}
+                patientName={patientName}
+                isModal
+                onClose={() => setPreviewDocData(null)}
+              />
+            </div>
           </div>
         </div>
       )}

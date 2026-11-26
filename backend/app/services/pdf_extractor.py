@@ -418,7 +418,7 @@ class PdfFastPathExtractor:
         # 9. Nhịp tim thai FHR (80 - 220 bpm)
         if extracted["fhr_bpm"] is None:
             fhr_pattern = re.compile(
-                r"(?i)(?:Nhịp\s*tim(?:\s*thai)?|Tim\s*thai|FHR)\s*(?:\([^)]{1,10}\))?[\)\]]?\s*[:=]?\s*([0-9]{2,3})\s*(bpm|l\/p|nhịp\/phút|lần\/phút)?",
+                r"(?i)(?:Nhịp\s*tim(?:\s*thai)?|Tim\s*thai|FHR)\s*(?:\([^)]{1,15}\))?[\)\]]?\s*(?:[,;]?\s*tần\s*số)?\s*[:=]?\s*([0-9]{2,3})\s*(bpm|l\/p|nhịp\/phút|lần\/phút)?",
                 re.UNICODE,
             )
             match = fhr_pattern.search(raw_text)
@@ -438,6 +438,12 @@ class PdfFastPathExtractor:
                 re.UNICODE,
             )
             match = ga_pattern.search(raw_text)
+            if not match:
+                match = re.search(
+                    r"(?i)\b([0-9]{1,2})\s*tu[aầ]n\s*([0-6])\s*ng[aà]y\b",
+                    raw_text,
+                    re.UNICODE,
+                )
             if match:
                 try:
                     weeks = int(match.group(1))
@@ -488,82 +494,106 @@ class PdfFastPathExtractor:
             "recommendations": None,
         }
 
-        # 1. Table-First cho Sinh hiệu & Xét nghiệm từ pdfplumber
+        # 1. Table-First cho Sinh hiệu & Xét nghiệm từ pdfplumber (hỗ trợ bảng 2 cột và bảng 4 cột ghép cặp)
         if tables:
             for table in tables:
                 for row in table:
                     if len(row) < 2:
                         continue
-                    label_cell = row[0]
-                    value_cell = next((c for c in row[1:] if c), "")
-                    if not label_cell or not value_cell:
-                        continue
+                    pairs: List[Tuple[str, str]] = []
+                    if len(row) >= 4 and row[2] and row[3]:
+                        pairs.append((row[0], row[1]))
+                        pairs.append((row[2], row[3]))
+                    else:
+                        first_val = next((c for c in row[1:] if c), "")
+                        pairs.append((row[0], first_val))
 
-                    if vitals["blood_pressure_systolic"] is None and re.search(
-                        r"(?i)huyết\s*áp|\bBP\b", label_cell
-                    ):
-                        bp_m = re.search(r"([0-9]{2,3})\s*/\s*([0-9]{2,3})", value_cell)
-                        if bp_m:
-                            vitals["blood_pressure_systolic"] = float(bp_m.group(1))
-                            vitals["blood_pressure_diastolic"] = float(bp_m.group(2))
+                    for label_cell, value_cell in pairs:
+                        if not label_cell or not value_cell:
+                            continue
 
-                    if vitals["weight_kg"] is None and re.search(
-                        r"(?i)cân\s*nặng(?:\s*mẹ|\s*thai\s*phụ)?", label_cell
-                    ) and not re.search(r"(?i)thai|efw|ước\s*tính", label_cell):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 30.0 <= val <= 150.0:
-                            vitals["weight_kg"] = round(val, 2)
+                        if vitals["blood_pressure_systolic"] is None and re.search(
+                            r"(?i)huyết\s*áp|\bBP\b", label_cell
+                        ):
+                            bp_m = re.search(r"([0-9]{2,3})\s*/\s*([0-9]{2,3})", value_cell)
+                            if bp_m:
+                                vitals["blood_pressure_systolic"] = float(bp_m.group(1))
+                                vitals["blood_pressure_diastolic"] = float(bp_m.group(2))
 
-                    if vitals["heart_rate_bpm"] is None and re.search(
-                        r"(?i)\bmạch\b|nhịp\s*tim\s*mẹ", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 40.0 <= val <= 160.0:
-                            vitals["heart_rate_bpm"] = round(val, 0)
+                        if vitals["weight_kg"] is None and re.search(
+                            r"(?i)cân\s*nặng(?:\s*hiện\s*tại|\s*mẹ|\s*thai\s*phụ)?", label_cell
+                        ) and not re.search(r"(?i)thai|efw|ước\s*tính", label_cell):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None and 30.0 <= val <= 150.0:
+                                vitals["weight_kg"] = round(val, 2)
 
-                    if vitals["temperature_c"] is None and re.search(
-                        r"(?i)thân\s*nhiệt|nhiệt\s*độ", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 34.0 <= val <= 42.0:
-                            vitals["temperature_c"] = round(val, 1)
+                        if vitals["heart_rate_bpm"] is None and re.search(
+                            r"(?i)\bmạch\b|nhịp\s*tim\s*mẹ", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None and 40.0 <= val <= 160.0:
+                                vitals["heart_rate_bpm"] = round(val, 0)
 
-                    if vitals["bmi"] is None and re.search(r"(?i)\bbmi\b", label_cell):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 12.0 <= val <= 55.0:
-                            vitals["bmi"] = round(val, 1)
+                        if vitals["temperature_c"] is None and re.search(
+                            r"(?i)thân\s*nhiệt|nhiệt\s*độ", label_cell
+                        ):
+                            temp_m = re.search(
+                                r"([34][0-9](?:[.,][0-9])?)\s*(?:°\s*C|C\b)",
+                                value_cell,
+                                re.IGNORECASE,
+                            )
+                            val = (
+                                self._normalize_float(temp_m.group(1))
+                                if temp_m
+                                else self._extract_value_and_unit(value_cell)[0]
+                            )
+                            if val is not None and 34.0 <= val <= 42.0:
+                                vitals["temperature_c"] = round(val, 1)
 
-                    # Labs
-                    if labs["hgb"] is None and re.search(
-                        r"(?i)huyết\s*sắc\s*tố|\bhgb\b|\bhb\b", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None:
-                            labs["hgb"] = str(round(val, 2))
+                        if vitals["bmi"] is None and re.search(r"(?i)\bbmi\b", label_cell):
+                            bmi_m = re.search(
+                                r"(?i)BMI\s*[:=]?\s*([0-9]{2}(?:[.,][0-9]+)?)",
+                                value_cell,
+                            )
+                            val = (
+                                self._normalize_float(bmi_m.group(1))
+                                if bmi_m
+                                else self._extract_value_and_unit(value_cell)[0]
+                            )
+                            if val is not None and 12.0 <= val <= 55.0:
+                                vitals["bmi"] = round(val, 1)
 
-                    if labs["glucose"] is None and re.search(
-                        r"(?i)đường\s*huyết|\bglucose\b", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None:
-                            labs["glucose"] = str(round(val, 2))
+                        # Labs
+                        if labs["hgb"] is None and re.search(
+                            r"(?i)huyết\s*sắc\s*tố|\bhgb\b|\bhb\b", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None:
+                                labs["hgb"] = str(round(val, 2))
 
-                    if labs["urine_protein"] is None and re.search(
-                        r"(?i)protein\s*niệu|đạm\s*nước\s*tiểu", label_cell
-                    ):
-                        labs["urine_protein"] = value_cell
+                        if labs["glucose"] is None and re.search(
+                            r"(?i)đường\s*huyết|\bglucose\b", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None:
+                                labs["glucose"] = str(round(val, 2))
 
-                    if labs["urine_ph"] is None and re.search(
-                        r"(?i)\bph\b\s*(?:nước\s*tiểu)?", label_cell
-                    ):
-                        val, _, _ = self._extract_value_and_unit(value_cell)
-                        if val is not None and 4.0 <= val <= 9.5:
-                            labs["urine_ph"] = str(round(val, 1))
+                        if labs["urine_protein"] is None and re.search(
+                            r"(?i)protein\s*niệu|đạm\s*nước\s*tiểu", label_cell
+                        ):
+                            labs["urine_protein"] = value_cell
 
-                    if labs["urine_leukocyte"] is None and re.search(
-                        r"(?i)bạch\s*cầu\s*niệu|leukocyte", label_cell
-                    ):
-                        labs["urine_leukocyte"] = value_cell
+                        if labs["urine_ph"] is None and re.search(
+                            r"(?i)\bph\b\s*(?:nước\s*tiểu)?", label_cell
+                        ):
+                            val, _, _ = self._extract_value_and_unit(value_cell)
+                            if val is not None and 4.0 <= val <= 9.5:
+                                labs["urine_ph"] = str(round(val, 1))
+
+                        if labs["urine_leukocyte"] is None and re.search(
+                            r"(?i)bạch\s*cầu\s*niệu|leukocyte", label_cell
+                        ):
+                            labs["urine_leukocyte"] = value_cell
 
         if not raw_text:
             return {
@@ -575,20 +605,35 @@ class PdfFastPathExtractor:
 
         # 2. Thông tin hành chính & Chẩn đoán giữ nguyên hàng lối từ PyMuPDF (sort=True)
         date_m = re.search(
-            r"(?i)(?:Ng[aà]y\s*(?:si[eê]u\s*[aâ]m|kh[aá]m|l[aậ]p\s*phi[eế]u))\s*[:=]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4})",
+            r"(?i)(?:Ng[aà]y\s*(?:si[eê]u\s*[aâ]m|kh[aá]m|l[aậ]p\s*phi[eế]u))\s*[:=]?\s*([0-9]{1,2})\s*[/-]\s*([0-9]{1,2})\s*[/-]\s*([0-9]{4})",
             raw_text,
             re.UNICODE,
         )
         if date_m:
-            administrative_info["visit_date"] = date_m.group(1).strip()
+            administrative_info["visit_date"] = f"{date_m.group(1).zfill(2)}/{date_m.group(2).zfill(2)}/{date_m.group(3)}"
+        else:
+            date_vn_m = re.search(
+                r"(?i)Ng[aà]y\s+([0-9]{1,2})\s+th[aá]ng\s+([0-9]{1,2})\s+n[aă]m\s+([0-9]{4})",
+                raw_text,
+                re.UNICODE,
+            )
+            if date_vn_m:
+                administrative_info["visit_date"] = f"{date_vn_m.group(1).zfill(2)}/{date_vn_m.group(2).zfill(2)}/{date_vn_m.group(3)}"
 
         doc_m = re.search(
-            r"(?i)(?:B[aá]c\s*s[iĩ]\s*(?:th[uự]c\s*hi[eệ]n|si[eê]u\s*[aâ]m|kh[aá]m|[đd]i[eề]u\s*tr[iị])|BS\.?\s*th[uự]c\s*hi[eệ]n)\s*[:=]?\s*([^\n\r|]{3,80})",
+            r"(?i)(?:B[aá]c\s*s[iĩ]\s*(?:th[uự]c\s*hi[eệ]n|si[eê]u\s*[aâ]m|kh[aá]m|ch[iỉ]\s*[đd][iị]nh|[đd]i[eề]u\s*tr[iị])|BS\.?\s*th[uự]c\s*hi[eệ]n)\s*[:=]?\s*([^\n\r|]{3,80})",
             raw_text,
             re.UNICODE,
         )
         if doc_m:
             administrative_info["doctor_performer"] = doc_m.group(1).strip()
+        else:
+            bs_line_m = re.search(
+                r"(?m)(BS\.\s*(?:CK[I|II]+\.?\s*)?[A-ZÀ-Ỹ][^\n\r]{3,60})",
+                raw_text,
+            )
+            if bs_line_m:
+                administrative_info["doctor_performer"] = bs_line_m.group(1).strip()
 
         dept_m = re.search(
             r"(?i)(?:Khoa|Ph[oò]ng\s*kh[aá]m)\s*[:=]?\s*([^\n\r|]{3,80})",
@@ -620,6 +665,34 @@ class PdfFastPathExtractor:
                 if val is not None and 30.0 <= val <= 150.0:
                     vitals["weight_kg"] = round(val, 2)
 
+        # Fallback xét nghiệm từ đoạn văn bản gộp (Mục IV)
+        if labs["hgb"] is None:
+            hb_m = re.search(r"(?i)\b(?:HGB|Hb)\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:g/dL)?", raw_text)
+            if hb_m:
+                val = self._normalize_float(hb_m.group(1))
+                if val is not None:
+                    labs["hgb"] = str(round(val, 2))
+
+        if labs["glucose"] is None:
+            glu_m = re.search(
+                r"(?i)(?:Đường\s*huyết(?:\s*đói)?|Glucose)\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:mmol/L)?",
+                raw_text,
+                re.UNICODE,
+            )
+            if glu_m:
+                val = self._normalize_float(glu_m.group(1))
+                if val is not None:
+                    labs["glucose"] = str(round(val, 2))
+
+        if labs["urine_protein"] is None:
+            prot_m = re.search(r"(?i)Protein\s*(?:niệu)?\s*[:=]?\s*(\(\s*[+-]+\s*\)|Âm\s*tính|Dương\s*tính|[0-9]+(?:[.,][0-9]+)?)", raw_text)
+            if prot_m:
+                labs["urine_protein"] = "Âm tính" if "-" in prot_m.group(1) else prot_m.group(1)
+
+        if labs["urine_leukocyte"] is None:
+            leu_m = re.search(r"(?i)(?:Bạch\s*cầu|Leukocyte)\s*(?:niệu)?\s*[:=]?\s*(\(\s*[+-]+\s*\)|Âm\s*tính|Dương\s*tính|[0-9]+)", raw_text)
+            if leu_m:
+                labs["urine_leukocyte"] = "Âm tính" if "-" in leu_m.group(1) else leu_m.group(1)
         # Kết luận chuyên môn & Dặn dò
         conc_m = re.search(
             r"(?im)^(?:\s*)(?:K[EẾ]T\s*LU[AẬ]N|CH[AẨ]N\s*[ĐD]O[AÁ]N)\s*[:\-]?\s*(.+?)(?=(?:\n\s*(?:[ĐD][EỀ]\s*NGH[IỊ]|D[AẶ]N\s*D[OÒ]|L[OỜ]I\s*KHUY[EÊ]N|H[EẸ]N\s*T[AÁ]I\s*KH[AÁ]M|B[AÁ]C\s*S[IĨ]|$)))",

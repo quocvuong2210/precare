@@ -38,6 +38,13 @@ export interface CreateCheckupPayload {
   blood_pressure_systolic?: number | null;
   blood_pressure_diastolic?: number | null;
   notes?: string | null;
+  biometrics?: {
+    bpd?: number | null;
+    hc?: number | null;
+    ac?: number | null;
+    fl?: number | null;
+    efw?: number | null;
+  } | null;
 }
 
 export async function fetchCheckupHistory(profileId: string): Promise<CheckupTimelineRecord[]> {

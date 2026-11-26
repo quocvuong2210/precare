@@ -12,6 +12,8 @@ class MinioStorageService:
     def __init__(self):
         # Tự động lấy cấu hình từ config/env
         self.endpoint = settings.MINIO_ENDPOINT
+        self.public_endpoint = getattr(settings, "MINIO_PUBLIC_ENDPOINT", "") or self.endpoint
+        self.region = getattr(settings, "MINIO_REGION", "us-east-1")
         self.access_key = settings.MINIO_ACCESS_KEY
         self.secret_key = settings.MINIO_SECRET_KEY
         self.secure = settings.MINIO_SECURE
@@ -23,6 +25,15 @@ class MinioStorageService:
             access_key=self.access_key,
             secret_key=self.secret_key,
             secure=self.secure
+        )
+        # Client chuyên ký Presigned URL bằng public endpoint (trình duyệt truy cập từ ngoài Docker)
+        # Truyền region cố định để MinIO SDK ký offline, không gọi HTTP tới localhost:9000 từ trong container
+        self.public_client = Minio(
+            endpoint=self.public_endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            secure=self.secure,
+            region=self.region
         )
         self._ensure_bucket_exists()
 
@@ -71,8 +82,8 @@ class MinioStorageService:
         return storage_key
 
     def generate_presigned_view_url(self, storage_key: str, expires_in_seconds: int = 1800) -> str:
-        """Sinh Presigned URL truy cập riêng tư có chữ ký HMAC (mặc định 30 phút)"""
-        return self.client.get_presigned_url(
+        """Sinh Presigned URL truy cập riêng tư có chữ ký HMAC (mặc định 30 phút) bằng public endpoint"""
+        return self.public_client.get_presigned_url(
             method="GET",
             bucket_name=self.bucket_name,
             object_name=storage_key,

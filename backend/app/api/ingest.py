@@ -1,6 +1,7 @@
 # backend/app/api/ingest.py
 import json
 import uuid
+from datetime import datetime
 from typing import Optional, List
 import redis
 from celery.result import AsyncResult
@@ -34,7 +35,11 @@ from app.schemas.ingest import (
     FileListResponseData,
     UploadedFileSummary,
     PaginationMetadata,
-    CommonMessageResponse
+    CommonMessageResponse,
+    WorklistQueueItem,
+    WorklistQueueResponse,
+    WorklistQueueResponseData,
+    VerifyFileRequest
 )
 
 router = APIRouter()
@@ -512,6 +517,8 @@ def list_profile_files(
             file_size_bytes=r.file_size_bytes,
             status=r.status,
             uploaded_by_name=r.uploader.full_name if r.uploader else None,
+            verified_by_name=r.verifier.full_name if r.verifier else None,
+            verified_at=r.verified_at,
             created_at=r.created_at
         )
         for r in records
@@ -613,4 +620,144 @@ def retry_failed_file(
             "task_id": task.id,
             "tracking_url": f"/api/v1/ingest/tasks/{task.id}/status"
         }
+    }
+
+
+# 9. GET /api/v1/ingest/queue: Hàng đợi tài liệu cận lâm sàng toàn khoa (cho Web Doctor)
+@router.get(
+    "/queue",
+    response_model=WorklistQueueResponse,
+    summary="Danh sách hàng đợi tài liệu cận lâm sàng toàn khoa"
+)
+def list_worklist_queue(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    document_type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(["doctor", "admin"]))
+):
+    from datetime import date as date_cls
+
+    query = (
+        db.query(UploadedFile)
+        .join(PregnancyProfile, UploadedFile.pregnancy_profile_id == PregnancyProfile.id)
+        .filter(PregnancyProfile.is_deleted == False)
+    )
+    if status_filter:
+        query = query.filter(UploadedFile.status == status_filter)
+    if document_type:
+        query = query.filter(UploadedFile.document_type == document_type)
+
+    total_items = query.count()
+    total_pages = (total_items + page_size - 1) // page_size if total_items > 0 else 1
+
+    records = (
+        query.order_by(UploadedFile.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    items: List[WorklistQueueItem] = []
+    today = date_cls.today()
+    for r in records:
+        prof = r.pregnancy_profile
+        patient = prof.patient if prof else None
+        p_name = patient.full_name if patient else "Thai phụ"
+        p_phone = getattr(patient, "phone_number", None) if patient else None
+
+        # Tính tuổi thai tại thời điểm hiện tại từ EDD (hoặc lấy từ ocr_raw_payload)
+        ga_str = None
+        payload = r.ocr_raw_payload if isinstance(r.ocr_raw_payload, dict) else {}
+        ext_fields = payload.get("extracted_fields", {}) if isinstance(payload, dict) else {}
+        ga_days = ext_fields.get("gestational_age_days")
+        if isinstance(ga_days, (int, float)) and ga_days > 0:
+            w, d = int(ga_days) // 7, int(ga_days) % 7
+            ga_str = f"{w} tuần {d} ngày"
+        elif prof and prof.edd:
+            days_left = (prof.edd - today).days
+            calc_ga = 280 - days_left
+            if 14 <= calc_ga <= 310:
+                ga_str = f"{calc_ga // 7} tuần {calc_ga % 7} ngày"
+
+        conf_scores = payload.get("confidence_scores", {}) if isinstance(payload, dict) else {}
+        conf_vals = [float(v) for v in conf_scores.values() if isinstance(v, (int, float))]
+        avg_conf = round((sum(conf_vals) / len(conf_vals)) * 100, 1) if conf_vals else None
+
+        prim_doc = prof.primary_doctor if prof else None
+        items.append(
+            WorklistQueueItem(
+                id=r.id,
+                pregnancy_profile_id=r.pregnancy_profile_id,
+                checkup_id=r.checkup_id,
+                primary_doctor_id=prof.primary_doctor_id if prof else None,
+                primary_doctor_name=prim_doc.full_name if prim_doc else None,
+                patient_name=p_name,
+                patient_phone=p_phone,
+                gestational_age_formatted=ga_str,
+                document_type=r.document_type,
+                file_name=r.file_name,
+                file_type=r.file_type,
+                file_size_bytes=r.file_size_bytes,
+                status=r.status,
+                ocr_confidence=avg_conf,
+                uploaded_by_name=r.uploader.full_name if r.uploader else None,
+                verified_by_name=r.verifier.full_name if r.verifier else None,
+                verified_at=r.verified_at,
+                created_at=r.created_at,
+            )
+        )
+
+    return {
+        "success": True,
+        "data": WorklistQueueResponseData(
+            items=items,
+            pagination=PaginationMetadata(
+                page=page,
+                page_size=page_size,
+                total_items=total_items,
+                total_pages=total_pages,
+            ),
+        ),
+    }
+
+
+# 10. POST /api/v1/ingest/files/{file_id}/verify: Đánh dấu tài liệu đã được bác sĩ phê duyệt
+@router.post(
+    "/files/{file_id}/verify",
+    response_model=CommonMessageResponse,
+    summary="Xác nhận tài liệu cận lâm sàng đã được bác sĩ đối chiếu và phê duyệt"
+)
+def verify_uploaded_file(
+    file_id: uuid.UUID,
+    request: Request,
+    payload: Optional[VerifyFileRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(RoleChecker(["doctor", "admin"]))
+):
+    db_file = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
+    if not db_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy file.")
+
+    db_file.status = "verified"
+    db_file.verified_by = current_user.id
+    db_file.verified_at = datetime.utcnow()
+    if payload and payload.checkup_id:
+        db_file.checkup_id = payload.checkup_id
+    db.commit()
+
+    log_audit_event(
+        db=db,
+        user_id=current_user.id,
+        action="VERIFY_PARACLINICAL_DOCUMENT",
+        target_table="uploaded_files",
+        target_id=db_file.id,
+        request=request
+    )
+
+    return {
+        "success": True,
+        "message": "Đã xác nhận phê duyệt tài liệu cận lâm sàng.",
+        "data": {"file_id": str(db_file.id), "status": db_file.status},
     }
