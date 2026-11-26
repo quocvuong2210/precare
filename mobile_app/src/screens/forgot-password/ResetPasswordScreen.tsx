@@ -13,46 +13,46 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { resetPassword } from '../../services/api';
-import { colors } from '../../theme/colors';
 
-export default function ResetPasswordScreen({ navigation, route }: any) {
-  const email = route.params?.email || '';
-  const otp_code = route.params?.otp_code || '';
-
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  const hasMinLength = newPassword.length >= 8;
-  const hasUppercase = /[A-Z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
-
-  const strengthCount = [
-    hasMinLength,
-    hasUppercase,
-    hasNumber,
-    hasSpecial,
-  ].filter(Boolean).length;
-
-  const strengthLabel =
-    !newPassword
-      ? 'Chưa có'
-      : strengthCount <= 1
-        ? 'Yếu'
-        : strengthCount <= 2
-          ? 'Trung bình'
-          : strengthCount === 3
-            ? 'Khá mạnh'
-            : 'Rất mạnh';
-
-  const passwordsMismatch =
+const translations = {
+  vi: {
+    strengthNone: 'Chưa có',
+    strengthWeak: 'Yếu',
+    strengthMedium: 'Trung bình',
+    strengthStrong: 'Khá mạnh',
+    strengthVeryStrong: 'Rất mạnh',
+    notice: 'Thông báo',
+    fillBothPasswords: 'Vui lòng nhập đầy đủ mật khẩu.',
+    minLengthError: 'Mật khẩu phải có ít nhất 8 ký tự.',
+    mismatchError: 'Mật khẩu xác nhận không khớp.',
+    successTitle: 'Thành công',
+    defaultSuccessMsg: 'Mật khẩu đã được thay đổi.',
+    backToLoginBtn: 'Về đăng nhập',
+    errorTitle: 'Không thể đổi mật khẩu',
+    defaultErrorMsg: 'OTP không hợp lệ hoặc đã hết hạn.',
+    stepText: 'Bước 3/3 · Mật khẩu mới',
+    title: 'Đặt mật khẩu mới',
+    description:
+      'Tạo mật khẩu mới để bảo vệ tài khoản và hồ sơ thai kỳ của mẹ.',
+    newPasswordLabel: 'Mật khẩu mới',
+    newPasswordPlaceholder: 'Nhập mật khẩu mới',
+    confirmPasswordLabel: 'Xác nhận mật khẩu mới',
+    confirmPasswordPlaceholder: 'Nhập lại mật khẩu mới',
+    mismatchInline: 'Mật khẩu xác nhận không khớp. Vui lòng nhập lại.',
+    strengthTitle: 'Độ mạnh mật khẩu',
+    reqMinLength: 'Có ít nhất 8 ký tự',
+    reqUpperLower: 'Chứa chữ thường và chữ viết hoa',
+    reqNumber: 'Có ít nhất một chữ số',
+    reqSpecial: 'Có ít nhất một ký tự đặc biệt',
+    securityNote:
+      'Không chia sẻ mật khẩu của bạn với bất kỳ ai, kể cả người tự xưng là nhân viên PreCare.',
+    submitButton: 'Đổi mật khẩu',
     submitted &&
     confirmPassword.length > 0 &&
     newPassword !== confirmPassword;
