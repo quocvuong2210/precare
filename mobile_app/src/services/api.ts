@@ -1538,61 +1538,61 @@ export async function getIngestTaskStatus(
   const headers = await getIngestAuthHeaders(false);
   const response = await fetch(
     `${API_BASE_URL}/ingest/tasks/${encodeURIComponent(taskId)}/status`,
-      ? payload.profileId
-      : await ensureActivePregnancyProfileId(payload.gestationalWeek);
-
-  const getNum = (k: string): number | null => {
-    const found = payload.metrics.find((m) => m.key.toLowerCase() === k);
-    if (!found) return null;
-    const match = String(found.value).replace(',', '.').match(/\d+(\.\d+)?/);
-    return match ? parseFloat(match[0]) : null;
-  };
-
-  const bpd = getNum('bpd');
-  const hc = getNum('hc');
-  const ac = getNum('ac');
-  const fl = getNum('fl');
-  const efw = getNum('efw');
-  const fhr = getNum('fhr');
-  const afi = getNum('afi');
-  const hgb = getNum('hgb');
-  const glu = getNum('glu');
-  const pro = getNum('pro');
-  const weight = getNum('weight');
-  const crl = getNum('crl');
-
-  // Bóc tách huyết áp (VD: '118/76')
-  let bpSys: number | null = null;
-  let bpDia: number | null = null;
-  const bpFound = payload.metrics.find((m) => /^(bp|blood_pressure|huyet_ap)$/i.test(m.key));
-  if (bpFound) {
-    const parts = bpFound.value.split('/');
-    if (parts.length >= 2) {
-      const s = parseInt(parts[0].replace(/\D/g, ''), 10);
-      const d = parseInt(parts[1].replace(/\D/g, ''), 10);
-      if (!isNaN(s) && !isNaN(d) && s > d) {
-        bpSys = s;
-        bpDia = d;
-      }
+    {
+      method: 'GET',
+      headers,
     }
-  }
+  );
 
-  const totalGestationalDays =
-    Math.max(12, payload.gestationalWeek || 24) * 7 + (payload.gestationalDays ?? 0);
+  const data: any = await handleResponse(response);
+  console.log(`Kiểm tra trạng thái Task Celery (${taskId}) thành công!`);
+  return data;
+}
 
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const checkupDateIso = payload.checkupDate || todayIso;
-  const savedEndpoints: string[] = [];
-  let lastCreatedCheckupId: string | null = isUuid(payload.checkupId)
-    ? payload.checkupId!
-    : null;
-  let lastCreatedBiometricId: string | null = null;
+// 4. GET /api/v1/ingest/batches/{batch_id}/status — Polling tiến trình tổng hợp của đợt tải hàng loạt
+export async function getIngestBatchStatus(
+  batchId: string
+): Promise<{ success: boolean; data: IngestBatchStatusData }> {
+  console.log(
+    `[API 4/8] Đang kiểm tra tiến trình Batch: ${batchId} (GET /api/v1/ingest/batches/${batchId}/status)...`
+  );
+  const headers = await getIngestAuthHeaders(false);
+  const response = await fetch(
+    `${API_BASE_URL}/ingest/batches/${encodeURIComponent(batchId)}/status`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
 
-  // 1. Chuẩn bị payload chuẩn theo schema CreateCheckupRequest của Backend
-  const biometricsPayload: Record<string, number> = {};
-  if (bpd !== null && bpd >= 10.0 && bpd <= 120.0) biometricsPayload.bpd = bpd;
-  if (hc !== null && hc >= 50.0 && hc <= 400.0) biometricsPayload.hc = hc;
-  if (ac !== null && ac >= 50.0 && ac <= 450.0) biometricsPayload.ac = ac;
+  const data: any = await handleResponse(response);
+  console.log(`Kiểm tra tiến trình Batch (${batchId}) thành công!`);
+  return data;
+}
+
+// 5. GET /api/v1/ingest/files/{file_id} — Chi tiết file & lấy Presigned URL xem trước bản gốc
+export async function getIngestFileDetail(
+  fileId: string
+): Promise<{ success: boolean; data: IngestFileDetailData }> {
+  console.log(
+    `[API 5/8] Đang lấy chi tiết file & Presigned URL: ${fileId} (GET /api/v1/ingest/files/${fileId})...`
+  );
+  const headers = await getIngestAuthHeaders(false);
+  const response = await fetch(
+    `${API_BASE_URL}/ingest/files/${encodeURIComponent(fileId)}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  const data: any = await handleResponse(response);
+  console.log(`Lấy chi tiết file & Presigned URL (${fileId}) thành công!`);
+  return data;
+}
+
+// 6. DELETE /api/v1/ingest/files/{file_id} — Xóa tài liệu tải lên nhầm (khi status là pending hoặc failed)
+export async function deleteIngestFile(
   if (fl !== null && fl >= 5.0 && fl <= 95.0) biometricsPayload.fl = fl;
   if (efw !== null && efw >= 50.0 && efw <= 6000.0) biometricsPayload.efw = efw;
 
