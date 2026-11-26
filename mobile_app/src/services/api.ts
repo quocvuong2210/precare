@@ -1593,61 +1593,61 @@ export async function getIngestFileDetail(
 
 // 6. DELETE /api/v1/ingest/files/{file_id} — Xóa tài liệu tải lên nhầm (khi status là pending hoặc failed)
 export async function deleteIngestFile(
-  if (fl !== null && fl >= 5.0 && fl <= 95.0) biometricsPayload.fl = fl;
-  if (efw !== null && efw >= 50.0 && efw <= 6000.0) biometricsPayload.efw = efw;
-
-  const checkupBody: Record<string, any> = {
-    pregnancy_profile_id: validProfileId,
-    checkup_date: checkupDateIso,
-    notes: payload.explanationPatient || 'Kết quả bóc tách đối chiếu từ phiếu khám cận lâm sàng',
-  };
-
-  if (weight !== null && weight >= 30.0 && weight <= 200.0) {
-    checkupBody.weight_kg = weight;
-  }
-  if (bpSys !== null && bpDia !== null && bpSys >= 60 && bpSys <= 250 && bpDia >= 40 && bpDia <= 150 && bpSys > bpDia) {
-    checkupBody.blood_pressure_systolic = bpSys;
-    checkupBody.blood_pressure_diastolic = bpDia;
-  }
-  if (Object.keys(biometricsPayload).length > 0) {
-    checkupBody.biometrics = biometricsPayload;
+  fileId: string
+): Promise<{ success: boolean; message: string; data?: any }> {
+  const trimmedId = (fileId || '').trim();
+  if (!isUuid(trimmedId)) {
+    throw new Error(`Định danh file "${fileId}" không hợp lệ (cần mã UUID). Không thể gửi yêu cầu xoá lên Database.`);
   }
 
-  // 2. Gửi request POST /api/v1/checkups ghi nhận lượt khám & bảng biometric_data vào Database
-  try {
-    let checkupRes = await fetch(`${API_BASE_URL}/checkups`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(userToken ? { Authorization: `Bearer ${userToken}` } : {}),
-      },
-      body: JSON.stringify(checkupBody),
-    });
-
-    // Nếu người dùng có role là pregnant_woman (bị RoleChecker(['doctor']) chặn 403 Forbidden):
-    // Sử dụng token tài khoản y tế của bác sĩ hệ thống để ghi nhận lượt khám hợp lệ
-    if (checkupRes.status === 403) {
-      console.log('RoleChecker cần quyền bác sĩ để tạo Checkup. Đang ủy quyền tài khoản bác sĩ...');
-      const doctorToken = await getDoctorAuthToken();
-      if (doctorToken) {
-        checkupRes = await fetch(`${API_BASE_URL}/checkups`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${doctorToken}`,
-          },
-          body: JSON.stringify(checkupBody),
-        });
-      }
+  console.log(`[API 6/8] Đang xoá tài liệu: ${trimmedId} (DELETE /api/v1/ingest/files/${trimmedId})...`);
+  const headers = await getIngestAuthHeaders(false);
+  const response = await fetch(
+    `${API_BASE_URL}/ingest/files/${encodeURIComponent(trimmedId)}`,
+    {
+      method: 'DELETE',
+      headers,
     }
+  );
 
-    if (checkupRes.ok) {
-      const resJson: any = await safeParseJson(checkupRes);
-      const resData = resJson?.data || resJson;
-      if (resData?.id) {
-        lastCreatedCheckupId = String(resData.id);
+  if (response.status === 204) {
+    console.log(`Xoá tài liệu (${trimmedId}) thành công!`);
+    return { success: true, message: 'Đã xóa tài liệu khỏi Database.', data: trimmedId };
+  }
+  const data: any = await handleResponse(response);
+  console.log(`Xoá tài liệu (${trimmedId}) thành công!`);
+  return data;
+}
+
+// 7. GET /api/v1/ingest/profiles/{profile_id}/files — Danh sách tài liệu đã tải lên của hồ sơ thai kỳ
+export async function getProfileIngestFiles(
+  profileId?: string,
+  params?: { status?: string; document_type?: string; page?: number; page_size?: number }
+): Promise<any> {
+  const validProfileId =
+    profileId && profileId !== 'profile_demo_01'
+      ? profileId
+      : await ensureActivePregnancyProfileId();
+
+  const queryParams = new URLSearchParams();
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.document_type) queryParams.append('document_type', params.document_type);
+  queryParams.append('page', String(params?.page ?? 1));
+  queryParams.append('page_size', String(params?.page_size ?? 20));
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  console.log(
+    `[API 7/8] Đang lấy danh sách tài liệu của hồ sơ: ${validProfileId} (GET /api/v1/ingest/profiles/${validProfileId}/files${queryString})...`
+  );
+
+  const headers = await getIngestAuthHeaders(false);
+  const response = await fetch(
+    `${API_BASE_URL}/ingest/profiles/${encodeURIComponent(validProfileId)}/files${queryString}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
         savedEndpoints.push(`POST /api/v1/checkups (Checkup ID: ${resData.id})`);
       }
       if (resData?.biometric_data?.id) {
