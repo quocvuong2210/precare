@@ -468,108 +468,147 @@ export default function HistoryResultsScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Dữ liệu đồng bộ trực tiếp từ hồ sơ tài khoản của bạn
+      <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+        <Text style={[styles.footerText, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+          {isEn
+            ? 'Checkup records synced to your account from PreCare database'
+            : 'Dữ liệu lần khám đồng bộ theo tài khoản từ cơ sở dữ liệu PreCare'}
         </Text>
+      </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F9FC' },
+  flexOne: { flex: 1 },
+  container: { flex: 1 },
   header: {
-    height: 54,
-    backgroundColor: '#FFFFFF',
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5EAF0',
   },
   backButton: {
     position: 'absolute',
     left: 16,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#F1F5F9',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#172B4D',
     textAlign: 'center',
   },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 10,
   },
   filterButton: {
-    height: 36,
-    paddingHorizontal: 10,
+    minHeight: 44,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
+    gap: 6,
     borderWidth: 1,
-    borderColor: '#E0E7EF',
-    borderRadius: 9,
+    borderRadius: 11,
   },
-  toolbarText: { fontSize: 12, fontWeight: '600', color: '#334155' },
+  toolbarText: { fontSize: 14, fontWeight: '600' },
   searchBox: {
     flex: 1,
-    height: 36,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 9,
-    backgroundColor: '#FFFFFF',
+    gap: 8,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#E0E7EF',
-    borderRadius: 9,
+    borderRadius: 11,
   },
-  searchInput: { flex: 1, padding: 0, fontSize: 12, color: '#334155' },
-  content: { paddingHorizontal: 16, paddingBottom: 24 },
-  dateGroup: { marginBottom: 10 },
-  dateHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-    marginBottom: 8,
+  searchInput: { flex: 1, padding: 0, fontSize: 15 },
+  content: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
   },
-  dateText: { fontSize: 12.5, fontWeight: '800', color: '#008F83' },
+  sectionGroup: { marginTop: 4, marginBottom: 14 },
+  groupHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
   resultCard: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2EAF2',
-    borderRadius: 13,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
   },
   resultTitle: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
+  weekSubtitle: {
+    fontSize: 14.5,
+    lineHeight: 21,
+    fontWeight: '500',
+    marginTop: 3,
+  },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  statusText: { fontSize: 12.5, fontWeight: '700' },
+  sectionBlock: { marginTop: 14 },
+  valueLabel: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  metricTile: {
+    flexGrow: 1,
+    minWidth: '46%',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  metricTileLabel: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '800',
-    color: '#1E293B',
+    fontWeight: '600',
   },
-  fileSubtitle: {
-    fontSize: 11,
-    color: '#64748B',
+  metricTileValue: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  metricTileNote: {
+    fontSize: 13,
+    fontWeight: '600',
     marginTop: 2,
   },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 7 },
