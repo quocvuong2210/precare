@@ -31,6 +31,7 @@ interface UploadVerificationWizardProps {
   initialReviewFile?: InitialReviewFileInfo | null;
   onClose: () => void;
   onSaveSuccess: (savedData?: DocumentExtractionData) => void;
+  onDeleteSuccess?: (deletedFileId: string) => void;
 }
 
 export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> = ({
@@ -41,6 +42,7 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
   initialReviewFile = null,
   onClose,
   onSaveSuccess,
+  onDeleteSuccess,
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(
     initialReviewFile ? 2 : initialStep
@@ -65,6 +67,7 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
   });
   const [activeFileIndex, setActiveFileIndex] = useState<number>(0);
   const [isOcrProcessing, setIsOcrProcessing] = useState<boolean>(false);
+  const [isDeletingFile, setIsDeletingFile] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const blobUrlsRef = useRef<string[]>([]);
   const [processingStageText, setProcessingStageText] = useState<string>(
@@ -287,6 +290,45 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
   };
 
   // Xác nhận và lưu hồ sơ ở Bước 3
+  const handleDeleteActiveFile = async () => {
+    const targetFileId = activeExtraction.fileId || currentFile?.id || '';
+    setApiError(null);
+    setIsDeletingFile(true);
+    try {
+      if (isValidUuid(targetFileId)) {
+        await ingestService.deleteUploadedFile(targetFileId);
+      }
+
+      const deletedId = currentFile?.id;
+      const remainingFiles = files.filter((_, idx) => idx !== activeFileIndex);
+      setFiles(remainingFiles);
+      if (deletedId) {
+        setExtractionsMap((prev) => {
+          const next = { ...prev };
+          delete next[deletedId];
+          return next;
+        });
+      }
+
+      if (remainingFiles.length > 0) {
+        setActiveFileIndex((prev) => Math.min(prev, remainingFiles.length - 1));
+      } else if (onDeleteSuccess) {
+        onDeleteSuccess(targetFileId);
+      } else {
+        onClose();
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể xóa tài liệu khỏi hàng đợi.';
+      setApiError(msg);
+    } finally {
+      setIsDeletingFile(false);
+    }
+  };
+
   const handleConfirmStep3 = async () => {
     if (isValidUuid(currentPatientId)) {
       try {
@@ -419,6 +461,8 @@ export const UploadVerificationWizard: React.FC<UploadVerificationWizardProps> =
           onUpdateExtractionData={handleUpdateActiveExtraction}
           onBackToStep1={() => setCurrentStep(1)}
           onBackToQueue={initialReviewFile ? onClose : undefined}
+          onDeleteFile={handleDeleteActiveFile}
+          isDeletingFile={isDeletingFile}
           onProceedToStep3={() => setCurrentStep(3)}
           patientName={currentPatientName}
         />

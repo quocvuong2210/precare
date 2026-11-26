@@ -20,12 +20,15 @@ import {
   Activity,
   Layers,
   FileUp,
+  Trash2,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupDetailModal } from '../components/CheckupDetailModal';
 import { CheckupTimelineRecord } from '../services/checkup.service';
 import { DocumentExtractionData, formatFileSize } from '../components/ocr-workflow/mockOcrData';
-import { ingestService } from '../services/ingest.service';
+import { ingestService, isValidUuid } from '../services/ingest.service';
 import { apiClient } from '../services/auth.service';
 import { DataTable, DataTableColumn } from '../components/ui/DataTable';
 import { TableActionButton } from '../components/ui/TableActionButton';
@@ -250,6 +253,8 @@ export const TestResults: React.FC<TestResultsProps> = ({
     initialPatientId || ''
   );
   const [reviewingItem, setReviewingItem] = useState<ParaclinicalWorklistItem | null>(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<ParaclinicalWorklistItem | null>(null);
+  const [isDeletingWorklistItem, setIsDeletingWorklistItem] = useState(false);
   const [selectedVisitDetail, setSelectedVisitDetail] = useState<CheckupTimelineRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [successSavedModal, setSuccessSavedModal] = useState<{
@@ -406,6 +411,13 @@ export const TestResults: React.FC<TestResultsProps> = ({
           setReviewingItem(null);
         }}
         onSaveSuccess={handleSaveVerifiedDoc}
+        onDeleteSuccess={() => {
+          setIsWizardOpen(false);
+          setReviewingItem(null);
+          loadWorklistQueue();
+          setToastMessage('Đã xóa phiếu cận lâm sàng khỏi hàng đợi.');
+          setTimeout(() => setToastMessage(null), 3500);
+        }}
       />
     );
   }
@@ -718,12 +730,23 @@ export const TestResults: React.FC<TestResultsProps> = ({
               align: 'right',
               render: (item) =>
                 item.status === 'pending_review' ? (
-                  <TableActionButton
-                    label="Duyệt & Đối chiếu"
-                    icon={Eye}
-                    variant="primary"
-                    onClick={() => handleReviewPending(item)}
-                  />
+                  <div className="inline-flex items-center justify-end gap-1.5">
+                    <TableActionButton
+                      label="Duyệt & Đối chiếu"
+                      icon={Eye}
+                      variant="primary"
+                      onClick={() => handleReviewPending(item)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteItem(item)}
+                      title="Xóa phiếu khỏi hàng đợi"
+                      aria-label="Xóa phiếu khỏi hàng đợi"
+                      className="p-2 rounded-xl border border-rose-200 bg-rose-50/70 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ) : (
                   <TableActionButton
                     label="Xem chi tiết & dặn dò"
@@ -746,6 +769,94 @@ export const TestResults: React.FC<TestResultsProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Delete Pending Worklist Item Modal */}
+      {pendingDeleteItem && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Xóa phiếu khỏi hàng đợi chờ duyệt?
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Tệp gốc và kết quả OCR chưa phê duyệt sẽ bị xóa vĩnh viễn.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingDeleteItem(null)}
+                disabled={isDeletingWorklistItem}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
+              <div className="font-semibold text-slate-900 truncate">{pendingDeleteItem.fileName}</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Thai phụ: {pendingDeleteItem.patientName} • {pendingDeleteItem.documentTypeName}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteItem(null)}
+                disabled={isDeletingWorklistItem}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsDeletingWorklistItem(true);
+                  try {
+                    if (isValidUuid(pendingDeleteItem.id)) {
+                      await ingestService.deleteUploadedFile(pendingDeleteItem.id);
+                    }
+                    setPendingDeleteItem(null);
+                    await loadWorklistQueue();
+                    setToastMessage('Đã xóa phiếu cận lâm sàng khỏi hàng đợi.');
+                    setTimeout(() => setToastMessage(null), 3500);
+                  } catch (err: any) {
+                    const msg =
+                      err?.response?.data?.detail ||
+                      err?.response?.data?.message ||
+                      err?.message ||
+                      'Không thể xóa phiếu cận lâm sàng.';
+                    setToastMessage(msg);
+                    setTimeout(() => setToastMessage(null), 4000);
+                  } finally {
+                    setIsDeletingWorklistItem(false);
+                  }
+                }}
+                disabled={isDeletingWorklistItem}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+              >
+                {isDeletingWorklistItem ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang xóa...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xác nhận xóa</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Checkup Detail Modal */}
       {selectedVisitDetail && (
