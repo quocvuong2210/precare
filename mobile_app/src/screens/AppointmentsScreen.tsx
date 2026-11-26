@@ -25,20 +25,19 @@ type Appointment = {
 
 const APPOINTMENTS: Appointment[] = [];
 
-/* ================= HÀM HỖ TRỢ LỊCH ================= */
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const WEEKDAY_NAMES = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const WEEKDAYS_VI = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_NAMES_VI = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const WEEKDAY_NAMES_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_NAMES_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const formatDate = (d: Date) =>
-  `${WEEKDAY_NAMES[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 
 type Cell = { date: Date; inMonth: boolean };
 
-// Sinh lưới lịch của 1 tháng, mỗi hàng 7 ngày, bắt đầu từ Thứ 2
 function buildMonth(year: number, month: number): Cell[][] {
-  const offset = (new Date(year, month, 1).getDay() + 6) % 7; // T2 = 0
+  const offset = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const total = Math.ceil((offset + daysInMonth) / 7) * 7;
 
@@ -54,12 +53,18 @@ function buildMonth(year: number, month: number): Cell[][] {
 }
 
 export default function AppointmentsScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [view, setView] = useState(() => {
     const today = new Date();
     return { year: today.getFullYear(), month: today.getMonth() };
   });
   const [selected, setSelected] = useState(() => new Date());
   const [reminder, setReminder] = useState(true);
+
+  const weekdays = isEn ? WEEKDAYS_EN : WEEKDAYS_VI;
+  const formatDate = (d: Date) =>
+    `${isEn ? WEEKDAY_NAMES_EN[d.getDay()] : WEEKDAY_NAMES_VI[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 
   const rows = buildMonth(view.year, view.month);
   const selectedKey = toKey(selected);
@@ -73,58 +78,54 @@ export default function AppointmentsScreen({ navigation }: Props) {
 
   const onPickDay = (cell: Cell) => {
     setSelected(cell.date);
-    // Bấm vào ngày của tháng khác thì nhảy sang tháng đó
     if (!cell.inMonth) {
       setView({ year: cell.date.getFullYear(), month: cell.date.getMonth() });
     }
   };
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
 
-      {/* ================= HEADER ================= */}
-      <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={18} color={colors.navy} />
-        </Pressable>
-
-        <Text style={styles.headerTitle}>Lịch hẹn khám</Text>
-
-        <Pressable style={styles.headerButton} onPress={() => {}}>
-          <Ionicons name="ellipsis-vertical" size={18} color={colors.navy} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title={isEn ? 'Appointments' : 'Lịch hẹn khám'}
+        onBack={() => navigation.goBack()}
+        rightIcon="ellipsis-vertical"
+        onRightPress={() => {}}
+        rightAccessibilityLabel={isEn ? 'Options' : 'Tùy chọn'}
+      />
 
       <ScrollView
+        style={{ backgroundColor: theme.background }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ================= LỊCH ================= */}
-        <View style={styles.calendarCard}>
+        <View style={[styles.calendarCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.monthRow}>
-            <Text style={styles.monthTitle}>
-              Tháng {view.month + 1}, {view.year}
+            <Text style={[styles.monthTitle, fontStyle(16, { min: 14.5, max: 19 }), { color: theme.text }]}>
+              {isEn
+                ? `${MONTH_NAMES_EN[view.month]} ${view.year}`
+                : `Tháng ${view.month + 1}, ${view.year}`}
             </Text>
 
             <View style={styles.monthArrows}>
               <Pressable onPress={() => changeMonth(-1)} hitSlop={10}>
-                <Ionicons name="chevron-back" size={18} color={colors.navy} />
+                <Ionicons name="chevron-back" size={18} color={theme.text} />
               </Pressable>
               <Pressable onPress={() => changeMonth(1)} hitSlop={10} style={{ marginLeft: 14 }}>
-                <Ionicons name="chevron-forward" size={18} color={colors.navy} />
+                <Ionicons name="chevron-forward" size={18} color={theme.text} />
               </Pressable>
             </View>
           </View>
 
-          {/* Hàng thứ trong tuần */}
           <View style={styles.weekRow}>
-            {WEEKDAYS.map((w) => (
-              <Text key={w} style={styles.weekday}>{w}</Text>
+            {weekdays.map((w) => (
+              <Text key={w} style={[styles.weekday, fontStyle(12, { min: 11, max: 13.5 }), { color: theme.muted }]}>
+                {w}
+              </Text>
             ))}
           </View>
 
-          {/* Các ngày */}
           {rows.map((row, ri) => (
             <View key={ri} style={styles.weekRow}>
               {row.map((cell) => {
@@ -138,14 +139,14 @@ export default function AppointmentsScreen({ navigation }: Props) {
                       <Text
                         style={[
                           styles.dayText,
-                          !cell.inMonth && styles.dayTextMuted,
+                          fontStyle(14, { min: 12.5, max: 16 }),
+                          { color: cell.inMonth ? theme.text : theme.muted, opacity: cell.inMonth ? 1 : 0.45 },
                           isSelected && styles.dayTextSelected,
                         ]}
                       >
                         {cell.date.getDate()}
                       </Text>
 
-                      {/* Chấm nhỏ báo ngày có lịch hẹn */}
                       {hasAppointment && !isSelected && <View style={styles.dot} />}
                     </View>
                   </Pressable>
@@ -155,56 +156,69 @@ export default function AppointmentsScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* ================= NHẮC NHỞ ================= */}
-        <View style={styles.reminderCard}>
-          <View style={styles.reminderIcon}>
-            <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+        <View style={[styles.reminderCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={[styles.reminderIcon, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="notifications-outline" size={18} color={theme.tealText} />
           </View>
 
           <View style={styles.reminderInfo}>
-            <Text style={styles.reminderTitle}>Nhắc nhở trước lịch khám</Text>
-            <Text style={styles.reminderSub}>Thông báo trước 24 giờ</Text>
+            <Text style={[styles.reminderTitle, fontStyle(15, { lineHeight: 21, min: 14 }), { color: theme.text }]}>
+              {isEn ? 'Appointment reminder' : 'Nhắc nhở trước lịch khám'}
+            </Text>
+            <Text style={[styles.reminderSub, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.muted }]}>
+              {isEn ? 'Notify 24 hours before checkup' : 'Thông báo trước 24 giờ'}
+            </Text>
           </View>
 
           <Switch
             value={reminder}
             onValueChange={setReminder}
-            trackColor={{ false: '#CBD5E1', true: colors.primary }}
+            trackColor={{ false: theme.switchTrack, true: colors.primary }}
             thumbColor={colors.white}
-            ios_backgroundColor="#CBD5E1"
+            ios_backgroundColor={theme.switchTrack}
           />
         </View>
 
-        {/* ================= CHI TIẾT LỊCH HẸN ================= */}
-        <Text style={styles.sectionTitle}>Chi tiết lịch hẹn</Text>
+        <Text style={[styles.sectionTitle, fontStyle(15.5, { min: 14.5 }), { color: theme.textSecondary }]}>
+          {isEn ? 'Appointment details' : 'Chi tiết lịch hẹn'}
+        </Text>
 
         {todaysAppointments.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>Không có lịch hẹn trong ngày này</Text>
+          <View style={[styles.emptyBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.emptyText, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.muted }]}>
+              {isEn ? 'No appointments on this date' : 'Không có lịch hẹn trong ngày này'}
+            </Text>
           </View>
         ) : (
           todaysAppointments.map((item) => (
-            <View key={item.id} style={styles.detailCard}>
-              <View style={styles.detailIcon}>
-                <Ionicons name="heart" size={22} color={colors.primary} />
+            <View key={item.id} style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.detailIcon, { backgroundColor: theme.tealSoft }]}>
+                <Ionicons name="heart" size={22} color={theme.tealText} />
               </View>
 
               <View style={styles.detailInfo}>
                 <View style={styles.detailTitleRow}>
-                  <Text style={styles.detailTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text
+                    style={[styles.detailTitle, fontStyle(15, { lineHeight: 21, min: 14 }), { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
 
                   {item.status === 'upcoming' && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>Sắp tới</Text>
+                    <View style={[styles.badge, { backgroundColor: theme.badgeGreenBg }]}>
+                      <Text style={[styles.badgeText, fontStyle(12, { min: 11, max: 13.5 }), { color: theme.badgeGreenText }]}>
+                        {isEn ? 'Upcoming' : 'Sắp tới'}
+                      </Text>
                     </View>
                   )}
                 </View>
 
-                <Text style={styles.detailDoctor}>
-                  {item.doctor} • Tuần thai {item.pregnancyWeek}
+                <Text style={[styles.detailDoctor, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.textSecondary }]}>
+                  {item.doctor} • {isEn ? `Week ${item.pregnancyWeek}` : `Tuần thai ${item.pregnancyWeek}`}
                 </Text>
 
-                <Text style={styles.detailTime}>
+                <Text style={[styles.detailTime, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.muted }]}>
                   {item.time} • {formatDate(selected)}
                 </Text>
               </View>
@@ -213,13 +227,10 @@ export default function AppointmentsScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* ================= NÚT THÊM LỊCH ================= */}
       <View style={styles.bottomBar}>
         <PrimaryButton
-          title="+ Thêm lịch hẹn mới"
-          onPress={() => {
-            // TODO: mở màn hình / modal thêm lịch hẹn
-          }}
+          title={isEn ? '+ Add new appointment' : '+ Thêm lịch hẹn mới'}
+          onPress={() => {}}
         />
       </View>
     </SafeAreaView>
@@ -227,18 +238,14 @@ export default function AppointmentsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F5F8FA' },
-
-  /* ================= HEADER ================= */
+  flex: { flex: 1 },
   header: {
     height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   headerButton: {
     width: 32,
