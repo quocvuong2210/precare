@@ -17,7 +17,7 @@ import type { UploadStackParamList } from './UploadNavigator';
 /* ================= TÊN CÁC TAB ================= */
 export type MainTabParamList = {
   Home: undefined;
-  Records: { section?: 'personal' | 'contacts' } | undefined;
+  Records: { section?: 'personal' } | undefined;
   Upload: NavigatorScreenParams<UploadStackParamList> | undefined;
   Charts: undefined;
   Settings: undefined;
@@ -39,15 +39,18 @@ const TAB_ICONS: Record<keyof MainTabParamList, { active: IconName; inactive: Ic
 export default function MainTabs() {
   // Lấy chiều cao vùng an toàn phía dưới (thanh gesture Android / home indicator iPhone)
   const insets = useSafeAreaInsets();
-  const { preferences } = useAppSettings();
+  const { preferences, scaleText } = useAppSettings();
   const theme = settingsThemes[preferences.darkMode ? 'dark' : 'light'];
   const labels = preferences.language === 'vi'
     ? { Home: 'Trang chủ', Records: 'Hồ sơ', Upload: 'Tải lên', Charts: 'Biểu đồ', Settings: 'Cài đặt' }
     : { Home: 'Home', Records: 'Profile', Upload: 'Upload', Charts: 'Charts', Settings: 'Settings' };
+  const labelFontSize = scaleText(11.5, { min: 10.5, max: 13 });
+  const extraTabHeight = preferences.textSize === 'large' ? 4 : 0;
 
   return (
     <Tab.Navigator
       initialRouteName="Home"
+      backBehavior="history"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarLabel: labels[route.name],
@@ -57,7 +60,7 @@ export default function MainTabs() {
         tabBarInactiveTintColor: theme.muted,
 
         // Chữ bên dưới icon
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+        tabBarLabelStyle: { fontSize: labelFontSize, fontWeight: '600', marginTop: 2 },
 
         // Khung thanh bar
         tabBarStyle: {
@@ -66,7 +69,7 @@ export default function MainTabs() {
           borderTopColor: theme.border,
           paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 8),
-          height: 56 + Math.max(insets.bottom, 8),
+          height: 56 + extraTabHeight + Math.max(insets.bottom, 8),
         },
 
         // Icon: đang chọn thì dùng bản đặc, không chọn dùng bản viền

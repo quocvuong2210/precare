@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -21,11 +21,10 @@ import ForgotPasswordScreen from '../screens/forgot-password/ForgotPasswordScree
 import OtpVerificationScreen from '../screens/forgot-password/OtpVerificationScreen';
 import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen';
 
-
-
 import HistoryResultsScreen from '../screens/profile/HistoryResultsScreen';
 import DeletionRequestScreen from '../screens/profile/DeletionRequestScreen';
 import PregnancySetupScreen from '../screens/PregnancySetupScreen';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { verifySessionWithBackend } from '../services/api';
 import { colors } from '../theme/colors';
 export type RootStackParamList = {
@@ -76,10 +75,28 @@ type InitialLaunchState = {
 };
 
 export default function AppNavigator() {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [launchState, setLaunchState] = useState<InitialLaunchState>({
     ready: false,
     routeName: 'Onboarding',
   });
+
+  const navTheme = useMemo(() => {
+    const base = preferences.darkMode ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      dark: preferences.darkMode,
+      colors: {
+        ...base.colors,
+        primary: colors.primary,
+        background: theme.background,
+        card: theme.surface,
+        text: theme.text,
+        border: theme.border,
+      },
+    };
+  }, [preferences.darkMode, theme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -136,99 +153,69 @@ export default function AppNavigator() {
 
   if (!launchState.ready) {
     return (
-      <LinearGradient colors={['#F2FCFC', '#E5F7FF']} style={styles.splashFlex}>
-        <StatusBar style="dark" />
+      <LinearGradient
+        colors={[theme.gradientTop, theme.gradientBottom]}
+        style={styles.splashFlex}
+      >
+        <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
         <SafeAreaView style={styles.splashContainer}>
-          <View style={styles.splashLogo}>
+          <View style={[styles.splashLogo, { borderColor: theme.border }]}>
             <Ionicons name="heart" size={36} color={colors.white} />
           </View>
-          <Text style={styles.splashTitle}>PreCare</Text>
+          <Text style={[styles.splashTitle, fontStyle(24, { min: 22, max: 28 }), { color: theme.tealText }]}>
+            PreCare
+          </Text>
           <ActivityIndicator color={colors.primary} style={styles.splashSpinner} />
-          <Text style={styles.splashText}>Đang xác thực phiên đăng nhập...</Text>
+          <Text style={[styles.splashText, fontStyle(15, { min: 14 }), { color: theme.muted }]}>
+            {isEn ? 'Authenticating session...' : 'Đang xác thực phiên đăng nhập...'}
+          </Text>
         </SafeAreaView>
       </LinearGradient>
     );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName={launchState.routeName}>
-        <Stack.Screen name="DeletionRequest" component={DeletionRequestScreen} options={{ headerShown: false }} />
-        <Stack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          options={{ headerShown: false }}
-        />
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <Stack.Navigator
+        initialRouteName={launchState.routeName}
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: theme.background },
+        }}
+      >
+        <Stack.Screen name="DeletionRequest" component={DeletionRequestScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
 
         <Stack.Screen
           name="Login"
           component={LoginScreen}
           initialParams={launchState.loginParams}
-          options={{ title: 'Đăng nhập' }}
         />
 
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ title: 'Đăng ký' }}
-        />
+        <Stack.Screen name="Register" component={RegisterScreen} />
 
-        <Stack.Screen
-          name="Main"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Main" component={MainTabs} />
 
         <Stack.Screen
           name="PregnancySetup"
           component={PregnancySetupScreen}
-          options={{ headerShown: false, gestureEnabled: false }}
+          options={{ gestureEnabled: false }}
         />
 
-        <Stack.Screen
-          name="Appointments"
-          component={AppointmentsScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Appointments" component={AppointmentsScreen} />
 
-        <Stack.Screen
-          name="ForgotPassword"
-          component={ForgotPasswordScreen}
-          options={{ title: 'Quên mật khẩu' }}
-        />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 
-        <Stack.Screen
-          name="ForgotOtpVerification"
-          component={OtpVerificationScreen}
-          options={{ title: 'Xác thực mã OTP' }}
-        />
+        <Stack.Screen name="ForgotOtpVerification" component={OtpVerificationScreen} />
 
-        <Stack.Screen
-          name="ResetPassword"
-          component={ResetPasswordScreen}
-          options={{ title: 'Đặt lại mật khẩu' }}
-        />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
 
-        <Stack.Screen
-          name="RegisterDetails"
-          component={RegisterDetailsScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="RegisterDetails" component={RegisterDetailsScreen} />
 
-        <Stack.Screen
-          name="RegisterOtpVerification"
-          component={RegisterOtpVerificationScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="RegisterOtpVerification" component={RegisterOtpVerificationScreen} />
 
-
-        <Stack.Screen
-          name="HistoryResults"
-          component={HistoryResultsScreen}
-          options={{ headerShown: false }}
-        />
-
-
+        <Stack.Screen name="HistoryResults" component={HistoryResultsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

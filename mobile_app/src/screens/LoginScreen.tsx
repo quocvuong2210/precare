@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import {
   loadRememberedLoginState,
   login,
@@ -31,6 +34,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation, route }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,7 +89,11 @@ export default function LoginScreen({ navigation, route }: Props) {
         }
       } catch {
         if (isMounted) {
-          setError('Không thể tải thông tin đăng nhập đã lưu.');
+          setError(
+            isEn
+              ? 'Unable to load saved login credentials.'
+              : 'Không thể tải thông tin đăng nhập đã lưu.',
+          );
         }
       } finally {
         if (isMounted) {
@@ -98,7 +107,7 @@ export default function LoginScreen({ navigation, route }: Props) {
     return () => {
       isMounted = false;
     };
-  }, [navigation, route.params?.sessionMessage, route.params?.skipAutoLogin]);
+  }, [isEn, navigation, route.params?.sessionMessage, route.params?.skipAutoLogin]);
 
   const isBusy = loading || autoAuthenticating;
 
@@ -109,7 +118,7 @@ export default function LoginScreen({ navigation, route }: Props) {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError('Vui lòng nhập email và mật khẩu.');
+      setError(isEn ? 'Please enter email and password.' : 'Vui lòng nhập email và mật khẩu.');
       return;
     }
 
@@ -120,7 +129,7 @@ export default function LoginScreen({ navigation, route }: Props) {
       const data = await login(trimmedEmail, password);
 
       if (!data.access_token) {
-        throw new Error('API không trả về access_token.');
+        throw new Error(isEn ? 'Server did not return an access token.' : 'API không trả về access_token.');
       }
       console.log('Đăng nhập thành công!');
 
@@ -137,11 +146,13 @@ export default function LoginScreen({ navigation, route }: Props) {
       );
       if (credentialStorageFailed) {
         Alert.alert(
-          'Không thể cập nhật thông tin đã lưu',
-          'Bạn đã đăng nhập thành công, nhưng thông tin ghi nhớ chưa được cập nhật.',
+          isEn ? 'Unable to update saved credentials' : 'Không thể cập nhật thông tin đã lưu',
+          isEn
+            ? 'Signed in successfully, but Remember Me details could not be saved.'
+            : 'Bạn đã đăng nhập thành công, nhưng thông tin ghi nhớ chưa được cập nhật.',
           [
             {
-              text: 'Tiếp tục',
+              text: isEn ? 'Continue' : 'Tiếp tục',
               onPress: () => navigation.replace(destination),
             },
           ],
@@ -155,7 +166,7 @@ export default function LoginScreen({ navigation, route }: Props) {
       const message =
         err instanceof Error
           ? err.message
-          : 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+          : (isEn ? 'Unable to connect to server. Please try again.' : 'Không thể kết nối máy chủ. Vui lòng thử lại.');
 
       setError(message);
     } finally {
@@ -164,16 +175,24 @@ export default function LoginScreen({ navigation, route }: Props) {
   };
 
   return (
-    <LinearGradient
-      colors={['#F4F9FC', '#EAF8FA']}
-      style={styles.flex}
-    >
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Sign in' : 'Đăng nhập'}
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+      />
 
-      <SafeAreaView style={styles.flex}>
-        <View style={styles.content}>
+      <LinearGradient
+        colors={[theme.gradientTop, theme.gradientBottom]}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.brand}>
-            <View style={styles.logo}>
+            <View style={[styles.logo, { borderColor: theme.border }]}>
               <Ionicons
                 name="heart"
                 size={36}
@@ -181,14 +200,14 @@ export default function LoginScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <Text style={styles.appName}>PreCare</Text>
+            <Text style={[styles.appName, fontStyle(25, { lineHeight: 30, min: 23, max: 29 }), { color: theme.tealText }]}>PreCare</Text>
 
-            <Text style={styles.tagline}>
-              THEO DÕI THAI KỲ CỦA BẠN
+            <Text style={[styles.tagline, fontStyle(12, { lineHeight: 17, min: 11, max: 14 }), { color: theme.muted }]}>
+              {isEn ? 'TRACK YOUR PREGNANCY JOURNEY' : 'THEO DÕI THAI KỲ CỦA BẠN'}
             </Text>
           </View>
 
-          <View style={styles.photoShadow}>
+          <View style={[styles.photoShadow, { backgroundColor: theme.surface }]}>
             <Image
               source={require('../assets/image-login.png')}
               style={styles.photo}
@@ -196,13 +215,15 @@ export default function LoginScreen({ navigation, route }: Props) {
             />
           </View>
 
-          <Text style={styles.label}>Email của thai phụ</Text>
+          <Text style={[styles.label, fontStyle(14.5, { min: 13.5, max: 17 }), { color: theme.textSecondary }]}>
+            {isEn ? 'Patient email' : 'Email của thai phụ'}
+          </Text>
 
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <TextInput
-              style={styles.input}
-              placeholder="Nhập email"
-              placeholderTextColor="#94A3B8"
+              style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+              placeholder={isEn ? 'Enter email' : 'Nhập email'}
+              placeholderTextColor={theme.muted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -212,13 +233,15 @@ export default function LoginScreen({ navigation, route }: Props) {
             />
           </View>
 
-          <Text style={styles.labelPassword}>Mật khẩu</Text>
+          <Text style={[styles.labelPassword, fontStyle(14.5, { min: 13.5, max: 17 }), { color: theme.textSecondary }]}>
+            {isEn ? 'Password' : 'Mật khẩu'}
+          </Text>
 
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <TextInput
-              style={styles.passwordInput}
-              placeholder="Nhập mật khẩu"
-              placeholderTextColor="#94A3B8"
+              style={[styles.passwordInput, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+              placeholder={isEn ? 'Enter password' : 'Nhập mật khẩu'}
+              placeholderTextColor={theme.muted}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -237,13 +260,13 @@ export default function LoginScreen({ navigation, route }: Props) {
               <Ionicons
                 name={showPassword ? 'eye' : 'eye-outline'}
                 size={20}
-                color="#8FA3BA"
+                color={theme.muted}
               />
             </Pressable>
           </View>
 
           {error ? (
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={[styles.errorText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.danger }]}>{error}</Text>
           ) : null}
 
           <View style={styles.optionsRow}>
@@ -267,15 +290,18 @@ export default function LoginScreen({ navigation, route }: Props) {
                 )}
               </View>
 
-              <Text style={styles.rememberText}>Ghi nhớ tôi</Text>
+              <Text style={[styles.rememberText, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.muted }]}>
+                {isEn ? 'Remember me' : 'Ghi nhớ tôi'}
+              </Text>
             </Pressable>
 
             <Pressable
               onPress={() => navigation.navigate('ForgotPassword')}
+              style={styles.linkTouch}
               disabled={isBusy}
             >
-              <Text style={styles.forgotPassword}>
-                Quên mật khẩu?
+              <Text style={[styles.forgotPassword, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {isEn ? 'Forgot password?' : 'Quên mật khẩu?'}
               </Text>
             </Pressable>
           </View>
@@ -285,10 +311,10 @@ export default function LoginScreen({ navigation, route }: Props) {
           <PrimaryButton
             title={
               autoAuthenticating
-                ? 'Đang xác thực phiên...'
+                ? (isEn ? 'Verifying session...' : 'Đang xác thực phiên...')
                 : loading
-                  ? 'Đang đăng nhập...'
-                  : 'Đăng nhập'
+                  ? (isEn ? 'Signing in...' : 'Đang đăng nhập...')
+                  : (isEn ? 'Sign in' : 'Đăng nhập')
             }
             onPress={handleLogin}
             disabled={isBusy}
@@ -302,22 +328,23 @@ export default function LoginScreen({ navigation, route }: Props) {
           )}
 
           <View style={styles.registerRow}>
-            <Text style={styles.registerText}>
-              Chưa có tài khoản?
+            <Text style={[styles.registerText, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.muted }]}>
+              {isEn ? "Don't have an account?" : 'Chưa có tài khoản?'}
             </Text>
 
             <Pressable
               onPress={() => navigation.navigate('Register')}
+              style={styles.linkTouch}
               disabled={isBusy}
             >
-              <Text style={styles.registerLink}>
-                Đăng ký ngay
+              <Text style={[styles.registerLink, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                {isEn ? 'Sign up now' : 'Đăng ký ngay'}
               </Text>
             </Pressable>
           </View>
-        </View>
-      </SafeAreaView>
-    </LinearGradient>
+        </ScrollView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
@@ -327,7 +354,7 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 28,
     paddingTop: 10,
     paddingBottom: 19,
@@ -368,8 +395,8 @@ const styles = StyleSheet.create({
 
   tagline: {
     marginTop: 3,
-    fontSize: 10.5,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     letterSpacing: 0.5,
     color: colors.textLight,
     textAlign: 'center',
@@ -399,14 +426,14 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#475569',
     marginBottom: 7,
   },
 
   labelPassword: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#475569',
     marginTop: 18,
@@ -415,7 +442,7 @@ const styles = StyleSheet.create({
 
   inputContainer: {
     width: '100%',
-    height: 41,
+    minHeight: 48,
     borderRadius: 9,
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -427,48 +454,51 @@ const styles = StyleSheet.create({
 
   input: {
     flex: 1,
-    height: '100%',
-    fontSize: 13,
+    paddingVertical: 10,
+    fontSize: 15.5,
     color: colors.navy,
   },
 
   passwordInput: {
     flex: 1,
-    height: '100%',
-    fontSize: 13,
+    paddingVertical: 10,
+    fontSize: 15.5,
     color: colors.navy,
   },
 
   eyeButton: {
-    width: 30,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   errorText: {
     color: '#DC2626',
-    fontSize: 12,
+    fontSize: 13.5,
     marginTop: 8,
   },
 
   optionsRow: {
     width: '100%',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 15,
   },
 
   rememberContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
   },
 
   checkbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: colors.primary,
     alignItems: 'center',
@@ -482,18 +512,24 @@ const styles = StyleSheet.create({
 
   rememberText: {
     marginLeft: 7,
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: '#64748B',
   },
 
+  linkTouch: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+
   forgotPassword: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '600',
     color: colors.primaryDark,
   },
 
   spacer: {
     flex: 1,
+    minHeight: 16,
   },
 
   loading: {
@@ -502,19 +538,21 @@ const styles = StyleSheet.create({
 
   registerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     marginTop: 14,
   },
 
   registerText: {
-    fontSize: 11.5,
+    fontSize: 13.5,
     color: '#64748B',
   },
 
   registerLink: {
     marginLeft: 4,
-    fontSize: 11.5,
+    fontSize: 13.5,
     fontWeight: '700',
     color: colors.primaryDark,
   },

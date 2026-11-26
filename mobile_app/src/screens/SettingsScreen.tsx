@@ -20,6 +20,7 @@ import {
 } from "react-native-safe-area-context";
 
 import appConfig from "../../app.json";
+import ScreenHeader from "../components/ScreenHeader";
 import { useAppSettings } from "../context/AppSettingsContext";
 import type { MainTabParamList } from "../navigation/MainTabs";
 import type { RootStackParamList } from "../navigation/AppNavigator";
@@ -35,9 +36,6 @@ const translations = {
     account: "Tài khoản",
     personal: "Thông tin cá nhân",
     password: "Đổi mật khẩu",
-    notifications: "Thông báo",
-    events: "Sự kiện sắp diễn ra",
-    email: "Email thông báo",
     general: "Chung",
     language: "Ngôn ngữ",
     darkMode: "Chế độ tối",
@@ -50,7 +48,6 @@ const translations = {
     delete: "Yêu cầu xóa dữ liệu",
     export: "Xuất hồ sơ y tế (PDF)",
     textSize: "Điều chỉnh cỡ chữ",
-    contacts: "Liên hệ khẩn cấp",
     logout: "Đăng xuất",
     cancel: "Hủy",
     continue: "Tiếp tục",
@@ -59,7 +56,7 @@ const translations = {
     standard: "Mặc định",
     large: "Lớn",
     sample: "Mẹ an tâm, bé khỏe mạnh",
-    textSizeNote: "Xem trước cỡ chữ trong màn hình Cài đặt.",
+    textSizeNote: "Chọn cỡ chữ phù hợp để áp dụng cho toàn bộ ứng dụng.",
     passwordNote: "Xác thực email của mẹ để đặt lại mật khẩu qua mã OTP.",
     logoutNote: "Mẹ có muốn đăng xuất khỏi PreCare?",
     loggingOut: "Đang đăng xuất…",
@@ -73,15 +70,12 @@ const translations = {
       "Điều khoản sử dụng chính thức chưa được cập nhật trong phiên bản này. Nội dung sẽ được hiển thị tại đây khi có sẵn.",
     privacyNote:
       "Chính sách bảo mật chính thức chưa được cập nhật trong phiên bản này. Mẹ có thể xem và chỉnh sửa thông tin cá nhân trong mục Hồ sơ.",
-    helpProfile: "Cập nhật thông tin cá nhân ở đâu?",
+    helpProfile: "Xem chỉ số thai kỳ & sửa tài khoản ở đâu?",
     helpProfileAnswer:
-      "Vào Hồ sơ → Chỉnh sửa hồ sơ để cập nhật thông tin của mẹ.",
+      "Vào mục Hồ sơ để xem các chỉ số thai kỳ đã lưu và bấm Chỉnh sửa tài khoản để cập nhật thông tin cá nhân.",
     helpUpload: "Làm sao thêm phiếu khám?",
     helpUploadAnswer:
       "Vào Tải lên để chọn ảnh, chụp phiếu khám hoặc thêm tệp PDF.",
-    helpContacts: "Quản lý người liên hệ như thế nào?",
-    helpContactsAnswer:
-      "Chọn Liên hệ khẩn cấp để thêm, chỉnh sửa hoặc gọi người thân đã lưu.",
     storageError: "Chưa thể lưu cài đặt trên thiết bị. Vui lòng thử lại.",
   },
   en: {
@@ -91,9 +85,6 @@ const translations = {
     account: "Account",
     personal: "Personal information",
     password: "Change password",
-    notifications: "Notifications",
-    events: "Upcoming events",
-    email: "Email notifications",
     general: "General",
     language: "Language",
     darkMode: "Dark mode",
@@ -106,7 +97,6 @@ const translations = {
     delete: "Request data deletion",
     export: "Export health records (PDF)",
     textSize: "Text size",
-    contacts: "Emergency contacts",
     logout: "Log out",
     cancel: "Cancel",
     continue: "Continue",
@@ -115,7 +105,7 @@ const translations = {
     standard: "Default",
     large: "Large",
     sample: "Care for you, care for your baby",
-    textSizeNote: "Preview text size on the Settings screen.",
+    textSizeNote: "Choose a comfortable text size for the entire app.",
     passwordNote:
       "Verify your email with a one-time code to reset your password.",
     logoutNote: "Would you like to log out of PreCare?",
@@ -130,15 +120,12 @@ const translations = {
       "The official terms of use are not available in this version. They will appear here when provided.",
     privacyNote:
       "The official privacy policy is not available in this version. You can view and edit your personal information in your profile.",
-    helpProfile: "Where can I edit my information?",
+    helpProfile: "Where can I view pregnancy metrics or edit my account?",
     helpProfileAnswer:
-      "Go to Profile → Edit profile to update your personal information.",
+      "Go to Profile to view your saved pregnancy metrics and tap Edit account to update your account details.",
     helpUpload: "How do I add a medical document?",
     helpUploadAnswer:
       "Go to Upload to choose an image, take a photo, or add a PDF.",
-    helpContacts: "How do I manage emergency contacts?",
-    helpContactsAnswer:
-      "Select Emergency contacts to add, edit, or call a saved contact.",
     storageError: "Unable to save settings on this device. Please try again.",
   },
 };
@@ -154,11 +141,15 @@ type Dialog =
   | "logout"
   | "password";
 type IconName = keyof typeof Ionicons.glyphMap;
+type FontStyleFn = (
+  baseSize: number,
+  options?: { min?: number; max?: number; lineHeight?: number },
+) => { fontSize: number; lineHeight?: number };
 type RowProps = {
   icon: IconName;
   label: string;
   theme: Theme;
-  fontScale: number;
+  fontStyle: FontStyleFn;
   value?: string;
   last?: boolean;
   danger?: boolean;
@@ -176,7 +167,7 @@ function SettingsRow({
   icon,
   label,
   theme,
-  fontScale,
+  fontStyle,
   value,
   last,
   danger,
@@ -215,9 +206,9 @@ function SettingsRow({
         <Text
           style={[
             styles.rowLabel,
+            fontStyle(15, { lineHeight: 22, min: 14 }),
             {
               color: dangerLabel ? theme.danger : theme.text,
-              fontSize: 14 * fontScale,
             },
           ]}
         >
@@ -242,7 +233,8 @@ function SettingsRow({
               <Text
                 style={[
                   styles.rowValue,
-                  { color: theme.muted, fontSize: 13 * fontScale },
+                  fontStyle(14, { min: 13 }),
+                  { color: theme.muted },
                 ]}
               >
                 {value}
@@ -274,15 +266,23 @@ function SettingsRow({
 function SettingsSection({
   title,
   theme,
+  fontStyle,
   children,
 }: {
   title: string;
   theme: Theme;
+  fontStyle: FontStyleFn;
   children: React.ReactNode;
 }) {
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.muted }]}>
+      <Text
+        style={[
+          styles.sectionTitle,
+          fontStyle(12, { lineHeight: 17, min: 11, max: 14 }),
+          { color: theme.muted },
+        ]}
+      >
         {title.toLocaleUpperCase()}
       </Text>
       <View
@@ -300,7 +300,7 @@ function SettingsSection({
 export default function SettingsScreen({
   navigation,
 }: BottomTabScreenProps<MainTabParamList, "Settings">) {
-  const { preferences, updatePreference, isLoaded, storageError } =
+  const { preferences, fontStyle, updatePreference, isLoaded, storageError } =
     useAppSettings();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -310,13 +310,7 @@ export default function SettingsScreen({
   const focused = useIsFocused();
   const theme = settingsThemes[preferences.darkMode ? "dark" : "light"];
   const copy = translations[preferences.language];
-  const fontScale =
-    preferences.textSize === "small"
-      ? 0.9
-      : preferences.textSize === "large"
-        ? 1.15
-        : 1;
-  const shared = { theme, fontScale };
+  const shared = { theme, fontStyle };
   const close = () => {
     if (!logoutInProgress.current) {
       setDialog(null);
@@ -346,7 +340,7 @@ export default function SettingsScreen({
     }
   };
   const dialogTitle = dialog ? copy[dialog] : "";
-  const textStyle = { color: theme.muted, fontSize: 14 * fontScale };
+  const textStyle = { color: theme.muted, ...fontStyle(15, { lineHeight: 22, min: 14 }) };
   const dialogNotes = {
     password: copy.passwordNote,
     logout: copy.logoutNote,
@@ -381,9 +375,9 @@ export default function SettingsScreen({
       <Text
         style={[
           styles.actionText,
+          fontStyle(15, { min: 14 }),
           {
             color: secondary ? theme.text : "#FFFFFF",
-            fontSize: 14 * fontScale,
           },
         ]}
       >
@@ -398,33 +392,18 @@ export default function SettingsScreen({
       style={[styles.container, { backgroundColor: theme.surface }]}
     >
       {focused && <StatusBar style={preferences.darkMode ? "light" : "dark"} />}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.back}
-          onPress={() => navigation.navigate("Home")}
-          style={styles.headerButton}
-        >
-          <Ionicons name="chevron-back" size={21} color={theme.text} />
-        </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[
-            styles.headerTitle,
-            { color: theme.text, fontSize: 16 * fontScale },
-          ]}
-        >
-          {copy.title}
-        </Text>
-        <View style={styles.headerButton} />
-      </View>
+      <ScreenHeader
+        title={copy.title}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home"))}
+        backLabel={copy.back}
+      />
 
       <ScrollView
         style={{ backgroundColor: theme.background }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <SettingsSection title={copy.account} theme={theme}>
+        <SettingsSection title={copy.account} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="person-outline"
@@ -442,33 +421,7 @@ export default function SettingsScreen({
           />
         </SettingsSection>
 
-        <SettingsSection title={copy.notifications} theme={theme}>
-          <SettingsRow
-            {...shared}
-            icon="notifications-outline"
-            label={copy.events}
-            toggle={{
-              value: preferences.eventNotifications,
-              onChange: (value) =>
-                updatePreference("eventNotifications", value),
-              disabled: !isLoaded,
-            }}
-          />
-          <SettingsRow
-            {...shared}
-            icon="mail-outline"
-            label={copy.email}
-            last
-            toggle={{
-              value: preferences.emailNotifications,
-              onChange: (value) =>
-                updatePreference("emailNotifications", value),
-              disabled: !isLoaded,
-            }}
-          />
-        </SettingsSection>
-
-        <SettingsSection title={copy.general} theme={theme}>
+        <SettingsSection title={copy.general} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="globe-outline"
@@ -489,7 +442,7 @@ export default function SettingsScreen({
           />
         </SettingsSection>
 
-        <SettingsSection title={copy.support} theme={theme}>
+        <SettingsSection title={copy.support} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="help-circle-outline"
@@ -517,7 +470,7 @@ export default function SettingsScreen({
           />
         </SettingsSection>
 
-        <SettingsSection title={copy.privacySupport} theme={theme}>
+        <SettingsSection title={copy.privacySupport} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="trash-outline"
@@ -535,16 +488,8 @@ export default function SettingsScreen({
             {...shared}
             icon="text-outline"
             label={copy.textSize}
-            onPress={() => setDialog("textSize")}
-          />
-          <SettingsRow
-            {...shared}
-            icon="help-circle-outline"
-            label={copy.contacts}
             last
-            onPress={() =>
-              navigation.navigate("Records", { section: "contacts" })
-            }
+            onPress={() => setDialog("textSize")}
           />
         </SettingsSection>
 
@@ -569,7 +514,11 @@ export default function SettingsScreen({
         {!!storageError && (
           <Text
             accessibilityRole="alert"
-            style={[styles.storageError, { color: theme.danger }]}
+            style={[
+              styles.storageError,
+              fontStyle(13, { lineHeight: 19, min: 12 }),
+              { color: theme.danger },
+            ]}
           >
             {copy.storageError}
           </Text>
@@ -607,7 +556,8 @@ export default function SettingsScreen({
                 accessibilityRole="header"
                 style={[
                   styles.sheetTitle,
-                  { color: theme.text, fontSize: 18 * fontScale },
+                  fontStyle(18, { max: 21 }),
+                  { color: theme.text },
                 ]}
               >
                 {dialogTitle}
@@ -658,7 +608,8 @@ export default function SettingsScreen({
                     <Text
                       style={[
                         styles.optionLabel,
-                        { color: theme.text, fontSize: 15 * fontScale },
+                        fontStyle(15.5, { min: 14.5 }),
+                        { color: theme.text },
                       ]}
                     >
                       {label}
@@ -721,10 +672,10 @@ export default function SettingsScreen({
                             color: theme.text,
                             fontSize:
                               value === "small"
-                                ? 12
+                                ? 13
                                 : value === "large"
-                                  ? 17
-                                  : 14,
+                                  ? 17.5
+                                  : 15,
                           }}
                         >
                           {label}
@@ -735,7 +686,8 @@ export default function SettingsScreen({
                   <Text
                     style={[
                       styles.sample,
-                      { color: theme.text, fontSize: 18 * fontScale },
+                      fontStyle(18, { lineHeight: 27, min: 16 }),
+                      { color: theme.text },
                     ]}
                   >
                     {copy.sample}
@@ -749,13 +701,13 @@ export default function SettingsScreen({
                   {[
                     [copy.helpProfile, copy.helpProfileAnswer],
                     [copy.helpUpload, copy.helpUploadAnswer],
-                    [copy.helpContacts, copy.helpContactsAnswer],
                   ].map(([question, answer]) => (
                     <View key={question} style={styles.faq}>
                       <Text
                         style={[
                           styles.question,
-                          { color: theme.text, fontSize: 14 * fontScale },
+                          fontStyle(15, { lineHeight: 22, min: 14 }),
+                          { color: theme.text },
                         ]}
                       >
                         {question}
@@ -785,7 +737,7 @@ export default function SettingsScreen({
                       {logoutError && (
                         <Text
                           accessibilityRole="alert"
-                          style={[styles.bodyText, { color: theme.danger }]}
+                          style={[styles.bodyText, textStyle, { color: theme.danger }]}
                         >
                           {copy.logoutError}
                         </Text>

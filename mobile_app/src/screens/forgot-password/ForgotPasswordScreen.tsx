@@ -18,9 +18,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { forgotPassword } from '../../services/api';
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import { colors } from '../../theme/colors';
 
 export default function ForgotPasswordScreen({ navigation }: any) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,12 +33,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     if (loading) return;
 
     if (!email.trim()) {
-      setError('Vui lòng nhập địa chỉ email.');
+      setError(isEn ? 'Please enter your email address.' : 'Vui lòng nhập địa chỉ email.');
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Email không hợp lệ. Vui lòng kiểm tra và nhập lại.');
+      setError(isEn ? 'Invalid email address. Please try again.' : 'Email không hợp lệ. Vui lòng kiểm tra và nhập lại.');
       return;
     }
 
@@ -52,20 +56,24 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     console.log('3. Đã gọi navigate');
   } catch (err: any) {
     console.log('FAIL:', err?.message);
-    setError(err?.message || 'Không thể gửi OTP. Vui lòng thử lại.');
+    setError(err?.message || (isEn ? 'Unable to send OTP. Please try again.' : 'Không thể gửi OTP. Vui lòng thử lại.'));
   } finally {
     setLoading(false);
   }
 };
 
   return (
-    <LinearGradient
-      colors={['#F7F9FC', '#F4F8FB']}
-      style={styles.flex}
-    >
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.surface }]} edges={['top', 'bottom']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+      <ScreenHeader
+        title={isEn ? 'Forgot password' : 'Quên mật khẩu'}
+        onBack={() => navigation.goBack()}
+      />
 
-      <SafeAreaView style={styles.flex}>
+      <LinearGradient
+        colors={[theme.gradientTop, theme.gradientBottom]}
+        style={styles.flex}
+      >
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -78,12 +86,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
             <View style={styles.progressArea}>
               <View style={styles.progressTrack}>
                 <View style={styles.progressActive} />
-                <View style={styles.progressInactive} />
-                <View style={styles.progressInactive} />
+                <View style={[styles.progressInactive, { backgroundColor: theme.border }]} />
+                <View style={[styles.progressInactive, { backgroundColor: theme.border }]} />
               </View>
 
-              <Text style={styles.progressText}>
-                Bước 1/3 · Thông tin tài khoản
+              <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
+                {isEn ? 'Step 1/3 · Account details' : 'Bước 1/3 · Thông tin tài khoản'}
               </Text>
             </View>
 
@@ -96,34 +104,38 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                 />
               </View>
 
-              <Text style={styles.appName}>PreCare</Text>
+              <Text style={[styles.appName, fontStyle(19, { min: 17.5, max: 22 }), { color: theme.tealText }]}>PreCare</Text>
             </View>
 
             <View style={styles.heading}>
-              <Text style={styles.title}>Quên mật khẩu?</Text>
+              <Text style={[styles.title, fontStyle(23, { lineHeight: 30, min: 21, max: 27 }), { color: theme.text }]}>
+                {isEn ? 'Forgot password?' : 'Quên mật khẩu?'}
+              </Text>
 
-              <Text style={styles.description}>
-                Đừng lo, PreCare sẽ giúp bạn lấy lại quyền truy cập.
-                Nhập email hoặc số điện thoại đã đăng ký nhé.
+              <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.muted }]}>
+                {isEn
+                  ? "Don't worry, PreCare will help you restore access. Enter your registered email address."
+                  : 'Đừng lo, PreCare sẽ giúp bạn lấy lại quyền truy cập. Nhập email hoặc số điện thoại đã đăng ký nhé.'}
               </Text>
             </View>
 
             <View style={styles.form}>
-              <Text style={styles.label}>
-                Email hoặc số điện thoại
+              <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Registered email' : 'Email hoặc số điện thoại'}
                 <Text style={styles.required}> *</Text>
               </Text>
 
               <View
                 style={[
                   styles.inputContainer,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
                   error ? styles.inputError : null,
                 ]}
               >
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
                   placeholder="nguyen.lan@gmail.com"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={theme.muted}
                   value={email}
                   onChangeText={(value) => {
                     setEmail(value);
@@ -141,7 +153,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                   <Ionicons
                     name="alert-circle-outline"
                     size={18}
-                    color="#EF4444"
+                    color={theme.danger}
                   />
                 ) : null}
               </View>
@@ -151,21 +163,22 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                   <Ionicons
                     name="alert-circle"
                     size={14}
-                    color="#EF4444"
+                    color={theme.danger}
                   />
-                  <Text style={styles.errorText}>{error}</Text>
+                  <Text style={[styles.errorText, fontStyle(13, { lineHeight: 18, min: 12 }), { color: theme.danger }]}>{error}</Text>
                 </View>
               ) : null}
 
-              <View style={styles.infoBox}>
+              <View style={[styles.infoBox, { backgroundColor: theme.tealSoft }]}>
                 <Ionicons
                   name="mail-outline"
                   size={17}
-                  color="#21877F"
+                  color={theme.tealText}
                 />
-                <Text style={styles.infoText}>
-                  Mã xác thực 6 số sẽ được gửi đến email hoặc
-                  số điện thoại mà bạn nhập.
+                <Text style={[styles.infoText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+                  {isEn
+                    ? 'A 6-digit verification code will be sent to your email.'
+                    : 'Mã xác thực 6 số sẽ được gửi đến email hoặc số điện thoại mà bạn nhập.'}
                 </Text>
               </View>
             </View>
@@ -183,8 +196,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.buttonText}>
-                    Gửi mã xác thực
+                  <Text style={[styles.buttonText, fontStyle(15.5, { min: 14.5, max: 18 })]}>
+                    {isEn ? 'Send verification code' : 'Gửi mã xác thực'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -195,15 +208,15 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                 disabled={loading}
                 activeOpacity={0.7}
               >
-                <Text style={styles.footerText}>
-                  Quay lại đăng nhập
+                <Text style={[styles.footerText, fontStyle(14, { min: 13, max: 16 }), { color: theme.tealText }]}>
+                  {isEn ? 'Back to sign in' : 'Quay lại đăng nhập'}
                 </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
@@ -237,7 +250,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     color: '#64748B',
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 9,
   },
   brand: {
@@ -270,15 +283,15 @@ const styles = StyleSheet.create({
   },
   description: {
     color: '#718096',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 22,
   },
   form: {
     width: '100%',
   },
   label: {
     color: '#263449',
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -286,7 +299,7 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
   inputContainer: {
-    height: 48,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -300,9 +313,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: '100%',
+    paddingVertical: 10,
     color: '#263449',
-    fontSize: 13,
+    fontSize: 15.5,
   },
   errorRow: {
     flexDirection: 'row',
@@ -313,8 +326,8 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     color: '#EF4444',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 18,
   },
   infoBox: {
     flexDirection: 'row',
@@ -329,15 +342,16 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     color: '#39847E',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
   bottomArea: {
     marginTop: 'auto',
     paddingTop: 28,
   },
   button: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     backgroundColor: '#438F87',
     borderRadius: 7,
     alignItems: 'center',
@@ -348,18 +362,19 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15.5,
     fontWeight: '700',
   },
   footer: {
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 13,
+    paddingTop: 10,
     paddingBottom: 2,
   },
   footerText: {
     color: '#168C80',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
   },
 });
