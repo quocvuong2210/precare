@@ -154,33 +154,60 @@ function InfoRow({
   );
 }
 
-function OutlineButton({ title, icon, onPress }: {
-  title: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void;
+function OutlineButton({
+  title,
+  icon,
+  onPress,
+  disabled = false,
+}: {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  disabled?: boolean;
 }) {
+  const { theme, fontStyle } = useAppSettings();
   return (
-    <Pressable accessibilityRole="button" onPress={onPress}
-      style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-      <Ionicons name={icon} size={17} color={colors.primary} />
-      <Text style={styles.buttonText}>{title}</Text>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.outlineButton,
+        { backgroundColor: theme.surface, borderColor: theme.tealBorder },
+        (pressed || disabled) && styles.pressed,
+      ]}
+    >
+      <Ionicons name={icon} size={17} color={theme.tealText} />
+      <Text style={[styles.buttonText, fontStyle(14.5, { min: 13.5 }), { color: theme.tealText }]} numberOfLines={1}>
+        {title}
+      </Text>
     </Pressable>
   );
 }
 
 export default function RecordsScreen({ navigation, route }: BottomTabScreenProps<MainTabParamList, 'Records'>) {
-  const [profile, setProfile] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
-  const [draft, setDraft] = useState<Profile>(() => createEmptyProfile(currentUserProfile));
-  const [editor, setEditor] = useState<Editor>(null);
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+
+  const [account, setAccount] = useState<UserAccountInfo | null>(() => currentUserProfile);
+  const [accountDraft, setAccountDraft] = useState<AccountFields>(() =>
+    emptyAccountFields(currentUserProfile),
+  );
+  const [pregnancy, setPregnancy] = useState<PregnancyFields>(() => emptyPregnancyFields());
+  const [accountEditorOpen, setAccountEditorOpen] = useState(false);
+
+  const [loadingData, setLoadingData] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [contactsVisible, setContactsVisible] = useState(false);
 
-  const mainContact = contacts.find((contact) => contact.primary) || contacts[0];
+  const [trimesterNum, setTrimesterNum] = useState<number | null>(null);
+  const [trimesterVi, setTrimesterVi] = useState('');
+  const [gaWeeks, setGaWeeks] = useState<number | null>(null);
+  const [gaDays, setGaDays] = useState<number>(0);
+  const [doctorName, setDoctorName] = useState('');
+  const [rawStatus, setRawStatus] = useState('');
 
-  const [trimester, setTrimester] = useState('Chưa cập nhật');
-  const [gestationalAge, setGestationalAge] = useState('--');
-  const [dueDate, setDueDate] = useState('Chưa cập nhật');
-
-  // Hàm mở trang riêng HistoryResultsScreen trên RootStack
   const goToHistoryScreen = useCallback(() => {
     const rootNav = navigation.getParent() as any;
     if (rootNav) {
@@ -190,13 +217,70 @@ export default function RecordsScreen({ navigation, route }: BottomTabScreenProp
     }
   }, [navigation]);
 
-  const persistAccountData = async (
-    nextProfile: Profile,
-    nextTrimester: string,
-    nextGestationalAge: string,
-    nextDueDate: string,
-    nextContacts: EmergencyContact[],
-  ) => {
+  const applyDbRecordToState = useCallback(
+    async (dbRecord: any, resolvedAccount: UserAccountInfo | null) => {
+      const storageKey = getStorageKey(resolvedAccount?.email, resolvedAccount?.id);
+
+      if (!dbRecord || typeof dbRecord !== 'object') {
+        setPregnancy(emptyPregnancyFields());
+        setTrimesterNum(null);
+        setTrimesterVi('');
+        setGaWeeks(null);
+        setGaDays(0);
+        setDoctorName('');
+        setRawStatus('');
+        await AsyncStorage.removeItem(storageKey).catch(() => {});
+        return;
+      }
+
+      const nextFields = mapDbRecordToFields(dbRecord);
+      const ga = dbRecord.current_gestational_age;
+      const nextWeeks = ga?.weeks !== undefined && ga?.weeks !== null ? Number(ga.weeks) : null;
+      const nextDays = ga?.remaining_days ?? 0;
+      const nextTrimesterNum =
+        ga?.trimester ??
+        (nextWeeks !== null
+          ? nextWeeks < 14
+            ? 1
+            : nextWeeks < 28
+              ? 2
+              : 3
+          : null);
+      const nextTrimesterVi =
+        ga?.trimester_name || (nextTrimesterNum ? `Tam cá nguyệt ${nextTrimesterNum}` : '');
+      const nextDoctorName = String(
+        dbRecord.primary_doctor?.full_name || dbRecord.primary_doctor_name || '',
+      ).trim();
+
+      setPregnancy(nextFields);
+      setGaWeeks(nextWeeks);
+      setGaDays(nextDays);
+      setTrimesterNum(nextTrimesterNum);
+      setTrimesterVi(nextTrimesterVi);
+      setDoctorName(nextDoctorName);
+      setRawStatus(dbRecord.status || '');
+
+      const cachePayload: CachedAccountSummary = {
+        profile: {
+          lmp: parseStrictDmyToIso(nextFields.lmp) || '',
+          q1_ultrasound_date: parseStrictDmyToIso(nextFields.q1_ultrasound_date) || '',
+          q1_gestational_weeks: nextFields.q1_gestational_weeks,
+          q1_gestational_days: nextFields.q1_gestational_days,
+          crl_mm: nextFields.crl_mm,
+          override_edd: parseStrictDmyToIso(nextFields.edd) || '',
+        },
+        trimester: nextTrimesterVi,
+        gestationalAge: nextWeeks !== null ? `${nextWeeks} tuần ${nextDays} ngày` : '--',
+        dueDate: nextFields.edd || 'Chưa cập nhật',
+      };
+      await AsyncStorage.setItem(storageKey, JSON.stringify(cachePayload)).catch(() => {});
+    },
+    [],
+  );
+
+  const loadFromDatabase = useCallback(async (): Promise<UserAccountInfo | null> => {
+    setLoadingData(true);
+    setLoadError('');
     try {
       const account = currentUserProfile || (await restoreSession());
       const storageKey = getStorageKey(account?.email || nextProfile.email, account?.id);
