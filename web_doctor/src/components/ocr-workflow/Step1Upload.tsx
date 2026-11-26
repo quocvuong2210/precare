@@ -61,9 +61,6 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
           gestationalAge: item.gestationalAgeDisplay || 'Đang theo dõi',
         }));
         setPatientOptions(apiOptions);
-        if (onSelectPatient && !isValidUuid(selectedPatientId)) {
-          onSelectPatient(apiOptions[0].id, apiOptions[0].name);
-        }
       })
       .catch(() => {
         // Fallback giữ nguyên PATIENT_OPTIONS khi chưa bật backend
@@ -273,16 +270,21 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
             <div className="min-w-[240px]">
               <select
                 aria-label="Chọn thai phụ gắn hồ sơ"
-                value={selectedPatientId || patientOptions[0]?.id || 'prof-001'}
+                value={selectedPatientId || ''}
                 onChange={(e) => {
                   const selId = e.target.value;
                   const found = patientOptions.find((item) => item.id === selId);
-                  if (onSelectPatient && found) {
-                    onSelectPatient(found.id, found.name);
+                  if (onSelectPatient) {
+                    onSelectPatient(selId, found?.name || '');
                   }
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-[#275248] cursor-pointer"
+                className={`w-full px-3 py-2 rounded-xl border bg-slate-50 text-xs font-bold outline-none focus:border-[#275248] cursor-pointer ${
+                  !selectedPatientId
+                    ? 'border-amber-300 text-slate-500'
+                    : 'border-slate-200 text-slate-800'
+                }`}
               >
+                <option value="">-- Chọn thai phụ cần tiếp nhận phiếu --</option>
                 {patientOptions.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.gestationalAge})
@@ -528,7 +530,11 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
       {/* Bottom Action Footer */}
       <div className="pt-4 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-slate-500">
-          {files.length === 0 ? (
+          {!selectedPatientId ? (
+            <span className="text-amber-700 font-medium">
+              Vui lòng chọn thai phụ gắn hồ sơ trước khi trích xuất.
+            </span>
+          ) : files.length === 0 ? (
             <span>Chọn ít nhất một tệp để bắt đầu trích xuất.</span>
           ) : isUploadingAny ? (
             <span>Đang hoàn tất tải lên tệp...</span>
@@ -542,7 +548,7 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
         <button
           type="button"
           onClick={onStartOcr}
-          disabled={!allCompleted || files.length === 0}
+          disabled={!selectedPatientId || !allCompleted || files.length === 0}
           className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#275248] hover:bg-[#1f423a] disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all cursor-pointer"
         >
           <span>Bắt đầu trích xuất (OCR)</span>

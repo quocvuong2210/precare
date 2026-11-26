@@ -588,8 +588,8 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-1 border-b border-slate-100">
           {/* Tiêu đề bên trái */}
           <div className="flex items-center gap-2 text-slate-800">
-            <div className="w-6 h-6 rounded-full border-2 border-[#9F1239] flex items-center justify-center text-[#9F1239]">
-              <div className="w-1.5 h-1.5 bg-[#9F1239] rounded-full"></div>
+            <div className="w-6 h-6 rounded-full border-2 border-[#275248] flex items-center justify-center text-[#275248]">
+              <div className="w-1.5 h-1.5 bg-[#275248] rounded-full"></div>
             </div>
             <h3 className="text-base font-bold text-slate-800">
               Tuổi thai &amp; Tiến trình Thai kỳ
@@ -636,17 +636,17 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
         {/* 2 Thẻ chỉ số lớn cân đối (50% - 50%) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Thẻ 1: Tuổi thai xác định */}
-          <div className="bg-[#FFF5F7]/70 border border-[#FFE4E8] rounded-2xl p-5 flex flex-col justify-between">
+          <div className="bg-[#F0FDF4]/70 border border-emerald-200/80 rounded-2xl p-5 flex flex-col justify-between">
             <div>
               <div className="text-xs font-bold text-slate-600">Tuổi thai xác định</div>
-              <div className="text-4xl font-black text-[#9F1239] tracking-tight mt-2">
+              <div className="text-4xl font-black text-[#275248] tracking-tight mt-2">
                 {currentGaFormatted}
               </div>
               <div className="text-xs text-slate-500 mt-1 font-medium">
                 {currentGaDays != null ? `Tương đương: ${currentGaDays} ngày liên tục` : 'Chưa có dữ liệu tuổi thai'}
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-[#FFE4E8] flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+            <div className="mt-4 pt-3 border-t border-emerald-200/70 flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>
                 {currentGaDays != null ? 'Tốc độ phát triển chuẩn FTS' : 'Đang chờ cập nhật dữ liệu khám'}
@@ -683,7 +683,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
             <span className="font-bold text-slate-800 text-sm">
               Lược đồ Tiến trình Thai kỳ (3 Giai đoạn)
             </span>
-            <span className="font-extrabold text-[#9F1239] text-sm">
+            <span className="font-extrabold text-[#275248] text-sm">
               {currentGaDays != null ? `${progressPercent}% Thai kỳ` : 'Chưa có dữ liệu'}
             </span>
           </div>
@@ -696,10 +696,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                 className="absolute -top-1 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-10"
                 style={{ left: `${Math.min(96, Math.max(4, progressPercent))}%` }}
               >
-                <div className="px-2.5 py-1 bg-[#9F1239] text-white text-[11px] font-bold rounded-lg shadow-sm whitespace-nowrap">
+                <div className="px-2.5 py-1 bg-[#275248] text-white text-[11px] font-bold rounded-lg shadow-sm whitespace-nowrap">
                   {targetDate === getTodayISO() ? 'Hôm nay' : 'Mốc khám'}: {currentGaFormatted}
                 </div>
-                <div className="w-2 h-1 bg-[#9F1239] [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
+                <div className="w-2 h-1 bg-[#275248] [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
               </div>
             )}
 
@@ -709,7 +709,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
               <div className="rounded-l-full h-full bg-slate-200 overflow-hidden relative">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    q1IsActive ? 'bg-[#9F1239]' : 'bg-[#2D6A5D]'
+                    q1IsActive ? 'bg-[#0D9488]' : 'bg-[#2D6A5D]'
                   }`}
                   style={{ width: `${q1FillWidth}%` }}
                 ></div>
@@ -719,7 +719,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
               <div className="h-full bg-slate-200 overflow-hidden relative">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    q2IsActive ? 'bg-[#9F1239]' : 'bg-[#2D6A5D]'
+                    q2IsActive ? 'bg-[#0D9488]' : 'bg-[#2D6A5D]'
                   }`}
                   style={{ width: `${q2FillWidth}%` }}
                 ></div>
@@ -729,7 +729,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
               <div className="rounded-r-full h-full bg-slate-200 overflow-hidden relative">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    q3IsActive ? 'bg-[#9F1239]' : 'bg-[#2D6A5D]'
+                    q3IsActive ? 'bg-[#0D9488]' : 'bg-[#2D6A5D]'
                   }`}
                   style={{ width: `${q3FillWidth}%` }}
                 ></div>

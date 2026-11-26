@@ -19,6 +19,7 @@ import {
   Stethoscope,
   Activity,
   Layers,
+  FileUp,
 } from 'lucide-react';
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupDetailModal } from '../components/CheckupDetailModal';
@@ -134,13 +135,11 @@ const INITIAL_WORKLIST: ParaclinicalWorklistItem[] = [
 
 interface TestResultsProps {
   initialPatientId?: string | null;
-  newUploadSignal?: number;
   onNavigateToProfile?: (patientId: string) => void;
 }
 
 export const TestResults: React.FC<TestResultsProps> = ({
   initialPatientId,
-  newUploadSignal = 0,
   onNavigateToProfile,
 }) => {
   const [worklist, setWorklist] = useState<ParaclinicalWorklistItem[]>([]);
@@ -248,7 +247,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
   // Modal & Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardTargetPatientId, setWizardTargetPatientId] = useState<string>(
-    initialPatientId || 'prof-001'
+    initialPatientId || ''
   );
   const [reviewingItem, setReviewingItem] = useState<ParaclinicalWorklistItem | null>(null);
   const [selectedVisitDetail, setSelectedVisitDetail] = useState<CheckupTimelineRecord | null>(null);
@@ -310,16 +309,10 @@ export const TestResults: React.FC<TestResultsProps> = ({
 
   // Action: Open new upload
   const handleOpenNewUpload = (patientId?: string) => {
-    setWizardTargetPatientId(patientId || initialPatientId || 'prof-001');
+    setWizardTargetPatientId(patientId || initialPatientId || '');
     setReviewingItem(null);
     setIsWizardOpen(true);
   };
-
-  useEffect(() => {
-    if (newUploadSignal > 0) {
-      handleOpenNewUpload();
-    }
-  }, [newUploadSignal]);
 
   // Action: Open review for a pending document
   const handleReviewPending = (item: ParaclinicalWorklistItem) => {
@@ -426,6 +419,21 @@ export const TestResults: React.FC<TestResultsProps> = ({
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Page Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-slate-500">
+          Quản lý hàng đợi phiếu cận lâm sàng chờ trích xuất OCR và đối chiếu kết quả.
+        </div>
+        <button
+          type="button"
+          onClick={() => handleOpenNewUpload()}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <FileUp className="w-4 h-4" />
+          <span>Tải phiếu mới</span>
+        </button>
+      </div>
 
       {/* 4 KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
