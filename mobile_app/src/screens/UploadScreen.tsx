@@ -1208,61 +1208,61 @@ const nowLabel = (lang: AppLang = 'vi') => {
 export function decodeFileName(name?: string, lang: AppLang = 'vi'): string {
   if (!name) return UPLOAD_COPY[lang].defaultFileName;
   try {
-        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
-        fileDetail = detailRes?.data || detailRes;
-      }
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
 
-      const analyzedItem: UploadItem = {
-        ...newItem,
-        fileId,
-        taskId,
-        checkupId,
-        profileId: validPid,
-        presignedUrl: fileDetail?.presigned_view_url,
-        status: 'pending',
-        analysis:
-          parseBackendIngestResult(fileDetail || resData, name, profileWeek) ||
-          buildDefaultExtractedAnalysis(name, profileWeek),
-      };
+function isImageItem(item: UploadItem): boolean {
+  const lowerName = item.name.toLowerCase();
+  const lowerMime = (item.mimeType || '').toLowerCase();
+  return (
+    lowerMime.startsWith('image/') ||
+    lowerName.endsWith('.jpg') ||
+    lowerName.endsWith('.jpeg') ||
+    lowerName.endsWith('.png') ||
+    lowerName.endsWith('.webp')
+  );
+}
 
-      updateItemsAndPersist((prev) =>
-        prev.map((it) => (it.id === newItemId ? analyzedItem : it))
-      );
-      openVerificationModal(analyzedItem, false);
-    } catch (err: any) {
-      updateItemsAndPersist((prev) =>
-        prev.map((item) =>
-          item.id === newItemId
-            ? {
-                ...item,
-                status: 'failed',
-                canRetry: true,
-                errorMessage: err?.message || 'Không thể tải tài liệu lên máy chủ.',
-              }
-            : item
-        )
-      );
-      Alert.alert('Lỗi tải lên', err?.message || 'Không thể tải tài liệu lên máy chủ.');
-    }
-  };
+export default function UploadScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isDark = preferences.darkMode;
+  const lang = preferences.language;
+  const copy = UPLOAD_COPY[lang];
+  const statusStyle = getStatusStyle(lang, isDark);
+  const severityTheme = getSeverityTheme(theme, isDark, lang);
 
-  /* =========================================================================
-     API 2 & 4: POST /api/v1/ingest/upload-batch & GET /batches/{batch_id}/status
-     ========================================================================= */
-  const pickAndUploadBatch = async () => {
-    try {
-      isPickingFileRef.current = true;
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png'],
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
+  const langRef = useRef<AppLang>(lang);
+  langRef.current = lang;
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
 
-      if (result.canceled || !result.assets || result.assets.length === 0) return;
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [loadingStorage, setLoadingStorage] = useState(true);
+  const [savingToDb, setSavingToDb] = useState(false);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string>('');
+  const [profileWeek, setProfileWeek] = useState<number>(24);
+  const [batchProgressText, setBatchProgressText] = useState<string | null>(null);
 
-      const batchNow = Date.now();
-      const resolveMime = (fName: string, rawMime?: string | null) => {
-        if (rawMime && rawMime !== 'application/octet-stream') return rawMime;
+  const [verifyModalItem, setVerifyModalItem] = useState<UploadItem | null>(null);
+  const [isModalEditing, setIsModalEditing] = useState<boolean>(false);
+  const [draftWeek, setDraftWeek] = useState<string>('24');
+  const [draftMetrics, setDraftMetrics] = useState<Record<string, string>>({});
+  const [zoomSlipImage, setZoomSlipImage] = useState(false);
+
+  const isPickingFileRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
         const lower = (fName || '').toLowerCase();
         if (lower.endsWith('.pdf')) return 'application/pdf';
         if (lower.endsWith('.png')) return 'image/png';
