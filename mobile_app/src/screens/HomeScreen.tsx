@@ -107,9 +107,14 @@ export default function HomeScreen() {
 
       async function loadPregnancySummary() {
         try {
-          const account = currentUserProfile || (await restoreSession());
+          const restored = currentUserProfile || (await restoreSession());
+          const account = (await fetchCurrentUserFromDB(currentAccessToken)) || restored;
+          if (isActive && account?.full_name) {
+            setDisplayName(account.full_name);
+          }
+          let dbProfile: any = null;
           try {
-            const dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
+            dbProfile = await fetchPregnancyProfileFromDB(currentAccessToken);
             const doctor = dbProfile?.primary_doctor || dbProfile?.doctor || null;
             const doctorName =
               doctor?.full_name ||
@@ -122,20 +127,47 @@ export default function HomeScreen() {
             console.log('Không tải được bác sĩ phụ trách:', doctorError);
             if (isActive) setAssignedDoctorName('');
           }
+
+          if (dbProfile && typeof dbProfile === 'object') {
+            const ga = dbProfile.current_gestational_age;
+            const dbWeeks = ga?.weeks;
+            const dbDays = ga?.remaining_days ?? 0;
+            const tNum = ga?.trimester ?? inferTrimesterNumber(dbWeeks, ga?.trimester_name);
+            const dbTrimesterVi =
+              ga?.trimester_name ||
+              (tNum ? `Tam cá nguyệt ${tNum}` : '');
+            const dbDueDate = formatIsoToDmy(dbProfile.edd);
+
+            if (Number.isFinite(dbWeeks)) {
+              if (isActive) {
+                setPregnancy({
+                  weeks: dbWeeks,
+                  days: dbDays,
+                  trimesterNumber: tNum,
+                  trimesterVi: dbTrimesterVi,
+                  dueDate: dbDueDate,
+                });
+              }
+              return;
+            }
+          }
+
           const identifier = (account?.email || account?.id || 'guest').trim().toLowerCase();
           const raw = await AsyncStorage.getItem(`precare_account_record_${identifier}`);
           if (!raw) {
             if (isActive) {
-              setPregnancy({ weeks: null, days: 0, trimester: '', dueDate: '' });
+              setPregnancy({ weeks: null, days: 0, trimesterNumber: null, trimesterVi: '', dueDate: '' });
             }
             return;
           }
 
           const saved: SavedAccountRecord = JSON.parse(raw);
           const profile = saved.profile || {};
+          const parsedSaved = parseSavedWeeks(saved.gestationalAge);
           let next: PregnancySummary = {
-            ...parseSavedWeeks(saved.gestationalAge),
-            trimester: saved.trimester || '',
+            ...parsedSaved,
+            trimesterNumber: inferTrimesterNumber(parsedSaved.weeks, saved.trimester),
+            trimesterVi: saved.trimester || '',
             dueDate: saved.dueDate || '',
           };
 
@@ -172,15 +204,17 @@ export default function HomeScreen() {
               const data = response?.data || response;
               const weeks = data?.gestational_age?.weeks;
               const days = data?.gestational_age?.remaining_days ?? 0;
-              const trimester = data?.gestational_age?.trimester_name ||
-                (weeks < 14 ? 'Tam cá nguyệt 1' : weeks < 28 ? 'Tam cá nguyệt 2' : 'Tam cá nguyệt 3');
-              const dueDate = formatDueDate(data?.calculated_edd || data?.override_edd);
+              const tNum = data?.gestational_age?.trimester ?? inferTrimesterNumber(weeks, data?.gestational_age?.trimester_name);
+              const trimesterVi = data?.gestational_age?.trimester_name ||
+                (tNum ? `Tam cá nguyệt ${tNum}` : '');
+              const dueDate = formatIsoToDmy(data?.calculated_edd || data?.override_edd);
 
               if (Number.isFinite(weeks)) {
                 next = {
                   weeks,
                   days,
-                  trimester,
+                  trimesterNumber: tNum,
+                  trimesterVi,
                   dueDate: dueDate || next.dueDate,
                 };
               }
@@ -203,57 +237,76 @@ export default function HomeScreen() {
   );
 
   const ageText = pregnancy.weeks === null
-    ? 'Chưa cập nhật tuổi thai'
-    : `${pregnancy.weeks} tuần ${pregnancy.days} ngày`;
+    ? (isEn ? 'Gestational age not set' : 'Chưa cập nhật tuổi thai')
+    : isEn
+      ? `${pregnancy.weeks} weeks ${pregnancy.days} days`
+      : `${pregnancy.weeks} tuần ${pregnancy.days} ngày`;
+  const trimesterLabel = formatTrimesterLabel(
+    pregnancy.trimesterNumber,
+    pregnancy.trimesterVi,
+    preferences.language,
+  );
   const weekProgress = pregnancy.weeks === null
     ? 0
     : Math.min(100, Math.max(0, (pregnancy.weeks / 40) * 100));
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* ================= HEADER ================= */}
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <StatusBar style={preferences.darkMode ? 'light' : 'dark'} />
+
+      <View style={[styles.header, { backgroundColor: theme.background }]}>
         <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={25} color={colors.primaryDark} />
+          <View style={[styles.avatar, { backgroundColor: theme.tealSoft }]}>
+            <Ionicons name="person" size={25} color={theme.tealText} />
           </View>
 
-          <View>
-            <Text style={styles.hello}>Xin chào,</Text> 
-            <Text style={styles.userName}>{displayName}</Text>
+          <View style={styles.userTextCol}>
+            <Text style={[styles.hello, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+              {isEn ? 'Hello,' : 'Xin chào,'}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.userName, fontStyle(16, { min: 15, max: 19 }), { color: theme.text }]}
+            >
+              {displayName}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.weekBadge}>
-          <Text style={styles.weekText}>
-            {pregnancy.weeks === null ? 'Chưa cập nhật' : `Tuần thứ ${pregnancy.weeks}`}
+        <View style={[styles.weekBadge, { backgroundColor: theme.tealSoft }]}>
+          <Text style={[styles.weekText, fontStyle(12.5, { min: 11.5, max: 15 }), { color: theme.tealText }]}>
+            {pregnancy.weeks === null
+              ? (isEn ? 'Not set' : 'Chưa cập nhật')
+              : (isEn ? `Week ${pregnancy.weeks}` : `Tuần thứ ${pregnancy.weeks}`)}
           </Text>
         </View>
       </View>
 
-      {/* ================= CONTENT ================= */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* ================= PREGNANCY CARD ================= */}
         <View style={styles.pregnancyCard}>
           <View style={styles.pregnancyInfo}>
-            <Text style={styles.smallWhite}>TUỔI THAI HIỆN TẠI</Text>
-            <Text style={styles.weekNumber}>{ageText}</Text>
-            <Text style={styles.dueDate}>
-              {pregnancy.dueDate ? `Dự sinh: ${pregnancy.dueDate}` : 'Ngày dự sinh: Chưa cập nhật'}
-              {pregnancy.trimester ? ` • ${pregnancy.trimester}` : ''}
+            <Text style={[styles.smallWhite, fontStyle(11.5, { min: 11, max: 13.5 })]}>
+              {isEn ? 'CURRENT GESTATIONAL AGE' : 'TUỔI THAI HIỆN TẠI'}
+            </Text>
+            <Text style={[styles.weekNumber, fontStyle(24, { min: 22, max: 28 })]}>{ageText}</Text>
+            <Text style={[styles.dueDate, fontStyle(12.5, { lineHeight: 18, min: 11.5 })]}>
+              {pregnancy.dueDate
+                ? `${isEn ? 'Due date' : 'Dự sinh'}: ${pregnancy.dueDate}`
+                : isEn ? 'Due date: Not set' : 'Ngày dự sinh: Chưa cập nhật'}
+              {trimesterLabel ? ` • ${trimesterLabel}` : ''}
             </Text>
 
             <View style={styles.progressBackground}>
               <View style={[styles.progress, { width: `${weekProgress}%` as `${number}%` }]} />
             </View>
 
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, fontStyle(12, { lineHeight: 17, min: 11 })]}>
               {pregnancy.weeks === null
-                ? 'Cập nhật thông tin trong Hồ sơ để theo dõi thai kỳ'
-                : `Tuần ${pregnancy.weeks} trên hành trình 40 tuần`}
+                ? (isEn ? 'Complete your pregnancy setup to track progress' : 'Cập nhật thông tin trong Hồ sơ để theo dõi thai kỳ')
+                : (isEn ? `Week ${pregnancy.weeks} of 40-week journey` : `Tuần ${pregnancy.weeks} trên hành trình 40 tuần`)}
             </Text>
           </View>
 
@@ -269,37 +322,43 @@ export default function HomeScreen() {
         <View
           style={[
             styles.doctorCard,
-            !assignedDoctorName && styles.doctorCardUnassigned,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+            !assignedDoctorName && { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
           ]}
         >
           <View
             style={[
               styles.doctorIcon,
-              !assignedDoctorName && styles.doctorIconUnassigned,
+              !assignedDoctorName && { backgroundColor: theme.iconBackground, shadowOpacity: 0, elevation: 0 },
             ]}
           >
             <Ionicons
               name={assignedDoctorName ? 'medical' : 'person-add-outline'}
               size={21}
-              color={assignedDoctorName ? '#FFFFFF' : colors.textMuted}
+              color={assignedDoctorName ? '#FFFFFF' : theme.muted}
             />
           </View>
           <View style={styles.doctorInfo}>
-            <Text style={styles.doctorLabel}>BÁC SĨ PHỤ TRÁCH</Text>
+            <Text style={[styles.doctorLabel, fontStyle(11, { lineHeight: 15, min: 10.5, max: 13 }), { color: theme.muted }]}>
+              {isEn ? 'PRIMARY DOCTOR' : 'BÁC SĨ PHỤ TRÁCH'}
+            </Text>
             <View style={styles.doctorNameRow}>
               <Text
                 numberOfLines={1}
                 style={[
                   styles.assignedDoctorName,
-                  !assignedDoctorName && styles.assignedDoctorNameUnassigned,
+                  fontStyle(15.5, { lineHeight: 22, min: 14 }),
+                  { color: assignedDoctorName ? theme.text : theme.muted },
                 ]}
               >
-                {assignedDoctorName || 'Chưa phân công'}
+                {assignedDoctorName || (isEn ? 'Unassigned' : 'Chưa phân công')}
               </Text>
               {assignedDoctorName ? (
-                <View style={styles.assignedBadge}>
+                <View style={[styles.assignedBadge, { backgroundColor: theme.tealSoft }]}>
                   <View style={styles.assignedDot} />
-                  <Text style={styles.assignedBadgeText}>Đang phụ trách</Text>
+                  <Text style={[styles.assignedBadgeText, fontStyle(11.5, { min: 10.5, max: 13.5 }), { color: theme.tealText }]}>
+                    {isEn ? 'Assigned' : 'Đang phụ trách'}
+                  </Text>
                 </View>
               ) : null}
             </View>
