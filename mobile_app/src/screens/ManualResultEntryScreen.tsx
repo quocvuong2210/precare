@@ -603,61 +603,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
               <Text style={[styles.calendarMonth, fontStyle(15, { min: 14, max: 17.5 }), { color: theme.text }]}>
                 {isEn
                   ? `${MONTH_NAMES_EN[calendarMonth.month]} ${calendarMonth.year}`
-  subtitle: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textMuted,
-    marginTop: 5,
-    marginBottom: 14,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    padding: 14,
-  },
-  stageBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#CCFBF1',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  stageBannerText: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0F766E',
-    flex: 1,
-  },
-  metricsList: {
-    gap: 12,
-  },
-  metricFrame: {
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1.5,
-  },
-  metricFrameNormal: {
-    backgroundColor: colors.white,
-    borderColor: BORDER_COLOR,
-  },
-  metricFrameWarning: {
-    backgroundColor: '#FEFCE8',
-    borderColor: '#FACC15',
-  },
-  metricFrameDanger: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#EF4444',
-  },
-  metricHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+                  : `Tháng ${calendarMonth.month + 1}, ${calendarMonth.year}`}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEn ? 'Next month' : 'Tháng sau'}
+                onPress={() => changeMonth(1)}
+                style={styles.monthButton}
+              >
+                <Ionicons name="chevron-forward" size={20} color={theme.text} />
+              </Pressable>
+            </View>
+            <View style={styles.calendarGrid}>
+              {weekdays.map((day) => (
+                <Text key={day} style={[styles.calendarWeekday, fontStyle(12.5, { min: 11.5, max: 14 }), { color: theme.muted }]}>
+                  {day}
+                </Text>
+              ))}
+              {calendarCells.map((day, index) => {
+                const selected =
+                  day !== null &&
+                  parsedDate?.getUTCFullYear() === calendarMonth.year &&
+                  parsedDate.getUTCMonth() === calendarMonth.month &&
+                  parsedDate.getUTCDate() === day;
+                return (
+                  <View key={index} style={styles.calendarCell}>
+                    {day !== null && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${day}/${calendarMonth.month + 1}/${calendarMonth.year}`}
+                        accessibilityState={{ selected }}
+                        onPress={() => {
+                          setExamDate(
+                            `${pad(day)}/${pad(calendarMonth.month + 1)}/${calendarMonth.year}`
+                          );
+                          setCalendarOpen(false);
+                        }}
+                        style={[styles.calendarDay, selected && styles.calendarDaySelected]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            fontStyle(14, { min: 12.5, max: 16 }),
+                            { color: theme.text },
+                            selected && styles.calendarDayTextSelected,
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
     marginBottom: 4,
   },
   fieldLabel: { fontSize: 12.5, fontWeight: '800', color: colors.navy, flex: 1 },
