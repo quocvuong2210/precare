@@ -1868,61 +1868,61 @@ export default function UploadScreen({ navigation }: Props) {
 
   /* =========================================================================
      API 8: POST /api/v1/ingest/files/{file_id}/retry
-                        <View style={styles.slipOverlayHint}>
-                          <Ionicons name="expand-outline" size={14} color={colors.white} />
-                          <Text style={styles.slipOverlayHintText}>
-                            Nhấn để xem cảnh báo, đối chiếu & xác nhận dữ liệu
-                          </Text>
-                        </View>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={styles.pdfSlipPreviewBox}
-                        onPress={() => openVerificationModal(item)}
-                      >
-                        <Ionicons name="document-text" size={24} color="#EF4444" />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.pdfSlipName} numberOfLines={1}>
-                            {decodeFileName(item.name)}
-                          </Text>
-                          <Text style={styles.pdfSlipSub}>
-                            Nhấn vào để xem chỉ số đã phân tích, đối chiếu & xác nhận lưu Database
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color="#64748B" />
-                      </Pressable>
-                    )}
+     ========================================================================= */
+  const retryFailedFile = async (item: UploadItem) => {
+    const fId = item.fileId || item.id;
 
-                    {item.analysis.savedToProfile && (
-                      <View style={styles.savedRow}>
-                        <View style={styles.savedTag}>
-                          <Ionicons name="checkmark-done" size={14} color={colors.primaryDark} />
-                          <Text style={styles.savedTagText}>
-                            Đã đối chiếu & lưu vào Database ({item.analysis.gestationalAge})
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
-            );
-          })
-        )}
+    updateItemsAndPersist((prev) =>
+      prev.map((it) =>
+        it.id === item.id ? { ...it, status: 'processing', errorMessage: undefined } : it
+      )
+    );
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigation.navigate('ManualResultEntry')}
-          style={({ pressed }) => [styles.manualButton, pressed && { opacity: 0.85 }]}
-        >
-          <Ionicons name="create-outline" size={18} color={colors.primary} />
-          <Text style={styles.manualButtonText}>Nhập kết quả thủ công</Text>
-        </Pressable>
-      </ScrollView>
+    try {
+      const retryRes: any = await retryIngestFile(fId);
+      const retryData: any = retryRes?.data;
+      const newTaskId =
+        typeof retryData === 'string' && retryData.length > 0
+          ? retryData
+          : retryData?.task_id || item.taskId;
 
-      {/* MODAL MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU */}
-      <Modal
-        visible={verifyModalItem !== null}
+      if (newTaskId) {
+        await pollCeleryTaskStatus(item.id, String(newTaskId), fId, item.name);
+        return;
+      }
+
+      const analysis = buildDefaultExtractedAnalysis(item.name, profileWeek, langRef.current);
+      updateItemsAndPersist((prev) =>
+        prev.map((it) =>
+          it.id === item.id
+            ? {
+                ...it,
+                status: 'pending',
+                errorMessage: undefined,
+                analysis,
+              }
+            : it
+        )
+      );
+    } catch (e: any) {
+      updateItemsAndPersist((prev) =>
+        prev.map((it) =>
+          it.id === item.id
+            ? {
+                ...it,
+                status: 'failed',
+                errorMessage: e?.message || copyRef.current.retryFailMsg,
+              }
+            : it
+        )
+      );
+    }
+  };
+
+  /* =========================================================================
+     API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
+     ========================================================================= */
+  const deleteItem = (item: UploadItem) => {
         animationType="slide"
         onRequestClose={() => {
           setVerifyModalItem(null);
