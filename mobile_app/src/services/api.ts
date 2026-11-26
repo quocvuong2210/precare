@@ -1043,61 +1043,61 @@ export async function savePregnancyProfileToDB(
 // Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
 export async function fetchPregnancyProfileFromDB(
   token?: string,
-    role: string;
-  };
-  created_at: string;
-  [key: string]: any;
-}
-
-export function isUuid(val?: string | null): boolean {
-  if (!val || typeof val !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
-}
-
-async function getIngestAuthHeaders(isJson = false): Promise<Record<string, string>> {
-  if (!currentAccessToken) {
-    await restoreSession();
-  }
-  const authToken =
-    currentAccessToken || (await getStoredAccessToken()) || '';
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  };
-  if (isJson) {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
-  }
-  return headers;
-}
-
-/**
- * Tải file lên Backend bằng XMLHttpRequest thuần túy của React Native.
- * Bỏ qua hoàn toàn WinterCG expo/fetch để không bị lỗi "Unsupported FormDataPart implementation"
- * trên Expo SDK 52+ / 57 và React Native New Architecture.
- */
-export async function uploadMultipartViaXHR<T = any>(
-  url: string,
-  formData: FormData,
-  token?: string
-): Promise<T> {
+  options: { throwOnError?: boolean } = {}
+): Promise<any> {
   const authToken =
     token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) {
+    if (options.throwOnError) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+    return null;
+  }
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-    xhr.setRequestHeader('Accept', 'application/json');
-    if (authToken) {
-      xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${authToken}`,
+  };
+
+  try {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/pregnancy-profiles/active`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (res.ok) {
+      const json: any = await safeParseJson(res);
+      const profileObj = extractProfileObject(json);
+      const profileOwnerId = profileObj?.patient?.id ? String(profileObj.patient.id).trim() : '';
+      const activeUserId = currentUserProfile?.id ? String(currentUserProfile.id).trim() : '';
+      if (profileOwnerId && activeUserId && profileOwnerId !== activeUserId) {
+        await AsyncStorage.removeItem('precare_pregnancy_profile_id').catch(() => {});
+        return null;
+      }
+      const pid = extractProfileUuid(json);
+      if (pid) {
+        await AsyncStorage.setItem('precare_pregnancy_profile_id', pid);
+        return { ...profileObj, id: pid };
+      }
+      return profileObj;
     }
-    // LƯU Ý: Không set thủ công Content-Type để React Native tự động gán boundary chính xác
 
-    xhr.onload = () => {
-      try {
-        const text = xhr.responseText;
-        let json: any = {};
+    if (res.status === 404) {
+      await AsyncStorage.removeItem('precare_pregnancy_profile_id').catch(() => {});
+      return null;
+    }
+    if (options.throwOnError) {
+      await handleResponse(res);
+    }
+    if (res.status >= 500) {
+      return null;
+    }
+  } catch (e) {
+    console.log('Tải DB pregnancy_profiles:', e);
+    if (options.throwOnError) {
+      throw e;
+    }
+  }
+  return null;
+}
         try {
           json = JSON.parse(text);
         } catch {
