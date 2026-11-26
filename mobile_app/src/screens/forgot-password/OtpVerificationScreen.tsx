@@ -383,61 +383,61 @@ export default function OtpVerificationScreen({ navigation, route }: any) {
                   styles.resendText,
                   fontStyle(13.5, { min: 12.5 }),
                   { color: theme.tealText },
-    backgroundColor: '#438F87',
-    borderRadius: 3,
-  },
-  progressActive: {
-    flex: 1,
-    backgroundColor: '#258D83',
-    borderRadius: 3,
-  },
-  progressInactive: {
-    flex: 1,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-  },
-  progressText: {
-    color: '#64748B',
-    fontSize: 10,
-    marginTop: 9,
-  },
-  title: {
-    color: '#172033',
-    fontSize: 23,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  description: {
-    color: '#718096',
-    fontSize: 12,
-    lineHeight: 19,
-  },
-  emailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 22,
-    marginBottom: 24,
-  },
-  emailText: {
-    color: '#263449',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  changeEmail: {
-    color: '#258D83',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  label: {
-    color: '#263449',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  otpRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+                  !canResend && { color: theme.muted },
+                ]}
+              >
+                {resending
+                  ? copy.sendingCode
+                  : resendCount >= MAX_RESEND_COUNT
+                    ? copy.noMoreResends
+                    : resendCooldown > 0
+                      ? copy.resendIn(formatTime(resendCooldown))
+                      : copy.resendPrompt}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.statusText, fontStyle(13, { min: 12 }), { color: theme.tealText }]}>
+              {resendCount > 0
+                ? copy.resentCount(resendCount, MAX_RESEND_COUNT)
+                : copy.sentNotice}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.infoBox,
+              {
+                backgroundColor: theme.tealSoft,
+                borderColor: theme.tealBorder,
+                borderWidth: isDark ? 1 : 0,
+              },
+            ]}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={16}
+              color={theme.tealText}
+            />
+            <Text style={[styles.infoText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+              {copy.securityTip}
+            </Text>
+          </View>
+
+          <View style={styles.bottomArea}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                (otp.length !== 6 || isOtpExpired) && {
+                  backgroundColor: isDark ? theme.surfaceAlt : '#E2E7EF',
+                },
+              ]}
+              onPress={handleContinue}
+              disabled={otp.length !== 6 || isOtpExpired}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[
+                  styles.buttonText,
     gap: 7,
   },
   otpInput: {
