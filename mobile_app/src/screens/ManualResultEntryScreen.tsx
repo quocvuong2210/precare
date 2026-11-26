@@ -493,61 +493,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                       value={values[meta.key]}
                       onChangeText={(val) => setValues((prev) => ({ ...prev, [meta.key]: val }))}
                       keyboardType="decimal-pad"
-          />
-          <View style={styles.calendarCard} accessibilityViewIsModal>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Chọn ngày khám</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Đóng lịch"
-                onPress={() => setCalendarOpen(false)}
-                hitSlop={10}
-              >
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </Pressable>
-            </View>
-            <View style={styles.calendarMonthRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Tháng trước"
-                onPress={() => changeMonth(-1)}
-                style={styles.monthButton}
-              >
-                <Ionicons name="chevron-back" size={20} color={colors.navy} />
-              </Pressable>
-              <Text style={styles.calendarMonth}>
-                Tháng {calendarMonth.month + 1}, {calendarMonth.year}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Tháng sau"
-                onPress={() => changeMonth(1)}
-                style={styles.monthButton}
-              >
-                <Ionicons name="chevron-forward" size={20} color={colors.navy} />
-              </Pressable>
-            </View>
-            <View style={styles.calendarGrid}>
-              {WEEKDAYS.map((day) => (
-                <Text key={day} style={styles.calendarWeekday}>
-                  {day}
-                </Text>
-              ))}
-              {calendarCells.map((day, index) => {
-                const selected =
-                  day !== null &&
-                  parsedDate?.getUTCFullYear() === calendarMonth.year &&
-                  parsedDate.getUTCMonth() === calendarMonth.month &&
-                  parsedDate.getUTCDate() === day;
-                return (
-                  <View key={index} style={styles.calendarCell}>
-                    {day !== null && (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`${day}/${calendarMonth.month + 1}/${calendarMonth.year}`}
-                        accessibilityState={{ selected }}
-                        onPress={() => {
-                          setExamDate(
+                      maxLength={8}
+                      selectTextOnFocus
+                      placeholder={isEn ? 'Enter value...' : 'Nhập chỉ số...'}
+                      placeholderTextColor={theme.muted}
+                      style={[
+                        styles.inputText,
+                        fontStyle(16, { min: 15 }),
+                        { color: theme.text },
+                        status === 'danger' && { color: theme.danger, fontWeight: '800' },
+                        status === 'warning' && styles.warningInputText,
+                      ]}
+                    />
+                    <Text style={[styles.unit, fontStyle(13, { min: 12 }), { color: theme.muted }]}>{meta.unit}</Text>
+                    {status !== 'normal' && (
+                      <Ionicons
+                        name={status === 'danger' ? 'alert-circle' : 'warning'}
+                        size={18}
+                        color={status === 'danger' ? theme.danger : WARNING_COLOR}
+                        style={styles.inputWarningIcon}
+                      />
+                    )}
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.evalNoteText,
+                      fontStyle(13, { lineHeight: 19, min: 12 }),
+                      { color: status === 'danger' ? theme.danger : status === 'warning' ? WARNING_COLOR : theme.tealText },
+                    ]}
+                  >
+                    {message}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        <View style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+          <Text style={[styles.saveHint, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.textSecondary }]}>
+            {canSave
+              ? (isEn
+                  ? `Compared against ${stageLabelDisplay}. Tap Save to view on Upload screen.`
+                  : `Đã đối chiếu theo ${stageLabelDisplay}. Bấm Lưu để chuyển sang trang Tải lên.`)
+              : (isEn
+                  ? 'Please enter valid gestational age (12–41 weeks) and values greater than 0.'
+                  : 'Vui lòng nhập đầy đủ tuổi thai (12–41 tuần) và các chỉ số lớn hơn 0.')}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSave }}
+            disabled={!canSave}
+            onPress={handleSaveManualResult}
+            style={({ pressed }) => [
+              styles.saveButton,
                             `${pad(day)}/${pad(calendarMonth.month + 1)}/${calendarMonth.year}`
                           );
                           setCalendarOpen(false);
