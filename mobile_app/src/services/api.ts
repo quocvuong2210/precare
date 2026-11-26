@@ -933,61 +933,61 @@ function extractProfileUuid(raw: any): string | null {
   return null;
 }
 
-      return createdId;
+// Lưu hoặc cập nhật hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
+export async function savePregnancyProfileToDB(
+  payload: PregnancyCalculateRequest & {
+    edd?: string;
+    calculation_method?: PregnancyCalculationMethod;
+    profileId?: string | null;
+    recalculate_edd?: boolean;
+  },
+  token?: string
+): Promise<any> {
+  const authToken =
+    token || currentAccessToken || (await getStoredAccessToken()) || '';
+  if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Authorization: `Bearer ${authToken}`,
+  };
+
+  const baseFields: Record<string, any> = {};
+  if (payload.lmp) baseFields.lmp = payload.lmp;
+  if (payload.q1_ultrasound_date) baseFields.q1_ultrasound_date = payload.q1_ultrasound_date;
+  if (payload.q1_gestational_weeks !== undefined) {
+    baseFields.q1_gestational_weeks = payload.q1_gestational_weeks;
+  }
+  if (payload.q1_gestational_days !== undefined) {
+    baseFields.q1_gestational_days = payload.q1_gestational_days;
+  }
+  if (payload.crl_mm !== undefined) baseFields.crl_mm = payload.crl_mm;
+
+  const resolvedOverrideEdd =
+    payload.override_edd ||
+    (!payload.lmp && !payload.q1_ultrasound_date && payload.edd ? payload.edd : undefined);
+
+  const buildUpdatePayload = (): Record<string, any> => {
+    const updateBody: Record<string, any> = { ...baseFields };
+    if (payload.override_edd) {
+      updateBody.override_edd = payload.override_edd;
+      updateBody.recalculate_edd = false;
+    } else if (payload.edd && payload.recalculate_edd === false) {
+      updateBody.override_edd = payload.edd;
+      updateBody.recalculate_edd = false;
+    } else if (payload.edd && Object.keys(baseFields).length > 0) {
+      // Đồng bộ chính xác EDD đã tính theo các chỉ số vừa chỉnh sửa trên form
+      updateBody.override_edd = payload.edd;
+      updateBody.recalculate_edd = false;
+    } else {
+      updateBody.recalculate_edd = true;
     }
-  } catch (e) {
-    console.log('Tự động khởi tạo pregnancy_profile:', e);
-  }
+    return updateBody;
+  };
 
-  const retryExisting = await fetchPregnancyProfileFromDB();
-  if (retryExisting?.id) {
-    return String(retryExisting.id);
-  }
-
-  throw new Error(
-    'Chưa tìm thấy Hồ sơ thai kỳ (pregnancy_profile_id). Vui lòng vào mục Hồ sơ bấm Lưu thông tin thai kỳ trước khi tải phiếu khám.'
-  );
-}
-
-// =========================================================================
-// --- PARACLINICAL INGEST & QUEUE (8 ĐẦU API TẢI LÊN & HÀNG ĐỢI CELERY) ---
-// =========================================================================
-
-export interface IngestFilePayload {
-  uri: string;
-  name: string;
-  type: string;
-}
-
-export interface IngestUploadResponseData {
-  file_id: string;
-  task_id: string;
-  pregnancy_profile_id: string;
-  checkup_id?: string | null;
-  file_name: string;
-  file_type: string;
-  file_size_bytes: number;
-  document_type: string;
-  status: string;
-  tracking_url: string;
-  created_at: string;
-  [key: string]: any;
-}
-
-export interface IngestBatchItem {
-  file_id: string;
-  task_id: string;
-  file_name: string;
-  file_size_bytes: number;
-  status: string;
-  [key: string]: any;
-}
-
-export interface IngestBatchResponseData {
-  batch_id: string;
-  total_files: number;
-  successful_enqueued: number;
-  failed_enqueued: number;
+  let res: Response;
+  const knownProfileId = payload.profileId && isUuid(payload.profileId) ? payload.profileId : null;
   tracking_url: string;
   items: IngestBatchItem[];
   [key: string]: any;
