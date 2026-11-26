@@ -933,61 +933,61 @@ export function summarizeAnalysisState(
     const details = warningList
       .map((m) => `${localizeMetricLabel(m.key, m.label, lang)}: ${m.value} ${m.unit}`)
       .join('; ');
-    }
-  }, []);
+    return {
+      overallSeverity: 'warning' as SeverityLevel,
+      doctorConclusion: isEn
+        ? `[${stageLabel}] — YELLOW: ${warningList.length} metric(s) require closer follow-up [${details}]. Rest well, maintain balanced nutrition, and discuss at your next visit.`
+        : `[Đối chiếu chuẩn ${stageLabel}] — MỨC VÀNG: Có ${warningList.length} chỉ số cần lưu ý theo dõi thêm [${details}]. Mẹ hãy giữ tinh thần thoải mái, ăn uống nghỉ ngơi điều độ và trao đổi với bác sĩ trong kỳ khám tới nhé.`,
+    };
+  }
 
-  useFocusEffect(
-    useCallback(() => {
-      loadAccountData();
-    }, [loadAccountData])
-  );
+  return {
+    overallSeverity: 'normal' as SeverityLevel,
+    doctorConclusion: isEn
+      ? `[${stageLabel}] — GREEN: All ${metrics.length} metrics from "${fileName}" are within normal ranges for your gestational week.`
+      : `[Đối chiếu chuẩn ${stageLabel}] — MỨC XANH: Tất cả ${metrics.length} chỉ số từ "${fileName}" đều nằm trong khoảng chuẩn của tuần thai hiện tại. Mẹ và bé đang phát triển rất tốt!`,
+  };
+}
 
-  /* =========================================================================
-     MỞ MÀN HÌNH ĐỐI CHIẾU & XÁC NHẬN DỮ LIỆU (MẶC ĐỊNH CHỈ XEM)
-     ========================================================================= */
-  const openVerificationModal = useCallback(
-    async (item: UploadItem, shouldFetchDetail = true) => {
-      if (!item.analysis) return;
-      const fId = item.fileId || item.id;
+function buildMetricByWeek(
+  key: string,
+  label: string,
+  value: string,
+  unit: string,
+  defaultRefRange: string,
+  gestationalWeek: number,
+  lang: AppLang = 'vi'
+): MedicalMetric {
+  const evalResult = evaluateMetricByWeek(key, value, gestationalWeek, lang);
+  return {
+    key,
+    label: localizeMetricLabel(key, label, lang),
+    value,
+    unit,
+    refRange: evalResult.refRange || defaultRefRange,
+    severity: evalResult.severity,
+    clinicalNote: evalResult.clinicalNote,
+  };
+}
 
-      let updatedItem = item;
-      if (shouldFetchDetail && item.fileId) {
-        try {
-          const res: any = await getIngestFileDetail(fId);
-          const detail: any = res?.data || res;
-          const viewUrl = detail?.presigned_view_url || detail?.presigned_url;
-          if (viewUrl) {
-            updatedItem = {
-              ...item,
-              presignedUrl: String(viewUrl),
-              checkupId: detail?.checkup_id ?? item.checkupId,
-            };
-            updateItemsAndPersist((prev) =>
-              prev.map((it) => (it.id === item.id ? updatedItem : it))
-            );
-          }
-        } catch {
-          // Giữ nguyên URI cục bộ
-        }
-      }
+function detectWeekFromFileName(fileName: string): number {
+  const lower = fileName.toLowerCase();
+  const match =
+    lower.match(/(?:tuan|tuần|week|w)[_\-\s]*(\d{2})/i) ||
+    lower.match(/(\d{2})[_\-\s]*(?:tuan|tuần|week|w)/i);
+  if (match) {
+    const w = parseInt(match[1], 10);
+    if (w >= 12 && w <= 41) return w;
+  }
+  return 24;
+}
 
-      const initialDraft: Record<string, string> = {};
-      updatedItem.analysis!.metrics.forEach((m) => {
-        initialDraft[m.key] = m.value;
-      });
-      setDraftWeek(String(updatedItem.analysis!.gestationalWeek || profileWeek || 24));
-      setDraftMetrics(initialDraft);
-      setIsModalEditing(false);
-      setZoomSlipImage(false);
-      setVerifyModalItem(updatedItem);
-    },
-    [profileWeek, updateItemsAndPersist]
-  );
-
-  /* =========================================================================
-     API 3 & 5: POLLING TASK CELERY & LẤY PRESIGNED_VIEW_URL
-     ========================================================================= */
-  const pollCeleryTaskStatus = useCallback(
+function parseBackendIngestResult(
+  payload: any,
+  fileName: string,
+  fallbackWeek: number = 24,
+  lang: AppLang = 'vi'
+): MedicalAnalysisResult | null {
     async (
       localItemId: string,
       taskId: string,
