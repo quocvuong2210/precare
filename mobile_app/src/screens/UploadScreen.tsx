@@ -2638,61 +2638,61 @@ export default function UploadScreen({ navigation }: Props) {
                       <Text style={[styles.modalPdfTitle, fontStyle(14, { min: 13 })]} numberOfLines={1}>
                         {decodeFileName(verifyModalItem.name, lang)}
                       </Text>
-  weekStepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  weekStepBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  weekInput: {
-    width: 42,
-    height: 28,
-    textAlign: 'center',
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.navy,
-    backgroundColor: colors.white,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#0F766E',
-    paddingVertical: 0,
-  },
-  modalSectionLabel: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#334155',
-    marginBottom: 10,
-  },
-  verifyMetricCard: {
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    marginBottom: 10,
-  },
-  metricTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
-  },
-  verifyMetricLabel: { fontSize: 12, fontWeight: '800', color: colors.navy, flex: 1 },
-  severityPill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  severityPillText: { fontSize: 9.5, fontWeight: '800' },
-  readOnlyValueBox: {
-    marginTop: 6,
-    marginBottom: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    backgroundColor: '#F8FAFC',
+                      <Text style={[styles.modalPdfHint, fontStyle(12.5, { lineHeight: 18, min: 11.5 })]}>
+                        {isModalEditing ? copy.modalPdfHintEdit : copy.modalPdfHintView}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              <ScrollView
+                style={[styles.flex, { backgroundColor: theme.background }]}
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* HỘP CẢNH BÁO HIỂN THỊ NGAY BÊN TRONG MÀN HÌNH ĐỐI CHIẾU */}
+                {activeModalSummary && (
+                  <View
+                    style={[
+                      styles.doctorBanner,
+                      {
+                        backgroundColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? theme.badgeGreenBg
+                            : activeModalTheme.cardBg,
+                        borderColor:
+                          activeModalSummary.overallSeverity === 'normal'
+                            ? '#10B981'
+                            : activeModalTheme.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={activeModalTheme.icon}
+                      size={18}
+                      color={
+                        activeModalSummary.overallSeverity === 'normal'
+                          ? isDark
+                            ? '#34D399'
+                            : '#059669'
+                          : activeModalTheme.valueColor
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.doctorBannerText,
+                        fontStyle(14.5, { lineHeight: 21, min: 13.5 }),
+                        {
+                          color:
+                            activeModalSummary.overallSeverity === 'normal'
+                              ? theme.badgeGreenText
+                              : activeModalTheme.valueColor,
+                        },
+                      ]}
+                    >
+                      {activeModalSummary.doctorConclusion}
+                    </Text>
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
