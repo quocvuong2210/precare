@@ -163,14 +163,39 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
               <Ionicons name="checkmark-circle" size={21} color={PRIMARY} />
               <View style={styles.verifiedContent}>
                 <Text style={[styles.verifiedLabel, fontStyle(13.5, { min: 12.5, max: 16 }), { color: theme.tealText }]}>
+                  {isEn ? 'Email verified' : 'Email đã xác minh'}
+                </Text>
+                <Text style={[styles.verifiedEmail, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>{email}</Text>
+              </View>
+            </View>
 
-              <Text style={styles.label}>Số điện thoại <Text style={styles.required}>*</Text></Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="call-outline" size={19} color="#94A3B8" />
+            <View style={styles.form}>
+              <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Full name' : 'Họ và tên'} <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Ionicons name="person-outline" size={19} color={theme.muted} />
                 <TextInput
-                  style={styles.input}
-                  placeholder="Nhập số điện thoại"
-                  placeholderTextColor="#94A3B8"
+                  style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                  placeholder={isEn ? 'Enter full name' : 'Nhập họ và tên'}
+                  placeholderTextColor={theme.muted}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  editable={!loading}
+                />
+              </View>
+
+              <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Phone number' : 'Số điện thoại'} <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Ionicons name="call-outline" size={19} color={theme.muted} />
+                <TextInput
+                  style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                  placeholder={isEn ? 'Enter phone number' : 'Nhập số điện thoại'}
+                  placeholderTextColor={theme.muted}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
                   keyboardType="phone-pad"
@@ -179,13 +204,15 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
                 />
               </View>
 
-              <Text style={styles.label}>Mật khẩu <Text style={styles.required}>*</Text></Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={19} color="#94A3B8" />
+              <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Password' : 'Mật khẩu'} <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Ionicons name="lock-closed-outline" size={19} color={theme.muted} />
                 <TextInput
-                  style={styles.input}
-                  placeholder="Ít nhất 8 ký tự"
-                  placeholderTextColor="#94A3B8"
+                  style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                  placeholder={isEn ? 'At least 8 characters' : 'Ít nhất 8 ký tự'}
+                  placeholderTextColor={theme.muted}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -196,21 +223,28 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
                 />
                 <Pressable
                   onPress={() => setShowPassword(v => !v)}
-                  hitSlop={10}
+                  style={styles.eyeButton}
+                  hitSlop={6}
                   accessibilityRole="button"
-                  accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  accessibilityLabel={
+                    showPassword
+                      ? (isEn ? 'Hide password' : 'Ẩn mật khẩu')
+                      : (isEn ? 'Show password' : 'Hiện mật khẩu')
+                  }
                 >
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#64748B" />
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.muted} />
                 </Pressable>
               </View>
 
-              <Text style={styles.label}>Xác nhận mật khẩu <Text style={styles.required}>*</Text></Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="shield-checkmark-outline" size={19} color="#94A3B8" />
+              <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.textSecondary }]}>
+                {isEn ? 'Confirm password' : 'Xác nhận mật khẩu'} <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Ionicons name="shield-checkmark-outline" size={19} color={theme.muted} />
                 <TextInput
-                  style={styles.input}
-                  placeholder="Nhập lại mật khẩu"
-                  placeholderTextColor="#94A3B8"
+                  style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                  placeholder={isEn ? 'Re-enter password' : 'Nhập lại mật khẩu'}
+                  placeholderTextColor={theme.muted}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -221,18 +255,25 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
                 />
                 <Pressable
                   onPress={() => setShowConfirmPassword(v => !v)}
-                  hitSlop={10}
+                  style={styles.eyeButton}
+                  hitSlop={6}
                   accessibilityRole="button"
-                  accessibilityLabel={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+                  accessibilityLabel={
+                    showConfirmPassword
+                      ? (isEn ? 'Hide confirm password' : 'Ẩn mật khẩu xác nhận')
+                      : (isEn ? 'Show confirm password' : 'Hiện mật khẩu xác nhận')
+                  }
                 >
-                  <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#64748B" />
+                  <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={theme.muted} />
                 </Pressable>
               </View>
 
-              <View style={styles.note}>
-                <Ionicons name="information-circle-outline" size={18} color="#64748B" />
-                <Text style={styles.noteText}>
-                  Tài khoản sẽ được tạo theo vai trò đã chọn ở bước gửi OTP. Không chia sẻ mật khẩu với người khác.
+              <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
+                <Ionicons name="information-circle-outline" size={18} color={theme.muted} />
+                <Text style={[styles.noteText, fontStyle(13.5, { lineHeight: 20, min: 12.5 }), { color: theme.muted }]}>
+                  {isEn
+                    ? 'Your account will be created with the selected role. Never share your password.'
+                    : 'Tài khoản sẽ được tạo theo vai trò đã chọn ở bước gửi OTP. Không chia sẻ mật khẩu với người khác.'}
                 </Text>
               </View>
 
@@ -250,7 +291,9 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <Text style={styles.registerButtonText}>Tạo tài khoản</Text>
+                    <Text style={[styles.registerButtonText, fontStyle(15.5, { min: 14.5, max: 18 })]}>
+                      {isEn ? 'Create account' : 'Tạo tài khoản'}
+                    </Text>
                     <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
                   </>
                 )}
@@ -259,8 +302,10 @@ export default function RegisterDetailsScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.footer}>
-            <Ionicons name="shield-checkmark-outline" size={15} color="#94A3B8" />
-            <Text style={styles.footerText}>Thông tin của bạn được bảo vệ bởi PreCare</Text>
+            <Ionicons name="shield-checkmark-outline" size={15} color={theme.muted} />
+            <Text style={[styles.footerText, fontStyle(13, { min: 12 }), { color: theme.muted }]}>
+              {isEn ? 'Your data is protected by PreCare' : 'Thông tin của bạn được bảo vệ bởi PreCare'}
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -289,33 +334,34 @@ const styles = StyleSheet.create({
   pulse: { position: 'absolute' },
   appName: { marginTop: 10, fontSize: 19, fontWeight: '700', color: '#00847C' },
   title: { fontSize: 24, lineHeight: 32, fontWeight: '700', color: '#0F172A' },
-  subtitle: { marginTop: 7, fontSize: 13, lineHeight: 20, color: '#64748B' },
+  subtitle: { marginTop: 7, fontSize: 15, lineHeight: 22, color: '#64748B' },
   verifiedCard: {
     marginTop: 22, padding: 14, borderRadius: 12,
     backgroundColor: '#E7F7F2', flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   verifiedContent: { flex: 1 },
-  verifiedLabel: { fontSize: 12, color: '#0F766E', fontWeight: '600' },
-  verifiedEmail: { marginTop: 3, color: '#0F172A', fontSize: 13, fontWeight: '600' },
+  verifiedLabel: { fontSize: 13.5, color: '#0F766E', fontWeight: '600' },
+  verifiedEmail: { marginTop: 3, color: '#0F172A', fontSize: 14.5, fontWeight: '600' },
   form: { marginTop: 22 },
-  label: { fontSize: 12, color: '#334155', fontWeight: '600', marginBottom: 8, marginTop: 16 },
+  label: { fontSize: 14.5, color: '#334155', fontWeight: '600', marginBottom: 8, marginTop: 16 },
   required: { color: '#EF4444' },
   inputWrap: {
     minHeight: 49, backgroundColor: '#FFFFFF', borderWidth: 1,
     borderColor: '#DFE8F3', borderRadius: 9, flexDirection: 'row',
     alignItems: 'center', paddingHorizontal: 12, gap: 10,
   },
-  input: { flex: 1, minHeight: 46, fontSize: 13, color: '#0F172A', paddingVertical: 8 },
+  input: { flex: 1, minHeight: 46, fontSize: 15.5, color: '#0F172A', paddingVertical: 8 },
+  eyeButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   note: { flexDirection: 'row', gap: 8, padding: 13, marginTop: 24, backgroundColor: '#EDF3F8', borderRadius: 10 },
-  noteText: { flex: 1, fontSize: 12, lineHeight: 19, color: '#64748B' },
+  noteText: { flex: 1, fontSize: 13.5, lineHeight: 20, color: '#64748B' },
   registerButton: {
     minHeight: 50, marginTop: 25, borderRadius: 9,
     backgroundColor: PRIMARY, flexDirection: 'row',
-    justifyContent: 'center', alignItems: 'center', gap: 9,
+    justifyContent: 'center', alignItems: 'center', gap: 9, paddingVertical: 12,
   },
-  registerButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  registerButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15.5 },
   pressed: { opacity: 0.8 },
   disabled: { opacity: 0.65 },
   footer: { marginTop: 'auto', paddingTop: 35, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  footerText: { fontSize: 11, color: '#94A3B8' },
+  footerText: { fontSize: 13, color: '#94A3B8' },
 });
