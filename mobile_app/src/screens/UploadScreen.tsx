@@ -163,61 +163,61 @@ function getStatusStyle(
         label: 'Extraction failed',
         bg: isDark ? '#7F1D1D' : '#FEE2E2',
         color: isDark ? '#FCA5A5' : '#DC2626',
-    border: '#FACC15',
-    valueColor: '#A16207',
-    badgeBg: '#FEF08A',
-    badgeColor: '#854D0E',
-    badgeLabel: 'Mức Vàng (Cần theo dõi)',
-    icon: 'warning',
-  },
-  danger: {
-    cardBg: '#FEF2F2',
-    border: '#EF4444',
-    valueColor: '#DC2626',
-    badgeBg: '#FEE2E2',
-    badgeColor: '#991B1B',
-    badgeLabel: 'Mức Đỏ (<3rd / >97th)',
-    icon: 'alert-circle',
-  },
-};
+      },
+    };
+  }
 
-type RangePair = [number, number];
-type WeeklyFetalStandard = {
-  bpd: RangePair;
-  hc: RangePair;
-  ac: RangePair;
-  fl: RangePair;
-  efw: RangePair;
-};
+  return {
+    processing: {
+      label: 'Đang phân tích...',
+      bg: isDark ? '#422006' : '#FEF9C3',
+      color: isDark ? '#FDE047' : '#A16207',
+    },
+    pending: {
+      label: 'Chờ đối chiếu',
+      bg: isDark ? '#1E3A5F' : '#DBEAFE',
+      color: isDark ? '#93C5FD' : '#1D4ED8',
+    },
+    done: {
+      label: 'Đã lưu Database',
+      bg: isDark ? '#134E4A' : '#CCFBF1',
+      color: isDark ? '#5EEAD4' : colors.primaryDark,
+    },
+    failed: {
+      label: 'Trích xuất lỗi',
+      bg: isDark ? '#7F1D1D' : '#FEE2E2',
+      color: isDark ? '#FCA5A5' : '#DC2626',
+    },
+  };
+}
 
-const FETAL_GROWTH_BY_WEEK: Record<number, WeeklyFetalStandard> = {
-  12: { bpd: [18, 24], hc: [65, 85],   ac: [52, 68],   fl: [7, 12],  efw: [12, 20] },
-  13: { bpd: [21, 28], hc: [78, 98],   ac: [64, 82],   fl: [10, 15], efw: [20, 32] },
-  14: { bpd: [25, 32], hc: [92, 114],  ac: [76, 96],   fl: [13, 19], efw: [35, 55] },
-  15: { bpd: [29, 36], hc: [105, 128], ac: [88, 108],  fl: [16, 22], efw: [58, 88] },
-  16: { bpd: [32, 39], hc: [118, 142], ac: [98, 120],  fl: [19, 25], efw: [85, 125] },
-  17: { bpd: [35, 43], hc: [130, 156], ac: [110, 134], fl: [22, 28], efw: [120, 170] },
-  18: { bpd: [39, 46], hc: [144, 170], ac: [122, 146], fl: [25, 31], efw: [165, 230] },
-  19: { bpd: [42, 49], hc: [155, 182], ac: [133, 158], fl: [28, 34], efw: [215, 295] },
-  20: { bpd: [45, 52], hc: [166, 194], ac: [144, 170], fl: [31, 37], efw: [275, 375] },
-  21: { bpd: [48, 55], hc: [178, 206], ac: [154, 182], fl: [33, 40], efw: [340, 455] },
-  22: { bpd: [50, 58], hc: [188, 218], ac: [165, 193], fl: [36, 42], efw: [410, 550] },
-  23: { bpd: [53, 60], hc: [198, 228], ac: [174, 203], fl: [38, 45], efw: [490, 650] },
-  24: { bpd: [54, 62], hc: [206, 236], ac: [182, 208], fl: [39, 46], efw: [600, 780] },
-  25: { bpd: [58, 66], hc: [218, 248], ac: [195, 225], fl: [43, 49], efw: [680, 900] },
-  26: { bpd: [61, 69], hc: [228, 258], ac: [205, 236], fl: [45, 52], efw: [800, 1060] },
-  27: { bpd: [64, 72], hc: [238, 268], ac: [216, 248], fl: [48, 54], efw: [920, 1230] },
-  28: { bpd: [67, 75], hc: [248, 278], ac: [226, 260], fl: [50, 56], efw: [1060, 1410] },
-  29: { bpd: [70, 78], hc: [258, 288], ac: [236, 270], fl: [52, 59], efw: [1210, 1610] },
-  30: { bpd: [72, 80], hc: [266, 296], ac: [246, 282], fl: [54, 61], efw: [1380, 1820] },
-  31: { bpd: [75, 83], hc: [274, 304], ac: [256, 292], fl: [57, 63], efw: [1550, 2050] },
-  32: { bpd: [77, 85], hc: [282, 312], ac: [266, 304], fl: [59, 65], efw: [1730, 2280] },
-  33: { bpd: [80, 88], hc: [290, 320], ac: [276, 314], fl: [61, 67], efw: [1930, 2530] },
-  34: { bpd: [82, 90], hc: [296, 326], ac: [286, 324], fl: [63, 69], efw: [2130, 2790] },
-  35: { bpd: [84, 92], hc: [303, 333], ac: [295, 334], fl: [65, 71], efw: [2340, 3050] },
-  36: { bpd: [86, 94], hc: [309, 339], ac: [304, 344], fl: [66, 73], efw: [2540, 3300] },
-  37: { bpd: [88, 96], hc: [314, 344], ac: [313, 354], fl: [68, 75], efw: [2740, 3540] },
-  38: { bpd: [89, 97], hc: [319, 349], ac: [321, 362], fl: [70, 76], efw: [2920, 3760] },
+function getSeverityTheme(
+  theme: AppTheme,
+  isDark: boolean,
+  lang: AppLang
+): Record<
+  SeverityLevel,
+  {
+    cardBg: string;
+    border: string;
+    valueColor: string;
+    badgeBg: string;
+    badgeColor: string;
+    badgeLabel: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }
+> {
+  return {
+    normal: {
+      cardBg: theme.surface,
+      border: theme.border,
+      valueColor: theme.text,
+      badgeBg: theme.badgeGreenBg,
+      badgeColor: theme.badgeGreenText,
+      badgeLabel: lang === 'en' ? 'Green (10th–90th)' : 'Mức Xanh (10th–90th)',
+      icon: 'checkmark-circle',
+    },
+    warning: {
   39: { bpd: [90, 98], hc: [323, 353], ac: [329, 370], fl: [71, 78], efw: [3080, 3950] },
   40: { bpd: [91, 99], hc: [327, 357], ac: [336, 378], fl: [72, 79], efw: [3220, 4100] },
   41: { bpd: [91, 100], hc: [328, 360], ac: [340, 382], fl: [73, 80], efw: [3300, 4200] },
