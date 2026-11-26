@@ -2473,61 +2473,61 @@ export default function UploadScreen({ navigation }: Props) {
                           source={{ uri: previewSourceUri }}
                           style={[styles.slipThumbnail, { backgroundColor: theme.border }]}
                           resizeMode="cover"
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  slipOverlayHintText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  pdfSlipPreviewBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.white,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  pdfSlipName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.navy,
-  },
-  pdfSlipSub: {
-    fontSize: 10.5,
-    color: '#0F766E',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  savedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  savedTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savedTagText: { fontSize: 11.5, fontWeight: '700', color: colors.primaryDark },
-  manualButton: {
-    marginTop: 18,
-    minHeight: 42,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.white,
-    borderWidth: 1,
+                        />
+                        <View style={styles.slipOverlayHint}>
+                          <Ionicons name="expand-outline" size={14} color={colors.white} />
+                          <Text style={[styles.slipOverlayHintText, fontStyle(12, { min: 11, max: 14 })]}>
+                            {copy.overlayHint}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[
+                          styles.pdfSlipPreviewBox,
+                          {
+                            backgroundColor: theme.surface,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        onPress={() => openVerificationModal(item)}
+                      >
+                        <Ionicons name="document-text" size={24} color={theme.danger} />
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[styles.pdfSlipName, fontStyle(13.5, { min: 12.5 }), { color: theme.text }]}
+                            numberOfLines={1}
+                          >
+                            {decodeFileName(item.name, lang)}
+                          </Text>
+                          <Text style={[styles.pdfSlipSub, fontStyle(12, { lineHeight: 17, min: 11 }), { color: theme.tealText }]}>
+                            {copy.pdfSlipHint}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={theme.muted} />
+                      </Pressable>
+                    )}
+
+                    {item.analysis.savedToProfile && (
+                      <View style={[styles.savedRow, { borderTopColor: theme.divider }]}>
+                        <View style={styles.savedTag}>
+                          <Ionicons name="checkmark-done" size={14} color={theme.tealText} />
+                          <Text style={[styles.savedTagText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                            {copy.savedTagPrefix(
+                              getPregnancyStageInfo(
+                                item.analysis.gestationalWeek || 24,
+                                lang
+                              ).stageLabel
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })
     borderColor: '#E2E8F0',
     borderRadius: 10,
   },
