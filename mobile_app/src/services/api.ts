@@ -988,61 +988,61 @@ export async function savePregnancyProfileToDB(
 
   let res: Response;
   const knownProfileId = payload.profileId && isUuid(payload.profileId) ? payload.profileId : null;
-  tracking_url: string;
-  items: IngestBatchItem[];
-  [key: string]: any;
+
+  if (knownProfileId) {
+    res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${encodeURIComponent(knownProfileId)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(buildUpdatePayload()),
+    });
+  } else {
+    const createBody: Record<string, any> = { ...baseFields };
+    if (payload.calculation_method) {
+      createBody.calculation_method = payload.calculation_method;
+    } else if (payload.lmp) {
+      createBody.calculation_method = 'lmp';
+    } else if (payload.q1_ultrasound_date && payload.q1_gestational_weeks !== undefined) {
+      createBody.calculation_method = 'q1_ultrasound';
+    } else if (payload.q1_ultrasound_date && payload.crl_mm !== undefined) {
+      createBody.calculation_method = 'crl';
+    } else if (resolvedOverrideEdd) {
+      createBody.calculation_method = 'direct_edd';
+    }
+    if (resolvedOverrideEdd) {
+      createBody.override_edd = resolvedOverrideEdd;
+    }
+
+    res = await fetch(`${API_BASE_URL}/pregnancy-profiles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(createBody),
+    });
+
+    if (!res.ok && (res.status === 400 || res.status === 409)) {
+      const existingProfile = await fetchPregnancyProfileFromDB(authToken);
+      const existingId =
+        existingProfile?.id || (await AsyncStorage.getItem('precare_pregnancy_profile_id'));
+      if (existingId && isUuid(existingId)) {
+        res = await fetch(`${API_BASE_URL}/pregnancy-profiles/${encodeURIComponent(existingId)}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(buildUpdatePayload()),
+        });
+      }
+    }
+  }
+
+  const savedData = await handleResponse(res);
+  const savedId = extractProfileUuid(savedData);
+  if (savedId) {
+    await AsyncStorage.setItem('precare_pregnancy_profile_id', savedId);
+  }
+  return savedData;
 }
 
-export interface IngestTaskStatusData {
-  task_id: string;
-  file_id: string;
-  state: string;
-  status?: string;
-  progress_percentage: number;
-  current_stage: string;
-  stage_message: string;
-  estimated_seconds_remaining: number;
-  verification_url?: string;
-  error_code?: string;
-  can_retry: boolean;
-  [key: string]: any;
-}
-
-export interface IngestBatchStatusData {
-  batch_id: string;
-  total_files: number;
-  completed_files: number;
-  failed_files: number;
-  overall_progress_percentage: number;
-  is_all_finished: boolean;
-  files: {
-    file_id: string;
-    file_name: string;
-    state: string;
-    progress_percentage: number;
-    status: string;
-    verification_url?: string;
-  }[];
-  [key: string]: any;
-}
-
-export interface IngestFileDetailData {
-  id: string;
-  file_id?: string;
-  pregnancy_profile_id: string;
-  checkup_id?: string | null;
-  file_name: string;
-  file_type: string;
-  file_size_bytes: number;
-  document_type: string;
-  status: string;
-  presigned_view_url: string;
-  presigned_url?: string;
-  url?: string;
-  presigned_url_expires_in_seconds: number;
-  uploaded_by?: {
-    id: string;
-    full_name: string;
+// Lấy hồ sơ thai kỳ đang active từ Backend qua GET /pregnancy-profiles/active
+export async function fetchPregnancyProfileFromDB(
+  token?: string,
     role: string;
   };
   created_at: string;
