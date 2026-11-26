@@ -163,61 +163,61 @@ export default function RegisterOtpVerification({ navigation, route }: Props) {
       );
       setOtp("");
       setMessageType("info");
-            </View>
+      setMessage(result.message || copy.resendRequested);
+    } catch (error: unknown) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : copy.resendFailed);
+    } finally {
+      setResending(false);
+    }
+  };
 
-            <Text style={styles.title}>Xác nhận email</Text>
+  return (
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.surface }]} edges={["top", "bottom"]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <ScreenHeader
+        title={preferences.language === 'en' ? "Verify OTP" : "Xác thực mã OTP"}
+        onBack={() => navigation.goBack()}
+        backLabel={copy.backLabel}
+      />
 
-            <Text style={styles.description}>
-              Nhập mã xác nhận gồm 6 chữ số được gửi đến
-            </Text>
+      <KeyboardAvoidingView
+        style={[styles.flex, { backgroundColor: theme.background }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View>
+            <View style={styles.brand}>
+              <View style={styles.logo}>
+                <Ionicons name="heart-outline" size={31} color="#FFFFFF" />
 
-            <Text style={styles.email}>{email}</Text>
-
-            <Pressable
-              style={styles.changeEmailButton}
-              onPress={() => navigation.goBack()}
-              accessibilityRole="button"
-            >
-              <Text style={styles.changeEmailText}>Thay đổi email</Text>
-            </Pressable>
-
-            <Text style={styles.label}>Mã xác nhận</Text>
-
-            {/* A single input supports typing, pasting and autofill. */}
-            <View style={styles.otpContainer}>
-              <View
-                style={styles.otpRow}
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                {Array.from({ length: OTP_LENGTH }, (_, index) => {
-                  const active =
-                    focused && index === Math.min(otp.length, OTP_LENGTH - 1);
-
-                  return (
-                    <View
-                      key={index}
-                      style={[
-                        styles.otpBox,
-                        !!otp[index] && styles.otpBoxFilled,
-                        active && styles.otpBoxActive,
-                      ]}
-                    >
-                      <Text style={styles.otpDigit}>{otp[index] || ""}</Text>
-                    </View>
-                  );
-                })}
+                <View style={styles.pulse}>
+                  <Ionicons name="pulse" size={22} color="#FFFFFF" />
+                </View>
               </View>
 
-              <TextInput
-                ref={inputRef}
-                style={styles.otpInput}
-                value={otp}
-                onChangeText={handleChangeOtp}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                keyboardType="number-pad"
+              <Text style={[styles.appName, fontStyle(20, { min: 18, max: 23 }), { color: theme.tealText }]}>
+                PreCare
+              </Text>
+            </View>
+
+            <View style={[styles.mailIcon, { backgroundColor: theme.tealSoft }]}>
+              <Ionicons
+                name="mail-open-outline"
+                size={34}
+                color={theme.tealText}
+              />
+            </View>
+
+            <Text style={[styles.title, fontStyle(24, { lineHeight: 32, min: 22, max: 28 }), { color: theme.text }]}>
+              {copy.title}
+            </Text>
+
+            <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
                 textContentType="oneTimeCode"
                 autoComplete={
                   Platform.OS === "android" ? "sms-otp" : "one-time-code"
