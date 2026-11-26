@@ -218,61 +218,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
             <View style={styles.progressTrack}>
               <View style={styles.progressDone} />
               <View style={styles.progressDone} />
-                <Ionicons
-                  name={
-                    showConfirmPassword ? 'eye-outline' : 'eye-off-outline'
-                  }
-                  size={19}
-                  color="#64748B"
-                />
-              </TouchableOpacity>
+              <View style={styles.progressActive} />
             </View>
 
-            {passwordsMismatch ? (
-              <View style={styles.errorRow}>
+            <Text style={[styles.progressText, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
+              {copy.stepText}
+            </Text>
+          </View>
+
+          <Text style={[styles.title, fontStyle(23, { lineHeight: 30, min: 21, max: 27 }), { color: theme.text }]}>
+            {copy.title}
+          </Text>
+
+          <Text style={[styles.description, fontStyle(15, { lineHeight: 22, min: 14 }), { color: theme.textSecondary }]}>
+            {copy.description}
+          </Text>
+
+          <View style={styles.form}>
+            <Text style={[styles.label, fontStyle(14.5, { min: 13.5 }), { color: theme.text }]}>
+              {copy.newPasswordLabel}
+              <Text style={styles.required}> *</Text>
+            </Text>
+
+            <View
+              style={[
+                styles.inputContainer,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, fontStyle(15.5, { min: 14.5, max: 18 }), { color: theme.text }]}
+                placeholder={copy.newPasswordPlaceholder}
+                placeholderTextColor={theme.muted}
+                value={newPassword}
+                onChangeText={(value) => {
+                  setNewPassword(value);
+                  setSubmitted(false);
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                returnKeyType="next"
+              />
+
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={loading}
+              >
                 <Ionicons
-                  name="alert-circle-outline"
-                  size={14}
-                  color="#EF4444"
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={19}
+                  color={theme.muted}
                 />
-                <Text style={styles.errorText}>
-                  Mật khẩu xác nhận không khớp. Vui lòng nhập lại.
-                </Text>
-              </View>
-            ) : null}
-
-            <View style={styles.strengthCard}>
-              <View style={styles.strengthHeader}>
-                <Text style={styles.strengthTitle}>
-                  Độ mạnh mật khẩu
-                </Text>
-
-                <Text
-                  style={[
-                    styles.strengthLabel,
-                    strengthCount >= 3 && styles.strengthStrong,
-                    strengthCount <= 1 && newPassword.length > 0
-                      ? styles.strengthWeak
-                      : null,
-                  ]}
-                >
-                  {strengthLabel}
-                </Text>
-              </View>
-
-              <View style={styles.strengthBars}>
-                {[0, 1, 2, 3].map((index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.strengthBar,
-                      index < strengthCount && {
-                        backgroundColor:
-                          strengthCount <= 1
-                            ? '#EF4444'
-                            : strengthCount === 2
-                              ? '#F59E0B'
-                              : '#22B981',
+              </TouchableOpacity>
                       },
                     ]}
                   />
