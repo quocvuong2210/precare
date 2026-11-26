@@ -768,61 +768,61 @@ export async function fetchCurrentUserFromDB(
 }
 
 export interface UpdateUserAccountPayload {
-  if (!raw || typeof raw !== 'object') return null;
-  const d = raw.data !== undefined ? raw.data : raw;
-  if (!d) return null;
-  if (Array.isArray(d)) return d[0] || null;
-  if (Array.isArray(d.items)) return d.items[0] || null;
-  if (Array.isArray(d.profiles)) return d.profiles[0] || null;
-  if (d.profile && typeof d.profile === 'object') return d.profile;
-  if (d.pregnancy_profile && typeof d.pregnancy_profile === 'object') return d.pregnancy_profile;
-  return d;
+  full_name: string;
+  phone_number?: string | null;
+  email?: string;
 }
 
-function extractProfileUuid(raw: any): string | null {
-  const obj = extractProfileObject(raw);
-  const candidate = obj?.id || obj?.profile_id || obj?.pregnancy_profile_id;
-  if (candidate && typeof candidate === 'string' && candidate !== 'profile_demo_01') {
-    return candidate.trim();
+const ACCOUNT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ACCOUNT_PHONE_REGEX = /^[0-9+()\s-]{9,20}$/;
+
+/**
+ * Lưu thông tin tài khoản đã chỉnh sửa trên thiết bị cho phiên người dùng hiện tại
+ * (do Backend hiện chưa cung cấp API cập nhật bảng users).
+ */
+export async function updateLocalUserAccount(
+  payload: UpdateUserAccountPayload
+): Promise<UserAccountInfo> {
+  if (!currentAccessToken && !currentUserProfile) {
+    await restoreSession();
   }
-  return null;
-}
+  const baseUser = currentUserProfile;
+  if (!currentAccessToken && !baseUser) {
+    throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  }
 
-// Lưu hồ sơ thai kỳ xuống bảng public.pregnancy_profiles trong Database
-export async function savePregnancyProfileToDB(
-  payload: PregnancyCalculateRequest & {
-    edd?: string;
-    calculation_method?: PregnancyCalculationMethod;
-  },
-  token?: string
-): Promise<any> {
-  const authToken =
-    token || currentAccessToken || (await getStoredAccessToken()) || '';
-  if (!authToken) throw new Error('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.');
+  const trimmedName = payload.full_name.trim();
+  if (!trimmedName) {
+    throw new Error('Họ và tên không được để trống.');
+  }
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    Authorization: `Bearer ${authToken}`,
+  const trimmedPhone =
+    payload.phone_number !== undefined
+      ? String(payload.phone_number || '').trim()
+      : baseUser?.phone_number || '';
+  if (trimmedPhone && !ACCOUNT_PHONE_REGEX.test(trimmedPhone)) {
+    throw new Error('Số điện thoại không hợp lệ (từ 9 đến 20 ký tự số).');
+  }
+
+  const normalizedEmail =
+    payload.email !== undefined
+      ? payload.email.trim().toLowerCase()
+      : (baseUser?.email || '').trim().toLowerCase();
+  if (!normalizedEmail || !ACCOUNT_EMAIL_REGEX.test(normalizedEmail)) {
+    throw new Error('Email không hợp lệ. Vui lòng kiểm tra lại.');
+  }
+
+  const nextUser: UserAccountInfo = {
+    id: baseUser?.id || '',
+    full_name: trimmedName,
+    email: normalizedEmail,
+    phone_number: trimmedPhone,
   };
 
-  const requestBody: Record<string, any> = {};
-  if (payload.calculation_method) {
-    requestBody.calculation_method = payload.calculation_method;
-  } else if (payload.lmp) {
-    requestBody.calculation_method = 'lmp';
-  } else if (payload.q1_ultrasound_date) {
-    requestBody.calculation_method = 'q1_ultrasound';
-  } else if (payload.crl_mm !== undefined) {
-    requestBody.calculation_method = 'crl';
-  } else if (payload.override_edd || payload.edd) {
-    requestBody.calculation_method = 'direct_edd';
-  }
+  currentUserProfile = nextUser;
+  await AsyncStorage.setItem('precare_current_user', JSON.stringify(nextUser));
 
-  if (payload.lmp) requestBody.lmp = payload.lmp;
-  if (payload.q1_ultrasound_date) requestBody.q1_ultrasound_date = payload.q1_ultrasound_date;
-  if (payload.q1_gestational_weeks !== undefined) {
-    requestBody.q1_gestational_weeks = payload.q1_gestational_weeks;
+  const overrideKey = getAccountOverrideKey(baseUser || nextUser);
   }
   if (payload.q1_gestational_days !== undefined) {
     requestBody.q1_gestational_days = payload.q1_gestational_days;
