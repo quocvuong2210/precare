@@ -53,6 +53,7 @@ const LEVEL_CONFIG: Record<
   },
   danger: {
     badgeText: 'Mức Đỏ • Cần thăm khám sớm (< 3rd / > 97th)',
+    defaultTitle: 'Có chỉ số lệch nhiều so với khoảng chuẩn',
     bg: '#FEF2F2',
     border: '#EF4444',
     headerBg: '#FEE2E2',
@@ -71,51 +72,83 @@ export default function StatusSummaryCard({
   ruleVersion,
   modelVersion,
 }: StatusSummaryCardProps) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const cfg = LEVEL_CONFIG[level];
   const safeRuleVersion = ruleVersion || 'WHO-Hadlock-2026.v1.2';
   const safeModelVersion = modelVersion || 'PreCare-L1-v1.0';
+  const badgeText =
+    level === 'normal'
+      ? (isEn ? 'Green • Normal (10th – 90th)' : cfg.badgeText)
+      : level === 'warning'
+        ? (isEn ? 'Yellow • Monitor (3rd – 10th / 90th – 97th)' : cfg.badgeText)
+        : (isEn ? 'Red • Seek medical review (< 3rd / > 97th)' : cfg.badgeText);
+  const resolvedDefaultTitle =
+    level === 'normal'
+      ? (isEn ? 'Maternal and fetal metrics are stable' : cfg.defaultTitle)
+      : level === 'warning'
+        ? (isEn ? 'Some metrics need closer monitoring' : cfg.defaultTitle)
+        : (isEn ? 'Some metrics deviate significantly from normal range' : cfg.defaultTitle);
 
   return (
-    <View style={[styles.card, { backgroundColor: cfg.bg, borderColor: cfg.border }]}>
-      {/* Nhãn phân loại 3 mức cảnh báo (Xanh / Vàng / Đỏ) */}
+    <View style={[styles.card, { backgroundColor: preferences.darkMode ? theme.surface : cfg.bg, borderColor: cfg.border }]}>
       <View style={[styles.badgeRow, { backgroundColor: cfg.headerBg }]}>
         <Ionicons name={cfg.icon} size={18} color={cfg.iconColor} />
-        <Text style={[styles.badgeText, { color: cfg.textColor }]}>{cfg.badgeText}</Text>
+        <Text style={[styles.badgeText, fontStyle(13, { lineHeight: 18, min: 12 }), { color: cfg.textColor }]}>
+          {badgeText}
+        </Text>
       </View>
 
-      {/* Nội dung giải thích thân thiện cho Thai phụ trên App */}
       <View style={styles.body}>
-        <Text style={[styles.title, { color: cfg.textColor }]}>
-          {title || cfg.defaultTitle}
+        <Text
+          style={[
+            styles.title,
+            fontStyle(16, { lineHeight: 22, min: 14.5 }),
+            { color: preferences.darkMode ? theme.text : cfg.textColor },
+          ]}
+        >
+          {title || resolvedDefaultTitle}
         </Text>
 
         {!!gestationalStage && (
-          <Text style={styles.stageText}>Mốc đối chiếu: {gestationalStage}</Text>
+          <Text style={[styles.stageText, fontStyle(13.5, { lineHeight: 19, min: 12.5 }), { color: theme.tealText }]}>
+            {isEn ? 'Reference stage:' : 'Mốc đối chiếu:'} {gestationalStage}
+          </Text>
         )}
 
-        <Text style={[styles.explanation, { color: cfg.textColor }]}>
+        <Text
+          style={[
+            styles.explanation,
+            fontStyle(15, { lineHeight: 22, min: 14 }),
+            { color: preferences.darkMode ? theme.textSecondary : cfg.textColor },
+          ]}
+        >
           {appExplanation}
         </Text>
 
-        {/* Cảnh báo sụt giảm bách phân vị giữa 2 lần khám (AC 1) */}
         {!!percentileDropNote && (
           <View style={styles.dropBox}>
             <Ionicons name="trending-down-outline" size={16} color="#B45309" />
-            <Text style={styles.dropText}>{percentileDropNote}</Text>
+            <Text style={[styles.dropText, fontStyle(13.5, { lineHeight: 19, min: 12.5 })]}>
+              {percentileDropNote}
+            </Text>
           </View>
         )}
 
-        {/* Truy vết phiên bản rule_version & model_version khác NULL (AC 2) */}
-        <Text style={styles.versionMeta}>
+        <Text style={[styles.versionMeta, fontStyle(12, { min: 11, max: 14 }), { color: theme.muted }]}>
           Rule: {safeRuleVersion} • Model: {safeModelVersion}
         </Text>
       </View>
 
-      {/* TUYÊN BỐ GIỚI HẠN CỐ ĐỊNH KHÔNG THỂ TẮT (AC 4) */}
-      <View style={styles.disclaimerBox} accessibilityRole="text">
-        <Ionicons name="shield-checkmark-outline" size={15} color="#475569" />
-        <Text style={styles.disclaimerText}>
-          Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo hỗ trợ theo dõi thai kỳ, hoàn toàn không thay thế cho việc thăm khám hay chẩn đoán của bác sĩ chuyên khoa.
+      <View
+        style={[styles.disclaimerBox, { backgroundColor: theme.surfaceAlt, borderTopColor: theme.border }]}
+        accessibilityRole="text"
+      >
+        <Ionicons name="shield-checkmark-outline" size={15} color={theme.muted} />
+        <Text style={[styles.disclaimerText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.muted }]}>
+          {isEn
+            ? 'Disclaimer: These comparisons are for informational pregnancy tracking only and do not replace clinical examination or diagnosis by a specialist.'
+            : 'Tuyên bố giới hạn: Thông tin đối chiếu chỉ mang tính chất tham khảo hỗ trợ theo dõi thai kỳ, hoàn toàn không thay thế cho việc thăm khám hay chẩn đoán của bác sĩ chuyên khoa.'}
         </Text>
       </View>
     </View>

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -21,11 +21,10 @@ import ForgotPasswordScreen from '../screens/forgot-password/ForgotPasswordScree
 import OtpVerificationScreen from '../screens/forgot-password/OtpVerificationScreen';
 import ResetPasswordScreen from '../screens/forgot-password/ResetPasswordScreen';
 
-
-
 import HistoryResultsScreen from '../screens/profile/HistoryResultsScreen';
 import DeletionRequestScreen from '../screens/profile/DeletionRequestScreen';
 import PregnancySetupScreen from '../screens/PregnancySetupScreen';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { verifySessionWithBackend } from '../services/api';
 import { colors } from '../theme/colors';
 export type RootStackParamList = {
@@ -53,6 +52,7 @@ export type RootStackParamList = {
   RegisterOtpVerification: {
     email: string;
     role: string;
+    retryAfter?: number;
     retryAfter?: number;
   };
   RegisterDetails: {
