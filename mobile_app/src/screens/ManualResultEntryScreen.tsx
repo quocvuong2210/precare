@@ -438,61 +438,61 @@ export default function ManualResultEntryScreen({ navigation }: Props) {
                 status === 'danger'
                   ? theme.dangerBackground
                   : status === 'warning'
+                    ? (preferences.darkMode ? '#2E2411' : '#FEFCE8')
+                    : theme.surface;
+              const frameBorder =
+                status === 'danger'
+                  ? theme.danger
+                  : status === 'warning'
+                    ? '#FACC15'
+                    : theme.border;
+
+              const pillStyle =
+                status === 'danger'
+                  ? { backgroundColor: theme.dangerBackground }
+                  : status === 'warning'
+                  ? { backgroundColor: theme.badgeWarnBg }
+                  : { backgroundColor: theme.badgeGreenBg };
+
+              const pillTextStyle =
+                status === 'danger'
+                  ? { color: theme.danger }
+                  : status === 'warning'
+                  ? { color: theme.badgeWarnText }
+                  : { color: theme.badgeGreenText };
+
+              return (
+                <View key={meta.key} style={[styles.metricFrame, { backgroundColor: frameBg, borderColor: frameBorder }]}>
+                  <View style={styles.metricHeaderRow}>
+                    <Text style={[styles.fieldLabel, fontStyle(14.5, { lineHeight: 20, min: 13.5 }), { color: theme.text }]}>
+                      {meta.label}
+                    </Text>
+                    <View style={[styles.statusPill, pillStyle]}>
+                      <Text style={[styles.statusPillText, fontStyle(11.5, { min: 10.5, max: 13 }), pillTextStyle]}>
+                        {badgeText}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.rangeHintText, fontStyle(12.5, { lineHeight: 18, min: 11.5 }), { color: theme.tealText }]}>
+                    {isEn
+                      ? `Week ${bounds.clampedWeek} (Month ${stageInfo.month}): ${bounds.minNormal}–${bounds.maxNormal} ${meta.unit} · Red if < ${bounds.dangerLow} or > ${bounds.dangerHigh} ${meta.unit}`
+                      : `Chuẩn Tuần ${bounds.clampedWeek} (Tháng ${stageInfo.month}): ${bounds.minNormal} – ${bounds.maxNormal} ${meta.unit} · Báo đỏ khi < ${bounds.dangerLow} hoặc > ${bounds.dangerHigh} ${meta.unit}`}
+                  </Text>
+
+                  <View
                     style={[
-                      styles.evalNoteText,
-                      status === 'warning' && styles.warningErrorText,
-                      status === 'danger' && styles.dangerErrorText,
+                      styles.inputBox,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                      status === 'danger' && { borderColor: theme.danger, borderWidth: 1.5 },
+                      status === 'warning' && { borderColor: '#F59E0B', borderWidth: 1.5 },
                     ]}
                   >
-                    {message}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <Text style={styles.saveHint}>
-            {canSave
-              ? `Đã đối chiếu theo ${stageInfo.stageLabel}. Bấm Lưu để chuyển sang trang Tải lên.`
-              : 'Vui lòng nhập đầy đủ tuổi thai (12–41 tuần) và các chỉ số lớn hơn 0.'}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !canSave }}
-            disabled={!canSave}
-            onPress={handleSaveManualResult}
-            style={({ pressed }) => [
-              styles.saveButton,
-              !canSave && styles.saveButtonDisabled,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name={canSave ? 'save-outline' : 'lock-closed-outline'}
-              size={18}
-              color={canSave ? colors.white : '#7C8FA8'}
-            />
-            <Text style={[styles.saveButtonText, !canSave && styles.saveButtonTextDisabled]}>
-              Lưu kết quả & Xem trên trang Tải lên
-            </Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-
-      <Modal
-        visible={calendarOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCalendarOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setCalendarOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Đóng lịch"
+                    <TextInput
+                      accessibilityLabel={meta.label}
+                      value={values[meta.key]}
+                      onChangeText={(val) => setValues((prev) => ({ ...prev, [meta.key]: val }))}
+                      keyboardType="decimal-pad"
           />
           <View style={styles.calendarCard} accessibilityViewIsModal>
             <View style={styles.calendarHeader}>
