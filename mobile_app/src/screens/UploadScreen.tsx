@@ -768,61 +768,61 @@ export function evaluateMetricByWeek(
         return {
           severity: 'warning',
           clinicalNote: isEn
-  const isPickingFileRef = useRef(false);
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
+            ? `Yellow: Blood pressure mildly elevated (${clean} mmHg) — Rest, reduce salt, and monitor daily.`
+            : `Mức Vàng: Huyết áp chớm cao (${clean} mmHg) — Mẹ nên nghỉ ngơi, ăn nhạt và đo lại hàng ngày nhé.`,
+        };
+      }
+    }
+    return {
+      severity: 'normal',
+      clinicalNote: isEn
+        ? 'Stable blood pressure (< 130/85 mmHg).'
+        : 'Huyết áp ổn định (< 130/85 mmHg).',
     };
-  }, []);
+  }
 
-  const updateItemsAndPersist = useCallback((updater: (prev: UploadItem[]) => UploadItem[]) => {
-    setItems((prev) => {
-      const next = updater(prev);
-      resolveAccountStorageKey().then((storageKey) => {
-        AsyncStorage.setItem(storageKey, JSON.stringify(next)).catch((e) =>
-          console.log('Lỗi lưu dữ liệu hồ sơ:', e)
-        );
-      });
-      return next;
-    });
-  }, []);
+  if (key === 'leu') {
+    if (lower.includes('dương') || lower.includes('pos') || lower.includes('+') || (parseFloat(clean) || 0) > 25) {
+      return {
+        severity: 'warning',
+        clinicalNote: isEn
+          ? 'Positive urine leukocytes — Discuss with your doctor'
+          : 'Bạch cầu niệu dương tính — Cần trao đổi thêm với bác sĩ',
+      };
+    }
+    return {
+      severity: 'normal',
+      clinicalNote: isEn ? 'Negative — Normal' : 'Âm tính — Bình thường',
+    };
+  }
 
-  const persistConfirmedItemToPostgreSQL = useCallback(
-    async (confirmedItem: UploadItem) => {
-      if (!confirmedItem.analysis) return null;
-      const analysis = confirmedItem.analysis;
+  const numMatch = clean.replace(',', '.').match(/\d+(\.\d+)?/);
+  const num = numMatch ? parseFloat(numMatch[0]) : NaN;
+  if (isNaN(num)) {
+    return {
+      severity: 'normal',
+      clinicalNote: isEn ? 'Within physiological range' : 'Trong giới hạn sinh lý',
+    };
+  }
 
-      return await saveVerifiedRecordToDatabase({
-        fileId: confirmedItem.fileId,
-        profileId: confirmedItem.profileId || profileId,
-        checkupId: confirmedItem.checkupId,
-        verificationUrl: confirmedItem.verificationUrl,
-        gestationalWeek: analysis.gestationalWeek || profileWeek || 24,
-        gestationalDays: analysis.gestationalDays ?? 0,
-        overallSeverity: analysis.overallSeverity,
-        percentile:
-          analysis.overallSeverity === 'danger'
-            ? 2.0
-            : analysis.overallSeverity === 'warning'
-            ? 8.5
-            : 50.0,
-        explanationDoctor: analysis.doctorConclusion,
-        explanationPatient: analysis.appConclusion || analysis.doctorConclusion,
-        disclaimerText:
-          'Thông tin đối chiếu chỉ mang tính chất tham khảo, không thay thế chẩn đoán của bác sĩ chuyên khoa.',
-        ruleVersion: analysis.rule_version || DEFAULT_RULE_VERSION,
-        modelVersion: analysis.model_version || DEFAULT_MODEL_VERSION,
-        metrics: analysis.metrics.map((m) => ({
-          key: m.key,
-          label: m.label,
-          value: m.value,
-          unit: m.unit,
-          percentile: m.percentile,
-          severity: m.severity,
-        })),
+  switch (key) {
+    case 'fhr':
+      if (num < 110 || num > 170) {
+        return {
+          severity: 'danger',
+          clinicalNote: isEn
+            ? 'Red: Fetal heart rate outside 110–170 bpm range, seek prompt evaluation'
+            : 'Mức Đỏ: Nhịp tim thai ngoài ngưỡng 110–170 bpm, mẹ nên đi khám ngay nhé',
+        };
+      }
+      if (num < 120 || num > 160) {
+        return {
+          severity: 'warning',
+          clinicalNote: isEn
+            ? 'Yellow: Fetal heart rate mildly outside 120–160 bpm, continue monitoring'
+            : 'Mức Vàng: Nhịp tim thai lệch nhẹ ngưỡng 120–160 bpm, cần theo dõi thêm',
+        };
+      }
       });
     },
     [profileId, profileWeek]
