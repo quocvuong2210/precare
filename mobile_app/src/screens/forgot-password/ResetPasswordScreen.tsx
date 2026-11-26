@@ -438,61 +438,61 @@ export default function ResetPasswordScreen({ navigation, route }: any) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-  },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 5,
-    marginTop: 6,
-  },
-  errorText: {
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
     flex: 1,
-    color: '#EF4444',
-    fontSize: 10,
-    lineHeight: 15,
   },
-  strengthCard: {
-    padding: 12,
-    marginTop: 17,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E7EDF3',
-    borderRadius: 10,
-  },
-  strengthHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  strengthTitle: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  strengthLabel: {
-    color: '#94A3B8',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  strengthStrong: {
-    color: '#22B981',
-  },
-  strengthWeak: {
-    color: '#EF4444',
-  },
-  strengthBars: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  strengthBar: {
+  container: {
     flex: 1,
+    backgroundColor: '#F7F9FC',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  progressArea: {
+    marginBottom: 25,
+  },
+  progressTrack: {
+    flexDirection: 'row',
     height: 3,
-    borderRadius: 3,
-    backgroundColor: '#E2E8F0',
+    gap: 4,
   },
-  requirementRow: {
-    flexDirection: 'row',
+  progressDone: {
+    flex: 1,
+    backgroundColor: '#438F87',
+    borderRadius: 3,
+  },
+  progressActive: {
+    flex: 1,
+    backgroundColor: '#258D83',
+    borderRadius: 3,
+  },
+  progressText: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 9,
+  },
+  title: {
+    color: '#172033',
+    fontSize: 23,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  description: {
+    color: '#718096',
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  form: {
+    width: '100%',
     alignItems: 'center',
     marginTop: 6,
     gap: 5,
