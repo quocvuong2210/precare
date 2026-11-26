@@ -271,12 +271,25 @@ export default function ChartsScreen({ navigation }: BottomTabScreenProps<MainTa
       </ScrollView>
 
       <Modal transparent visible={showInfo} animationType="fade" onRequestClose={() => setShowInfo(false)}>
-        <View style={s.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Đóng thông tin" onPress={() => setShowInfo(false)} />
-          <View accessibilityViewIsModal style={s.dialog}>
-            <Text style={s.cardTitle}>Về biểu đồ tăng trưởng</Text>
-            <Text style={s.explanationText}>Chọn một chỉ số và chạm vào điểm đo hoặc mốc tuần để xem giá trị tương ứng. Các giá trị và vùng màu đang dùng dữ liệu minh họa, chưa phải kết quả khám của mẹ hoặc tiêu chuẩn y khoa.</Text>
-            <Pressable accessibilityRole="button" style={s.closeButton} onPress={() => setShowInfo(false)}><Text style={s.closeText}>Đã hiểu</Text></Pressable>
+        <View style={[s.overlay, { backgroundColor: theme.overlay }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel={isEn ? 'Close info' : 'Đóng thông tin'}
+            onPress={() => setShowInfo(false)}
+          />
+          <View accessibilityViewIsModal style={[s.dialog, { backgroundColor: theme.surface }]}>
+            <Text style={[s.cardTitle, fontStyle(16, { lineHeight: 22, min: 14.5 }), { color: theme.text }]}>
+              {isEn ? 'About growth charts' : 'Về biểu đồ tăng trưởng'}
+            </Text>
+            <Text style={[s.explanationText, fontStyle(15, { lineHeight: 23, min: 14 }), { color: theme.muted }]}>
+              {isEn
+                ? 'Select a metric and tap any data point or week label to view values. Current values and bands are UI sample data, not your medical record.'
+                : 'Chọn một chỉ số và chạm vào điểm đo hoặc mốc tuần để xem giá trị tương ứng. Các giá trị và vùng màu đang dùng dữ liệu minh họa, chưa phải kết quả khám của mẹ hoặc tiêu chuẩn y khoa.'}
+            </Text>
+            <Pressable accessibilityRole="button" style={s.closeButton} onPress={() => setShowInfo(false)}>
+              <Text style={[s.closeText, fontStyle(15, { min: 14 })]}>{isEn ? 'Got it' : 'Đã hiểu'}</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -286,44 +299,42 @@ export default function ChartsScreen({ navigation }: BottomTabScreenProps<MainTa
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#F7FAFC' },
-  header: { height: 56, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: '#E2EAF3' },
-  headerButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F7FAFC', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: colors.navy, fontSize: 18, fontWeight: '700', flexShrink: 1 },
+  container: { flex: 1 },
+  header: { height: 56, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderBottomWidth: 1 },
+  headerButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', flexShrink: 1 },
   content: { paddingBottom: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  selector: { backgroundColor: colors.white },
-  selectorButton: { minHeight: 38, paddingHorizontal: 18, borderWidth: 1, borderColor: '#E1E9F3', borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: '#F7FAFC' },
-  selectorText: { color: colors.navy, fontSize: 13, fontWeight: '500' },
-  option: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 18 },
+  selectorButton: { minHeight: 44, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  selectorText: { fontSize: 15, fontWeight: '500' },
+  option: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 18 },
   body: { padding: 18 },
-  card: { borderWidth: 1, borderColor: '#DFE8F4', backgroundColor: colors.white, borderRadius: 16, padding: 15 },
+  card: { borderWidth: 1, borderRadius: 16, padding: 15 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: colors.navy, lineHeight: 21 },
-  subtitle: { color: '#91A4BF', fontSize: 12, marginTop: 3, lineHeight: 17 },
-  valueBadge: { color: '#008B7E', fontSize: 13, fontWeight: '700', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 5, backgroundColor: '#CCFBF1', overflow: 'hidden' },
-  chart: { height: 198, backgroundColor: '#F7FAFC', borderRadius: 10, position: 'relative' },
-  range: { position: 'absolute', backgroundColor: '#E4F8F5' },
-  gridline: { position: 'absolute', height: 1, backgroundColor: '#DCEEEB' },
-  yLabel: { position: 'absolute', left: 0, width: 36, textAlign: 'right', fontSize: 9, color: '#94A8C0' },
+  cardTitle: { fontSize: 16, fontWeight: '700', lineHeight: 22 },
+  subtitle: { fontSize: 13.5, marginTop: 3, lineHeight: 19 },
+  valueBadge: { fontSize: 14, fontWeight: '700', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 5, overflow: 'hidden' },
+  chart: { height: 198, borderRadius: 10, position: 'relative' },
+  range: { position: 'absolute' },
+  gridline: { position: 'absolute', height: 1 },
+  yLabel: { position: 'absolute', left: 0, width: 42, textAlign: 'right', fontSize: 10.5 },
   segment: { position: 'absolute', height: 2, borderRadius: 1 },
   pointTarget: { position: 'absolute', width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   dot: { height: 4, width: 4, backgroundColor: colors.primary, borderRadius: 2, borderWidth: 1, borderColor: colors.white },
   selectedDot: { height: 10, width: 10, borderRadius: 5, borderWidth: 3, backgroundColor: '#FB7185', borderColor: '#FFD5DD' },
   weekTarget: { position: 'absolute', top: 167, width: 40, height: 30, alignItems: 'center', justifyContent: 'center' },
-  week: { color: '#94A8C0', fontSize: 10 },
-  selectedWeek: { color: '#008579', fontWeight: '700' },
+  week: { fontSize: 11.5 },
   legend: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 14, paddingTop: 13 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendBox: { width: 10, height: 9, backgroundColor: '#CCFBF1' },
+  legendBox: { width: 10, height: 9 },
   legendLine: { width: 12, height: 2, backgroundColor: colors.primary },
-  legendText: { color: colors.textMuted, fontSize: 11 },
+  legendText: { fontSize: 12.5 },
   explanation: { marginTop: 18 },
-  explanationText: { color: colors.textMuted, fontSize: 14, lineHeight: 22, marginTop: 9 },
-  footnote: { marginTop: 18, color: '#52627C', fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  explanationText: { fontSize: 15, lineHeight: 23, marginTop: 9 },
+  footnote: { marginTop: 18, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
   demoNote: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 14 },
-  demoText: { color: colors.textMuted, fontSize: 11, flexShrink: 1 },
-  overlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  dialog: { width: '100%', maxWidth: 420, backgroundColor: colors.white, borderRadius: 18, padding: 22 },
-  closeButton: { backgroundColor: colors.primary, borderRadius: 8, padding: 13, alignItems: 'center', marginTop: 20 },
-  closeText: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  demoText: { fontSize: 12.5, flexShrink: 1 },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  dialog: { width: '100%', maxWidth: 420, borderRadius: 18, padding: 22 },
+  closeButton: { minHeight: 44, backgroundColor: colors.primary, borderRadius: 8, padding: 13, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+  closeText: { color: colors.white, fontSize: 15, fontWeight: '600' },
 });

@@ -7,24 +7,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import {
   calculatePregnancyProfile,
   currentAccessToken,
   currentUserProfile,
+  fetchCurrentUserFromDB,
   fetchPregnancyProfileFromDB,
   restoreSession,
 } from '../services/api';
+import { formatIsoToDmy, getTodayISO } from '../utils/date';
 
 type PregnancySummary = {
   weeks: number | null;
   days: number;
-  trimester: string;
+  trimesterNumber: number | null;
+  trimesterVi: string;
   dueDate: string;
 };
 
@@ -42,18 +47,6 @@ type SavedAccountRecord = {
   dueDate?: string;
 };
 
-function getTodayISO(): string {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-}
-
-function formatDueDate(value?: string): string {
-  if (!value) return '';
-  const normalized = value.slice(0, 10);
-  const iso = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : normalized;
-}
-
 function parseSavedWeeks(value?: string): { weeks: number | null; days: number } {
   const match = value?.match(/(\d+)\s*tuần(?:\s*(\d+)\s*ngày)?/i);
   return match
@@ -61,13 +54,49 @@ function parseSavedWeeks(value?: string): { weeks: number | null; days: number }
     : { weeks: null, days: 0 };
 }
 
+function inferTrimesterNumber(weeks: number | null, rawName?: string): number | null {
+  if (rawName) {
+    if (rawName.includes('1') || rawName.toLowerCase().includes('đầu')) return 1;
+    if (rawName.includes('2') || rawName.toLowerCase().includes('giữa')) return 2;
+    if (rawName.includes('3') || rawName.toLowerCase().includes('cuối')) return 3;
+  }
+  if (weeks === null || !Number.isFinite(weeks)) return null;
+  if (weeks < 14) return 1;
+  if (weeks < 28) return 2;
+  return 3;
+}
+
+function formatTrimesterLabel(
+  trimesterNumber: number | null,
+  trimesterVi: string,
+  lang: 'vi' | 'en',
+): string {
+  if (!trimesterNumber && !trimesterVi) return '';
+  if (lang === 'en') {
+    if (trimesterNumber === 1) return '1st Trimester (First 3 months)';
+    if (trimesterNumber === 2) return '2nd Trimester (Second 3 months)';
+    if (trimesterNumber === 3) return '3rd Trimester (Last 3 months)';
+    return '';
+  }
+  if (trimesterVi) return trimesterVi;
+  if (trimesterNumber === 1) return 'Tam cá nguyệt 1';
+  if (trimesterNumber === 2) return 'Tam cá nguyệt 2';
+  if (trimesterNumber === 3) return 'Tam cá nguyệt 3';
+  return '';
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
-  const displayName = currentUserProfile?.full_name || 'Nguyễn Thị Lan';
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
+  const [displayName, setDisplayName] = useState(
+    () => currentUserProfile?.full_name || 'Mẹ bầu PreCare',
+  );
   const [pregnancy, setPregnancy] = useState<PregnancySummary>({
     weeks: null,
     days: 0,
-    trimester: '',
+    trimesterNumber: null,
+    trimesterVi: '',
     dueDate: '',
   });
   const [assignedDoctorName, setAssignedDoctorName] = useState('');
