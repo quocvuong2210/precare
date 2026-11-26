@@ -108,3 +108,113 @@ function loadAppSettingsContext({ initialStored = null, throwOnRead = false } = 
   };
 
   const code = transpile(CONTEXT_TSX_PATH);
+  const mod = { exports: {} };
+  const customRequire = (id) => {
+    if (id === 'react') return reactHarness;
+    if (id === '@react-native-async-storage/async-storage') return storageMock;
+    if (id === '../theme/settings' || id.endsWith('/theme/settings')) {
+      return themesMod;
+    }
+    return require(id);
+  };
+
+  vm.runInNewContext(code, {
+    module: mod,
+    exports: mod.exports,
+    require: customRequire,
+    console,
+  });
+
+  const { AppSettingsProvider, useAppSettings } = mod.exports;
+
+  const renderProvider = () => {
+    hookCursor = 0;
+    AppSettingsProvider({ children: null });
+    initialized = true;
+    return useAppSettings();
+  };
+
+  const flushEffects = async () => {
+    for (const eff of pendingEffects) {
+      if (typeof eff === 'function') {
+        await eff();
+      }
+    }
+    await new Promise((r) => setTimeout(r, 10));
+    return renderProvider();
+  };
+
+  return {
+    themesMod,
+    asyncStore,
+    renderProvider,
+    flushEffects,
+    modExports: mod.exports,
+  };
+}
+
+function toPlain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function collectTsxFiles(dir) {
+  const results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...collectTsxFiles(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith('.tsx')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+test('settingsThemes defines matching non-empty color tokens for light and dark modes', () => {
+  const { settingsThemes } = loadSettingsThemes();
+  assert.ok(settingsThemes.light, 'Expected light theme');
+  assert.ok(settingsThemes.dark, 'Expected dark theme');
+
+  const lightKeys = toPlain(Object.keys(settingsThemes.light).sort());
+  const darkKeys = toPlain(Object.keys(settingsThemes.dark).sort());
+  assert.deepEqual(darkKeys, lightKeys);
+
+  for (const key of lightKeys) {
+    assert.equal(typeof settingsThemes.light[key], 'string');
+    assert.ok(settingsThemes.light[key].length > 0, `Light token ${key} must be non-empty`);
+    assert.equal(typeof settingsThemes.dark[key], 'string');
+    assert.ok(settingsThemes.dark[key].length > 0, `Dark token ${key} must be non-empty`);
+  }
+
+  assert.notEqual(settingsThemes.dark.background, settingsThemes.light.background);
+  assert.notEqual(settingsThemes.dark.surface, settingsThemes.light.surface);
+  assert.notEqual(settingsThemes.dark.text, settingsThemes.light.text);
+});
+
+test('AppSettingsProvider omits notification flags and strips legacy notification fields from storage', async () => {
+  const legacyPayload = JSON.stringify({
+    darkMode: true,
+    language: 'en',
+    textSize: 'large',
+    eventNotifications: true,
+    emailNotifications: false,
+  });
+
+  const harness = loadAppSettingsContext({ initialStored: legacyPayload });
+  const initialCtx = harness.renderProvider();
+
+  assert.deepEqual(toPlain(initialCtx.preferences), {
+    darkMode: false,
+    language: 'vi',
+    textSize: 'default',
+  });
+  assert.equal('eventNotifications' in initialCtx.preferences, false);
+  assert.equal('emailNotifications' in initialCtx.preferences, false);
+  assert.deepEqual(toPlain(initialCtx.theme), toPlain(harness.themesMod.settingsThemes.light));
+
+  const hydratedCtx = await harness.flushEffects();
+  assert.deepEqual(toPlain(hydratedCtx.preferences), {
+    darkMode: true,
+    language: 'en',
+    textSize: 'large',
+  });
