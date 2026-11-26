@@ -19,91 +19,87 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { useAppSettings } from '../../context/AppSettingsContext';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import {
-  resolveAccountStorageKey,
-  type MedicalMetric,
-  type SeverityLevel,
-  type UploadItem,
-} from '../UploadScreen';
+  currentUserProfile,
+  fetchCheckupHistoryFromDB,
+  fetchCurrentUserFromDB,
+  fetchPregnancyProfileFromDB,
+  restoreSession,
+  type CheckupRecordFromDB,
+} from '../../services/api';
+import { formatIsoToDmy } from '../../utils/date';
 
-type Props = NativeStackScreenProps<any>;
+type Props = NativeStackScreenProps<RootStackParamList, 'HistoryResults'>;
 
-type HistoryItem = {
-  id: string;
-  fileName: string;
-  date: string;
-  week: string;
-  title: string;
-  valueSummary: string;
-  severity: SeverityLevel;
-  statusLabel: 'Bình thường' | 'Cần theo dõi' | 'Nguy hiểm';
-  description: string;
-  metrics: MedicalMetric[];
-  isConfirmed: boolean;
+type FilterType = 'all' | 'verified' | 'pending';
+
+const BP_STATUS_LABELS: Record<'vi' | 'en', Record<string, string>> = {
+  vi: {
+    normal: 'Bình thường',
+    elevated: 'Huyết áp hơi cao',
+    stage1_hypertension: 'Tăng huyết áp',
+    crisis: 'Cảnh báo huyết áp cao',
+  },
+  en: {
+    normal: 'Normal',
+    elevated: 'Elevated BP',
+    stage1_hypertension: 'Hypertension',
+    crisis: 'Hypertensive crisis',
+  },
 };
 
 export default function HistoryResultsScreen({ navigation }: Props) {
+  const { preferences, theme, fontStyle } = useAppSettings();
+  const isEn = preferences.language === 'en';
   const [keyword, setKeyword] = useState('');
-  const [filter, setFilter] = useState<'all' | 'normal' | 'follow' | 'danger'>('all');
-  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [checkups, setCheckups] = useState<CheckupRecordFromDB[]>([]);
+  const [hasProfile, setHasProfile] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  // Tự động tải 100% lịch sử thật của tài khoản đang đăng nhập (Không có dữ liệu mẫu)
-  const loadRealHistory = useCallback(async () => {
+  const formatDate = (raw?: string | null): string =>
+    formatIsoToDmy(raw) || (isEn ? 'Unknown date' : 'Chưa rõ ngày');
+
+  const loadDatabaseHistory = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    setCheckups([]);
     try {
-      setLoading(true);
-      const storageKey = await resolveAccountStorageKey();
-      const raw = await AsyncStorage.getItem(storageKey);
+      const restored = currentUserProfile || (await restoreSession());
+      const activeAccount = (await fetchCurrentUserFromDB()) || restored;
+      const profile = await fetchPregnancyProfileFromDB(undefined, { throwOnError: true });
 
-      if (!raw) {
-        setHistoryList([]);
+      const profilePatientId = profile?.patient?.id ? String(profile.patient.id).trim() : '';
+      const accountId = activeAccount?.id ? String(activeAccount.id).trim() : '';
+      if (!profile?.id || (profilePatientId && accountId && profilePatientId !== accountId)) {
+        setHasProfile(false);
+        setCheckups([]);
         return;
       }
 
-      const uploadedItems: UploadItem[] = JSON.parse(raw);
-      const mapped: HistoryItem[] = uploadedItems
-        .filter((item) => item.analysis)
-        .map((item) => {
-          const analysis = item.analysis!;
-          const severity: SeverityLevel = analysis.overallSeverity || 'normal';
-          const statusLabel =
-            severity === 'danger'
-              ? 'Nguy hiểm'
-              : severity === 'warning'
-              ? 'Cần theo dõi'
-              : 'Bình thường';
-
-          const metricsSummary = analysis.metrics
-            .map((m) => `${m.label}: ${m.value}${m.unit ? ` ${m.unit}` : ''}`)
-            .join(' • ');
-
-          return {
-            id: item.id,
-            fileName: item.name,
-            date: item.time,
-            week: `Tuần ${analysis.gestationalWeek || 24}`,
-            title: analysis.recordType,
-            valueSummary: metricsSummary || 'Đã trích xuất chỉ số',
-            severity,
-            statusLabel,
-            description: analysis.doctorConclusion || analysis.summary,
-            metrics: analysis.metrics || [],
-            isConfirmed: item.status === 'done' || Boolean(analysis.savedToProfile),
-          };
-        });
-
-      setHistoryList(mapped);
-    } catch (e) {
-      console.log('Lỗi đọc lịch sử kết quả:', e);
-      setHistoryList([]);
+      setHasProfile(true);
+      const profileId = String(profile.id);
+      const checkupRows = await fetchCheckupHistoryFromDB(profileId);
+      const scopedRows = checkupRows.filter(
+        (item) => String(item.pregnancy_profile_id) === profileId,
+      );
+      setCheckups([...scopedRows].reverse());
+    } catch (err) {
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : (isEn ? 'Unable to load checkup history from server.' : 'Không thể tải lịch sử khám từ cơ sở dữ liệu.'),
+      );
+      setCheckups([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isEn]);
 
   useFocusEffect(
     useCallback(() => {
-      loadRealHistory();
-    }, [loadRealHistory])
+      void loadDatabaseHistory();
+    }, [loadDatabaseHistory]),
   );
 
   // Xoá 1 bản ghi lịch sử nếu người dùng muốn dọn dẹp
