@@ -493,6 +493,118 @@ const styles = StyleSheet.create({
   progressActive: {
     flex: 1,
     backgroundColor: '#258D83',
+    borderRadius: 3,
+  },
+  progressInactive: {
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+  },
+  progressText: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 9,
+  },
+  title: {
+    color: '#172033',
+    fontSize: 23,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  description: {
+    color: '#718096',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  emailRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 22,
+    marginBottom: 24,
+  },
+  emailText: {
+    color: '#263449',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  linkTouch: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  changeEmail: {
+    color: '#258D83',
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  label: {
+    color: '#263449',
+    fontSize: 14.5,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  otpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 7,
+  },
+  otpInput: {
+    flex: 1,
+    minHeight: 54,
+    minWidth: 0,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#DCE5EF',
+    backgroundColor: '#FFFFFF',
+    color: '#172033',
+    fontSize: 21,
+    fontWeight: '800',
+    paddingHorizontal: 0,
+  },
+  otpFilled: {
+    borderColor: '#438F87',
+  },
+  otpFocused: {
+    borderColor: '#258D83',
+    borderWidth: 1.5,
+  },
+  otpExpired: {
+    borderColor: '#DC2626',
+  },
+  timerArea: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  timerText: {
+    color: '#64748B',
+    fontSize: 13,
+  },
+  expiredText: {
+    color: '#DC2626',
+  },
+  resendButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  resendText: {
+    color: '#438F87',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  resendDisabled: {
+    color: '#94A3B8',
+  },
+  statusText: {
+    color: '#39847E',
+    fontSize: 13,
     textAlign: 'center',
   },
   infoBox: {
@@ -508,15 +620,16 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     color: '#39847E',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
   bottomArea: {
     marginTop: 'auto',
     paddingTop: 28,
   },
   button: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     borderRadius: 7,
     backgroundColor: '#438F87',
     alignItems: 'center',
@@ -527,19 +640,21 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15.5,
     fontWeight: '700',
   },
   buttonTextDisabled: {
     color: '#94A3B8',
   },
   footer: {
+    minHeight: 44,
     alignItems: 'center',
-    paddingTop: 13,
+    justifyContent: 'center',
+    paddingTop: 10,
   },
   footerText: {
     color: '#168C80',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
   },
 });
