@@ -1593,61 +1593,61 @@ export default function UploadScreen({ navigation }: Props) {
                   ? {
                       ...item,
                       fileId: resolvedFileId || item.fileId,
-        asset.mimeType ?? 'image/jpeg'
-      );
-    } finally {
-      isPickingFileRef.current = false;
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      isPickingFileRef.current = true;
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-      await uploadAndAnalyzeFile(
-        asset.uri,
-        asset.fileName ?? `Anh_phieu_kham_${Date.now()}.jpg`,
-        asset.fileSize,
-        asset.mimeType ?? 'image/jpeg'
-      );
-    } finally {
-      isPickingFileRef.current = false;
-    }
-  };
-
-  const pickPdf = async () => {
-    try {
-      isPickingFileRef.current = true;
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-
-      let mime = asset.mimeType;
-      const lowerName = (asset.name || '').toLowerCase();
-      if (!mime || mime === 'application/octet-stream') {
-        if (lowerName.endsWith('.pdf')) mime = 'application/pdf';
-        else if (lowerName.endsWith('.png')) mime = 'image/png';
-        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mime = 'image/jpeg';
-        else mime = 'application/pdf';
+                      taskId,
+                      canRetry: taskData?.can_retry ?? true,
+                      status: 'failed',
+                      errorMessage: String(errMsg),
+                    }
+                  : item
+              )
+            );
+            return;
+          }
+        } catch {
+          // Tiếp tục chờ Celery
+        }
       }
 
-      await uploadAndAnalyzeFile(
-        asset.uri,
-        asset.name,
-        asset.size,
-        mime
-      );
-    } finally {
-      isPickingFileRef.current = false;
-    }
-  };
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
+      }
 
-  const openChooser = () => {
+      const activeLang = langRef.current;
+      const analysis =
+        parseBackendIngestResult(fileDetail, fileName, profileWeek, activeLang) ||
+        buildDefaultExtractedAnalysis(fileName, profileWeek, activeLang);
+
+      let fallbackItem: UploadItem | null = null;
+      updateItemsAndPersist((prev) =>
+        prev.map((item) => {
+          if (item.id !== localItemId) return item;
+          fallbackItem = {
+            ...item,
+            fileId: fileId || item.fileId,
+            taskId,
+            presignedUrl: fileDetail?.presigned_view_url || item.presignedUrl,
+            status: 'pending',
+            analysis,
+          };
+          return fallbackItem;
+        })
+      );
+      if (fallbackItem) {
+        if (isMountedRef.current) {
+          openVerificationModal(fallbackItem, false);
+        }
+      }
+    },
+    [openVerificationModal, persistConfirmedItemToPostgreSQL, profileWeek, updateItemsAndPersist]
+  );
+
+  /* =========================================================================
+     API 1: POST /api/v1/ingest/upload
+     ========================================================================= */
+  const uploadAndAnalyzeFile = async (
+    uri: string,
     Alert.alert('Tải lên phiếu khám cận lâm sàng', 'Chọn phương thức tải lên:', [
       { text: 'Chụp ảnh phiếu khám (Đơn lẻ)', onPress: takePhoto },
       { text: 'Chọn 1 ảnh từ thư viện', onPress: pickImage },
