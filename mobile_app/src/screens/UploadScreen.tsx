@@ -131,7 +131,7 @@ export type UploadItem = {
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_ATTEMPTS = 25;
+const MAX_POLL_ATTEMPTS = 90;
 
 const STATUS_STYLE: Record<Status, { label: string; bg: string; color: string }> = {
   processing: { label: 'Đang phân tích...', bg: '#FEF9C3', color: '#A16207' },
