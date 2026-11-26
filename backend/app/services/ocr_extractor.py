@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from PIL import Image, ImageOps
-import pypdf
+import fitz  # PyMuPDF
 
 from app.core.config import settings
 from app.services.pdf_extractor import pdf_extractor
@@ -127,27 +127,29 @@ class OcrPipelineExtractor:
 
     def extract_images_from_scanned_pdf(self, pdf_bytes: bytes) -> List[Image.Image]:
         """
-        Trích xuất các ảnh trang từ tài liệu PDF scan bằng pypdf.
-        Tránh phụ thuộc vào công cụ nhị phân bên ngoài (như poppler/pdftoppm).
+        Render toàn bộ các trang của tài liệu PDF scan thành ảnh RGB sắc nét (200 DPI) bằng PyMuPDF (fitz).
+        Tránh bỏ sót ảnh ghép nhiều mảnh hoặc chữ vector, không phụ thuộc poppler/pdftoppm.
         """
         extracted_images: List[Image.Image] = []
         if not pdf_bytes:
             return extracted_images
 
         try:
-            stream = io.BytesIO(pdf_bytes)
-            reader = pypdf.PdfReader(stream)
-            for page_idx, page in enumerate(reader.pages):
-                for img_obj in page.images:
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            try:
+                for page_idx, page in enumerate(doc):
                     try:
-                        img = Image.open(io.BytesIO(img_obj.data))
+                        pix = page.get_pixmap(dpi=200, alpha=False)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                         extracted_images.append(img)
                     except Exception as err:
                         logger.warning(
-                            f"[OCR Extractor] Không thể mở ảnh nhúng trang {page_idx}: {err}"
+                            f"[OCR Extractor] Không thể render trang {page_idx} từ PDF: {err}"
                         )
+            finally:
+                doc.close()
         except Exception as e:
-            logger.error(f"[OCR Extractor] Lỗi trích xuất ảnh từ scanned PDF: {e}")
+            logger.error(f"[OCR Extractor] Lỗi trích xuất ảnh từ scanned PDF bằng PyMuPDF: {e}")
 
         return extracted_images
 

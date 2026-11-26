@@ -216,3 +216,82 @@ def test_process_ocr_task_fast_path_integration():
     assert file_record.ocr_raw_payload["extracted_fields"]["efw_g"] == 1680.0
     verify_db.close()
 
+
+def create_tabular_report_pdf() -> bytes:
+    """Tạo file PDF dạng bảng biểu có đường kẻ ô (giống phiếu bệnh viện thật) bằng ReportLab Platypus."""
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("PHONG KHAM SAN PHU KHOA PRECARE", styles["Title"]))
+    elements.append(Paragraph("Ngay kham: 24/11/2026 | Bac si thuc hien: BS. Le Minh", styles["Normal"]))
+    elements.append(Paragraph("Huyet ap: 118/76 mmHg | Can nang me: 56.5 kg", styles["Normal"]))
+    elements.append(Spacer(1, 12))
+
+    # Bảng có cột Giá trị và cột Khoảng tham chiếu (để kiểm chứng Table-First không bắt nhầm số tham chiếu)
+    table_data = [
+        ["Chi so", "Gia tri", "Khoang tham chieu", "Danh gia"],
+        ["BPD", "58 mm", "54 - 62 mm", "Binh thuong"],
+        ["HC", "290 mm", "270 - 305 mm", "Binh thuong"],
+        ["AC", "196 mm", "185 - 210 mm", "Binh thuong"],
+        ["FL", "43 mm", "40 - 46 mm", "Binh thuong"],
+        ["EFW", "1.950 g", "1750 - 2150 g", "Binh thuong"],
+        ["FHR", "148 bpm", "120 - 160 bpm", "Binh thuong"],
+        ["HGB", "11.8 g/dL", "11.0 - 14.0 g/dL", "On dinh"],
+        ["Glucose", "5.4 mmol/L", "4.1 - 5.6 mmol/L", "Binh thuong"],
+    ]
+
+    t = Table(table_data)
+    t.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ]
+        )
+    )
+    elements.append(t)
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph("KET LUAN: Mot thai song phat trien binh thuong trong tu cung.", styles["Normal"]))
+    elements.append(Paragraph("DAN DO: Tai kham sau 2 tuan.", styles["Normal"]))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def test_hybrid_pdfplumber_table_and_clinical_sections():
+    pdf_bytes = create_tabular_report_pdf()
+    result = pdf_extractor.extract_pdf_fast_path(pdf_bytes, "ultrasound_report")
+
+    assert result["is_digital_pdf"] is True
+    assert result["metadata"]["engine"] == "pymupdf+pdfplumber"
+    assert result["metadata"]["tables_count"] >= 1
+
+    fields = result["extracted_fields"]
+    assert fields["bpd_mm"] == 58.0
+    assert fields["hc_mm"] == 290.0
+    assert fields["ac_mm"] == 196.0
+    assert fields["fl_mm"] == 43.0
+    assert fields["efw_g"] == 1950.0
+    assert fields["fhr_bpm"] == 148
+    assert result["confidence_scores"]["bpd"] == 0.995
+
+    sections = result["clinical_sections"]
+    assert sections["administrative_info"]["visit_date"] == "24/11/2026"
+    assert "Le Minh" in (sections["administrative_info"]["doctor_performer"] or "")
+    assert sections["vitals"]["blood_pressure_systolic"] == 118.0
+    assert sections["vitals"]["blood_pressure_diastolic"] == 76.0
+    assert sections["vitals"]["weight_kg"] == 56.5
+    assert sections["labs"]["hgb"] == "11.8"
+    assert sections["labs"]["glucose"] == "5.4"
+    assert "binh thuong" in (sections["conclusions"]["summary"] or "").lower()
+
+
