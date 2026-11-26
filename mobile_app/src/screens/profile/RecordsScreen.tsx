@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -19,44 +20,48 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import ScreenHeader from '../../components/ScreenHeader';
+import { useAppSettings } from '../../context/AppSettingsContext';
 import type { MainTabParamList } from '../../navigation/MainTabs';
 import { colors } from '../../theme/colors';
-import EmergencyContacts, { type EmergencyContact } from '../../components/EmergencyContacts';
 import {
-  calculatePregnancyProfile,
   currentUserProfile,
+  fetchCurrentUserFromDB,
   fetchPregnancyProfileFromDB,
+  mergeLocalAccountOverride,
   restoreSession,
-  savePregnancyProfileToDB,
-  type PregnancyCalculateRequest,
+  updateLocalUserAccount,
+  type UserAccountInfo,
 } from '../../services/api';
+import { formatIsoToDmy, parseStrictDmyToIso } from '../../utils/date';
 
-type Editor = 'personal' | 'medical' | null;
-type Profile = {
-  name: string;
-  birthday: string;
-  phone: string;
+type AccountFields = {
+  full_name: string;
+  phone_number: string;
   email: string;
-  blood: string;
-  allergies: string;
-  conditions: string;
-  obstetricHistory: string;
-  target_date: string;
+};
+
+type PregnancyFields = {
   lmp: string;
   q1_ultrasound_date: string;
   q1_gestational_weeks: string;
   q1_gestational_days: string;
   crl_mm: string;
-  override_edd: string;
+  edd: string;
 };
-type Field = { key: keyof Profile; label: string; placeholder?: string };
 
-type SavedAccountRecord = {
-  profile: Profile;
+type CachedAccountSummary = {
+  profile: {
+    lmp: string;
+    q1_ultrasound_date: string;
+    q1_gestational_weeks: string;
+    q1_gestational_days: string;
+    crl_mm: string;
+    override_edd: string;
+  };
   trimester: string;
   gestationalAge: string;
   dueDate: string;
-  contacts: EmergencyContact[];
 };
 
 function getTodayISO(): string {
