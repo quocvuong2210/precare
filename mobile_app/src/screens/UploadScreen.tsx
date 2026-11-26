@@ -1923,61 +1923,61 @@ export default function UploadScreen({ navigation }: Props) {
      API 6: DELETE /api/v1/ingest/files/{file_id} — Xoá tài liệu khỏi Database & Storage
      ========================================================================= */
   const deleteItem = (item: UploadItem) => {
-        animationType="slide"
-        onRequestClose={() => {
-          setVerifyModalItem(null);
-          setIsModalEditing(false);
-        }}
-      >
-        <SafeAreaView style={styles.modalScreen} edges={['top', 'bottom']}>
-          <View style={styles.modalHeader}>
-            <Pressable
-              style={styles.headerButton}
-              onPress={() => {
-                setVerifyModalItem(null);
-                setIsModalEditing(false);
-              }}
-            >
-              <Ionicons name="close" size={20} color={colors.navy} />
-            </Pressable>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={styles.modalHeaderTitle}>Đối chiếu & Xác nhận dữ liệu</Text>
-              <Text style={styles.modalHeaderSub}>
-                {isModalEditing
-                  ? 'Đang ở chế độ chỉnh sửa — Hãy nhập lại chỉ số bị lệch'
-                  : 'Chế độ xem chỉ số trích xuất — Bấm "Chỉnh sửa" nếu cần thay đổi'}
-              </Text>
-            </View>
-            <View style={{ width: 32 }} />
-          </View>
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
+    const displayName = decodeFileName(item.name, activeLang);
+    Alert.alert(
+      activeCopy.deleteTitle,
+      activeCopy.deleteConfirm(displayName),
+      [
+        { text: activeCopy.cancelBtn, style: 'cancel' },
+        {
+          text: activeCopy.deleteForeverBtn,
+          style: 'destructive',
+          onPress: async () => {
+            if (verifyModalItem?.id === item.id) setVerifyModalItem(null);
 
-          {verifyModalItem && verifyModalItem.analysis && (
-            <KeyboardAvoidingView
-              style={styles.flex}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-              <View style={[styles.splitTopPane, zoomSlipImage && styles.splitTopPaneExpanded]}>
-                <View style={styles.splitTopBar}>
-                  <View style={styles.slipPreviewTitleRow}>
-                    <Ionicons name="document-text-outline" size={15} color={colors.white} />
-                    <Text style={styles.splitTopBarTitle} numberOfLines={1}>
-                      Bản gốc: {decodeFileName(verifyModalItem.name)}
-                    </Text>
-                  </View>
-                  {isImageItem(verifyModalItem) && (
-                    <Pressable
-                      style={styles.zoomToggleBtn}
-                      onPress={() => setZoomSlipImage((z) => !z)}
-                    >
-                      <Ionicons
-                        name={zoomSlipImage ? 'contract-outline' : 'expand-outline'}
-                        size={14}
-                        color={colors.white}
-                      />
-                      <Text style={styles.zoomToggleText}>
-                        {zoomSlipImage ? 'Thu nhỏ ảnh' : 'Phóng to ảnh'}
-                      </Text>
-                    </Pressable>
+            // 1. Xác định chính xác UUID của file trong Database
+            let targetFileId: string | null = null;
+            if (item.fileId && isUuid(item.fileId)) {
+              targetFileId = item.fileId;
+            } else if (item.id && isUuid(item.id)) {
+              targetFileId = item.id;
+            } else {
+              // Tìm kiếm đối soát trong Database theo tên file hoặc ID
+              try {
+                const realPid = profileId || (await ensureActivePregnancyProfileId(profileWeek));
+                const remoteRes: any = await getProfileIngestFiles(realPid, { page: 1, page_size: 50 });
+                const remoteList: any[] = remoteRes?.data?.items || remoteRes?.items || [];
+                const match = remoteList.find(
+                  (rf: any) =>
+                    String(rf.id) === item.fileId ||
+                    String(rf.id) === item.id ||
+                    decodeFileName(rf.file_name, activeLang) === displayName
+                );
+                if (match && isUuid(match.id)) {
+                  targetFileId = String(match.id);
+                }
+              } catch (e) {
+                console.log('Không thể đối soát UUID từ DB:', e);
+              }
+            }
+
+            // 2. Nếu có file trên Database, gọi API DELETE
+            if (targetFileId) {
+              setDeletingFileId(item.id);
+              try {
+                console.log(`[API 6/8] Bắt đầu xoá file ${targetFileId} trong Database...`);
+                await deleteIngestFile(targetFileId);
+                console.log(`[API 6/8] Xoá file ${targetFileId} trong Database thành công!`);
+              } catch (e: any) {
+                setDeletingFileId(null);
+                console.error('Lỗi khi xoá tài liệu trên Database:', e);
+                Alert.alert(
+                  copyRef.current.cannotDeleteTitle,
+                  e?.message || copyRef.current.cannotDeleteBody
+                );
+                return; // QUAN TRỌNG: Không xoá local nếu DB xoá thất bại, tránh lỗi reload bị hiện lại!
                   )}
                 </View>
 
