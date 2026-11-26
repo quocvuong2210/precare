@@ -1648,61 +1648,61 @@ export default function UploadScreen({ navigation }: Props) {
      ========================================================================= */
   const uploadAndAnalyzeFile = async (
     uri: string,
-    Alert.alert('Tải lên phiếu khám cận lâm sàng', 'Chọn phương thức tải lên:', [
-      { text: 'Chụp ảnh phiếu khám (Đơn lẻ)', onPress: takePhoto },
-      { text: 'Chọn 1 ảnh từ thư viện', onPress: pickImage },
-      { text: 'Chọn 1 file PDF / Ảnh', onPress: pickPdf },
-      { text: 'Tải lên hàng loạt (Batch Upload)', onPress: pickAndUploadBatch },
-      { text: 'Huỷ', style: 'cancel' },
-    ]);
-  };
+    name: string,
+    size?: number | null,
+    mimeType: string = 'application/pdf'
+  ) => {
+    const activeCopy = copyRef.current;
+    const activeLang = langRef.current;
+    if (size && size > MAX_SIZE) {
+      Alert.alert(activeCopy.fileTooLargeTitle, activeCopy.fileTooLargeBody);
+      return;
+    }
 
-  const activeModalWeek =
-    parseInt(draftWeek, 10) || verifyModalItem?.analysis?.gestationalWeek || 24;
-  const activeModalMetrics: MedicalMetric[] = verifyModalItem?.analysis
-    ? verifyModalItem.analysis.metrics.map((m) => {
-        const val = draftMetrics[m.key] ?? m.value;
-        const ev = evaluateMetricByWeek(m.key, val, activeModalWeek);
-        return {
-          ...m,
-          value: val,
-          refRange: ev.refRange || m.refRange,
-          severity: ev.severity,
-          clinicalNote: ev.clinicalNote,
-        };
-      })
-    : [];
+    const newItemId = String(Date.now());
+    const newItem: UploadItem = {
+      id: newItemId,
+      profileId: profileId || undefined,
+      name,
+      time: nowLabel(activeLang),
+      status: 'processing',
+      uri,
+      mimeType,
+    };
 
-  const activeModalSummary = verifyModalItem?.analysis
-    ? summarizeAnalysisState(activeModalMetrics, verifyModalItem.name, activeModalWeek)
-    : null;
-  const activeModalTheme = activeModalSummary
-    ? SEVERITY_THEME[activeModalSummary.overallSeverity]
-    : SEVERITY_THEME.normal;
+    updateItemsAndPersist((prev) => [newItem, ...prev]);
 
-  return (
-    <SafeAreaView style={styles.flex} edges={['top']}>
-      <StatusBar style="dark" />
+    try {
+      const validPid = await ensureActivePregnancyProfileId(profileWeek);
+      setProfileId(validPid);
 
-      <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={() => navigation.navigate('Home')}>
-          <Ionicons name="arrow-back" size={18} color={colors.navy} />
-        </Pressable>
+      const uploadRes: any = await ingestUploadSingle(
+        { uri, name, type: mimeType },
+        validPid
+      );
 
-        <Text style={styles.headerTitle}>Tải lên & Đối chiếu phiếu khám</Text>
+      const resData: any = uploadRes?.data || uploadRes;
+      const fileId = resData?.file_id ? String(resData.file_id) : undefined;
+      const taskId = resData?.task_id ? String(resData.task_id) : undefined;
+      const checkupId = resData?.checkup_id ?? null;
 
-        <Pressable style={styles.headerButton} onPress={openChooser}>
-          <Ionicons name="add" size={20} color={colors.navy} />
-        </Pressable>
-      </View>
+      updateItemsAndPersist((prev) =>
+        prev.map((it) =>
+          it.id === newItemId
+            ? { ...it, fileId, taskId, checkupId, profileId: validPid }
+            : it
+        )
+      );
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Pressable style={styles.dropZone} onPress={openChooser}>
-          <View style={styles.cameraCircle}>
+      if (taskId) {
+        await pollCeleryTaskStatus(newItemId, taskId, fileId, name);
+        return;
+      }
+
+      let fileDetail: any = null;
+      if (fileId) {
+        const detailRes: any = await getIngestFileDetail(fileId).catch(() => null);
+        fileDetail = detailRes?.data || detailRes;
             <Ionicons name="cloud-upload-outline" size={28} color={colors.primary} />
           </View>
 
