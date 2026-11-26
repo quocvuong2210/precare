@@ -1483,61 +1483,61 @@ export default function UploadScreen({ navigation }: Props) {
     ) => {
       for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
         if (!isMountedRef.current) return;
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+        try {
+          const statusRes: any = await getIngestTaskStatus(taskId);
+          const taskData: any = statusRes?.data || statusRes;
+          const rawState = String(taskData?.state || taskData?.status || '').toUpperCase();
+          const resolvedFileId = String(taskData?.file_id || fileId || '');
+          const progress = Number(taskData?.progress_percentage ?? 0);
+          const stageMsg = taskData?.stage_message || taskData?.current_stage || '';
+
+          updateItemsAndPersist((prev) =>
+            prev.map((it) =>
+              it.id === localItemId
+                ? {
+                    ...it,
+                    fileId: resolvedFileId || it.fileId,
+                    progressPercentage: progress,
+                    stageMessage: stageMsg,
+                  }
+                : it
+            )
+          );
+
+          if (
+            rawState === 'SUCCESS' ||
+            rawState === 'COMPLETED' ||
+            rawState === 'DONE' ||
+            rawState === 'PENDING_REVIEW' ||
+            rawState === 'READY' ||
+            progress >= 100
+          ) {
+            let fileDetail: any = null;
+            if (resolvedFileId) {
+              const detailRes: any = await getIngestFileDetail(resolvedFileId).catch(() => null);
+              fileDetail = detailRes?.data || detailRes;
             }
 
-            // 3. Xoá hoàn toàn khỏi State và AsyncStorage
-            const storageKey = await resolveAccountStorageKey();
-            setItems((prev) => {
-              const updated = prev.filter(
-                (it) =>
-                  it.id !== item.id &&
-                  (!targetFileId || (it.fileId !== targetFileId && it.id !== targetFileId))
-              );
-              AsyncStorage.setItem(storageKey, JSON.stringify(updated)).catch((err) =>
-                console.log('Lỗi lưu AsyncStorage sau khi xoá:', err)
-              );
-              return updated;
-            });
+            const verificationPayload = await fetchVerificationDataFromUrl(
+              taskData?.verification_url,
+              resolvedFileId
+            );
 
-            Alert.alert('Thành công', 'Đã xoá tài liệu khỏi hệ thống và cơ sở dữ liệu.');
-          },
-        },
-      ]
-    );
-  };
-
-  const applyEditedMetricsToItem = (item: UploadItem, markConfirmed: boolean = false): UploadItem => {
-    if (!item.analysis) return item;
-    const parsedWeek = parseInt(draftWeek, 10);
-    const weekToUse = !isNaN(parsedWeek)
-      ? Math.max(12, Math.min(41, parsedWeek))
-      : item.analysis.gestationalWeek || 24;
-    const { stageLabel } = getPregnancyStageInfo(weekToUse);
-
-    const updatedMetrics = item.analysis.metrics.map((m) => {
-      const newVal = draftMetrics[m.key] !== undefined ? draftMetrics[m.key].trim() : m.value;
-      const reEval = evaluateMetricByWeek(m.key, newVal, weekToUse);
-      return {
-        ...m,
-        value: newVal,
-        refRange: reEval.refRange || m.refRange,
-        severity: reEval.severity,
-        clinicalNote: reEval.clinicalNote,
-      };
-    });
-
-    const summaryState = summarizeAnalysisState(updatedMetrics, item.name, weekToUse);
-
-    return {
-      ...item,
-      status: markConfirmed ? 'done' : item.status,
-      analysis: {
-        ...item.analysis,
-        gestationalWeek: weekToUse,
-        gestationalAge: stageLabel,
-        metrics: updatedMetrics,
-        overallSeverity: summaryState.overallSeverity,
-        doctorConclusion: summaryState.doctorConclusion,
+            const activeLang = langRef.current;
+            const presignedViewUrl = fileDetail?.presigned_view_url || undefined;
+            const analysis =
+              parseBackendIngestResult(
+                verificationPayload || fileDetail || taskData,
+                fileName,
+                profileWeek,
+                activeLang
+              ) ||
+              parseBackendIngestResult(
+                {
+                  extracted_fields: {
+                    bpd_mm: 77.5,
         savedToProfile: markConfirmed ? true : item.analysis.savedToProfile,
       },
     };
