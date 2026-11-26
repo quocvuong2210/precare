@@ -2253,61 +2253,61 @@ export default function UploadScreen({ navigation }: Props) {
           <View
             style={[
               styles.batchBanner,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  dropTitle: { fontSize: 14, fontWeight: '800', color: colors.navy, textAlign: 'center' },
-  dropSub: {
-    fontSize: 11.5,
-    color: colors.textLight,
-    marginTop: 5,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  uploadBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 16,
-  },
-  chooseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 38,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
-  chooseText: { fontSize: 12.5, fontWeight: '700', color: colors.white },
-  batchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 38,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    justifyContent: 'center',
-  },
-  batchButtonText: { fontSize: 12.5, fontWeight: '700', color: colors.primaryDark },
-  batchBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#CCFBF1',
-    borderWidth: 1,
-    borderColor: '#14B8A6',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+              { backgroundColor: theme.tealSoft, borderColor: theme.tealBorder },
+            ]}
+          >
+            <ActivityIndicator size="small" color={theme.tealText} />
+            <Text style={[styles.batchBannerText, fontStyle(13, { lineHeight: 19, min: 12 }), { color: theme.tealText }]}>
+              {batchProgressText}
+            </Text>
+          </View>
+        )}
+
+        <Text style={[styles.sectionTitle, fontStyle(15.5, { min: 14.5 }), { color: theme.textSecondary }]}>
+          {copy.savedSectionTitle(items.length)}
+        </Text>
+
+        {loadingStorage ? (
+          <View
+            style={[
+              styles.emptyBox,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.emptyText, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.syncingText}
+            </Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View
+            style={[
+              styles.emptyBox,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="document-outline" size={32} color={theme.muted} />
+            <Text style={[styles.emptyText, fontStyle(14.5, { lineHeight: 21, min: 13.5 }), { color: theme.textSecondary }]}>
+              {copy.emptyText}
+            </Text>
+          </View>
+        ) : (
+          items.map((item) => {
+            const s = statusStyle[item.status];
+            const isPdf = item.name.toLowerCase().endsWith('.pdf');
+            const previewSourceUri = item.presignedUrl || item.uri;
+            const hasImagePreview = Boolean(previewSourceUri) && isImageItem(item);
+
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.itemCard,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <View style={styles.itemHeaderRow}>
+                  <View
     borderRadius: 10,
     marginTop: 12,
   },
