@@ -16,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Trash2,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { DocumentExtractionData, UploadFileItem } from './mockOcrData';
 import { DocumentViewer } from './DocumentViewer';
@@ -28,6 +31,8 @@ interface Step2ReviewProps {
   onUpdateExtractionData: (data: DocumentExtractionData) => void;
   onBackToStep1: () => void;
   onBackToQueue?: () => void;
+  onDeleteFile?: () => Promise<void> | void;
+  isDeletingFile?: boolean;
   onProceedToStep3: () => void;
   patientName?: string;
 }
@@ -40,12 +45,15 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
   onUpdateExtractionData,
   onBackToStep1,
   onBackToQueue,
+  onDeleteFile,
+  isDeletingFile = false,
   onProceedToStep3,
   patientName,
 }) => {
   // Collapsible sections state
   const [openSection, setOpenSection] = useState<'vitals' | 'biometrics' | 'labs' | 'conclusions'>('biometrics');
   const [hasModified, setHasModified] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const formattedVisitDate = (() => {
     if (!extractionData.visitDate) return 'Chưa rõ ngày';
@@ -135,6 +143,17 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
             <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
             <span>{onBackToQueue ? 'Thay thế / Tải lại tệp (Bước 1)' : 'Quay lại Bước 1 (Tải tệp)'}</span>
           </button>
+          {onDeleteFile && (
+            <button
+              type="button"
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              disabled={isDeletingFile}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50/80 border border-rose-200 hover:bg-rose-100 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Xóa phiếu này</span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -469,85 +488,135 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                    {/* Huyết áp (Tâm thu / Tâm trương) */}
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">
-                        Huyết áp (tâm thu)
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1 whitespace-nowrap">
+                        Huyết áp (Tâm thu / Tâm trương)
                       </label>
-                      <input
-                        type="number"
-                        value={extractionData.vitals.bloodPressureSystolic}
-                        onChange={(e) =>
-                          handleVitalChange(
-                            'bloodPressureSystolic',
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-center"
-                      />
+                      <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white focus-within:border-[#275248] focus-within:ring-1 focus-within:ring-[#275248] transition-colors">
+                        <input
+                          type="number"
+                          aria-label="Huyết áp tâm thu"
+                          value={extractionData.vitals.bloodPressureSystolic}
+                          onChange={(e) =>
+                            handleVitalChange(
+                              'bloodPressureSystolic',
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-slate-300 font-bold select-none">/</span>
+                        <input
+                          type="number"
+                          aria-label="Huyết áp tâm trương"
+                          value={extractionData.vitals.bloodPressureDiastolic}
+                          onChange={(e) =>
+                            handleVitalChange(
+                              'bloodPressureDiastolic',
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          mmHg
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Cân nặng */}
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">
-                        Huyết áp (tâm trương)
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1 whitespace-nowrap">
+                        Cân nặng
                       </label>
-                      <input
-                        type="number"
-                        value={extractionData.vitals.bloodPressureDiastolic}
-                        onChange={(e) =>
-                          handleVitalChange(
-                            'bloodPressureDiastolic',
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-center"
-                      />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white focus-within:border-[#275248] focus-within:ring-1 focus-within:ring-[#275248] transition-colors">
+                        <input
+                          type="number"
+                          step="0.1"
+                          aria-label="Cân nặng"
+                          value={extractionData.vitals.weightKg}
+                          onChange={(e) =>
+                            handleVitalChange('weightKg', Number(e.target.value))
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          kg
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Mạch */}
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">
-                        Cân nặng (kg)
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1 whitespace-nowrap">
+                        Mạch
                       </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={extractionData.vitals.weightKg}
-                        onChange={(e) =>
-                          handleVitalChange('weightKg', Number(e.target.value))
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-center"
-                      />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white focus-within:border-[#275248] focus-within:ring-1 focus-within:ring-[#275248] transition-colors">
+                        <input
+                          type="number"
+                          aria-label="Mạch"
+                          value={extractionData.vitals.heartRateBpm}
+                          onChange={(e) =>
+                            handleVitalChange(
+                              'heartRateBpm',
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          bpm
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Thân nhiệt */}
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">
-                        Mạch (bpm)
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1 whitespace-nowrap">
+                        Thân nhiệt
                       </label>
-                      <input
-                        type="number"
-                        value={extractionData.vitals.heartRateBpm}
-                        onChange={(e) =>
-                          handleVitalChange(
-                            'heartRateBpm',
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-center"
-                      />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white focus-within:border-[#275248] focus-within:ring-1 focus-within:ring-[#275248] transition-colors">
+                        <input
+                          type="number"
+                          step="0.1"
+                          aria-label="Thân nhiệt"
+                          value={extractionData.vitals.temperatureC}
+                          onChange={(e) =>
+                            handleVitalChange(
+                              'temperatureC',
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          °C
+                        </span>
+                      </div>
                     </div>
+
+                    {/* BMI */}
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">
-                        Thân nhiệt (°C)
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1 whitespace-nowrap">
+                        Chỉ số BMI
                       </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={extractionData.vitals.temperatureC}
-                        onChange={(e) =>
-                          handleVitalChange(
-                            'temperatureC',
-                            Number(e.target.value)
-                          )
-                        }
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 text-center"
-                      />
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white focus-within:border-[#275248] focus-within:ring-1 focus-within:ring-[#275248] transition-colors">
+                        <input
+                          type="number"
+                          step="0.1"
+                          aria-label="Chỉ số BMI"
+                          value={extractionData.vitals.bmi}
+                          onChange={(e) =>
+                            handleVitalChange('bmi', Number(e.target.value))
+                          }
+                          className="w-full min-w-0 text-xs font-bold text-slate-800 text-left outline-none bg-transparent"
+                        />
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                          kg/m²
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -828,6 +897,76 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteConfirmOpen && onDeleteFile && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Xóa phiếu khỏi hàng đợi tiếp nhận?
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Thao tác này sẽ xóa tệp gốc và dữ liệu trích xuất chưa phê duyệt.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={isDeletingFile}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
+              <div className="font-semibold text-slate-900 truncate">{extractionData.fileName}</div>
+              {patientName && (
+                <div className="text-[11px] text-slate-500 mt-0.5">Thai phụ: {patientName}</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={isDeletingFile}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await onDeleteFile();
+                  setIsDeleteConfirmOpen(false);
+                }}
+                disabled={isDeletingFile}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+              >
+                {isDeletingFile ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang xóa...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xác nhận xóa</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Sticky Action Bar */}
       <div className="pt-4 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">

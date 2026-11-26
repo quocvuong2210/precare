@@ -542,7 +542,7 @@ def list_profile_files(
 @router.delete(
     "/files/{file_id}",
     response_model=CommonMessageResponse,
-    summary="Xóa tài liệu tải lên nhầm (khi status là pending hoặc failed)"
+    summary="Xóa tài liệu tải lên nhầm (khi status là pending, failed hoặc extracted)"
 )
 def delete_uploaded_file(
     file_id: uuid.UUID,
@@ -554,10 +554,10 @@ def delete_uploaded_file(
     if not db_file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy file để xóa.")
 
-    if db_file.status not in ["pending", "failed"]:
+    if db_file.status not in ["pending", "failed", "extracted"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Chỉ được phép xóa trực tiếp tài liệu khi ở trạng thái 'pending' hoặc 'failed'. Tài liệu đã xác thực phải qua luồng xóa bảo mật y tế."
+            detail="Chỉ được phép xóa trực tiếp tài liệu khi ở trạng thái 'pending', 'failed' hoặc 'extracted'. Tài liệu đã xác thực phải qua luồng xóa bảo mật y tế."
         )
 
     # Xóa file vật lý trên MinIO
