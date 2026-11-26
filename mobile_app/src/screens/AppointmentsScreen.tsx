@@ -6,15 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PrimaryButton from '../components/PrimaryButton';
+import ScreenHeader from '../components/ScreenHeader';
+import { useAppSettings } from '../context/AppSettingsContext';
 import { colors } from '../theme/colors';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Appointments'>;
 
-/* ================= DỮ LIỆU MẪU (sau này thay bằng API) ================= */
 type Appointment = {
   id: string;
-  date: string; // định dạng YYYY-MM-DD
+  date: string;
   title: string;
   doctor: string;
   pregnancyWeek: number;
@@ -22,8 +23,7 @@ type Appointment = {
   status: 'upcoming' | 'done';
 };
 
-const APPOINTMENTS: Appointment[] = [
-];
+const APPOINTMENTS: Appointment[] = [];
 
 /* ================= HÀM HỖ TRỢ LỊCH ================= */
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
