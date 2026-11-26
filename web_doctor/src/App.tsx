@@ -23,7 +23,6 @@ import {
   ArrowRight,
   Loader2,
   ScanText,
-  Plus,
 } from 'lucide-react';
 
 type AppView = 'login' | 'register' | 'app' | 'forgot-password' | 'reset-password';
@@ -121,7 +120,6 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>(initialRoute.tab);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(initialRoute.patientId);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [newUploadSignal, setNewUploadSignal] = useState(0);
 
   // Đồng bộ chuyển tab và cập nhật URL trình duyệt (Two-way SPA Routing)
   const syncRoute = (tab: TabType, patientId: string | null = null) => {
@@ -391,17 +389,6 @@ export const App: React.FC = () => {
 
             {/* Right Header Info */}
             <div className="flex items-center gap-3 shrink-0">
-              {activeTab === 'results' && (
-                <button
-                  type="button"
-                  onClick={() => setNewUploadSignal((prev) => prev + 1)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer shrink-0"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tiếp nhận hồ sơ mới</span>
-                </button>
-              )}
-
               <button
                 aria-label="Thông báo"
                 className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-colors cursor-pointer"
@@ -410,7 +397,7 @@ export const App: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-2.5 right-2.5"></span>
               </button>
 
-              <div className="text-right pl-2">
+              <div className="hidden xl:block text-right pl-2">
                 <div className="text-sm font-bold text-slate-800 leading-tight">Bệnh viện Phụ sản Trung ương</div>
                 <div className="text-xs text-slate-500">Phòng khám sản 402</div>
               </div>
@@ -429,7 +416,6 @@ export const App: React.FC = () => {
           ) : activeTab === 'results' ? (
             <TestResults
               initialPatientId={selectedPatientId}
-              newUploadSignal={newUploadSignal}
               onNavigateToProfile={(pid) => syncRoute('records', pid)}
             />
           ) : activeTab === 'records' ? (
