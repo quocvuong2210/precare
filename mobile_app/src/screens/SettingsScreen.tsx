@@ -438,58 +438,11 @@ export default function SettingsScreen({
               value: preferences.darkMode,
               onChange: (value) => updatePreference("darkMode", value),
               disabled: !isLoaded,
-            onPress={() => setDialog("password")}
-          />
-        </SettingsSection>
-
-        <SettingsSection title={copy.notifications} theme={theme}>
-          <SettingsRow
-            {...shared}
-            icon="notifications-outline"
-            label={copy.events}
-            toggle={{
-              value: preferences.eventNotifications,
-              onChange: (value) =>
-                updatePreference("eventNotifications", value),
-              disabled: !isLoaded,
-            }}
-          />
-          <SettingsRow
-            {...shared}
-            icon="mail-outline"
-            label={copy.email}
-            last
-            toggle={{
-              value: preferences.emailNotifications,
-              onChange: (value) =>
-                updatePreference("emailNotifications", value),
-              disabled: !isLoaded,
             }}
           />
         </SettingsSection>
 
-        <SettingsSection title={copy.general} theme={theme}>
-          <SettingsRow
-            {...shared}
-            icon="globe-outline"
-            label={copy.language}
-            value={preferences.language === "vi" ? "Tiếng Việt" : "English"}
-            onPress={() => setDialog("language")}
-          />
-          <SettingsRow
-            {...shared}
-            icon="moon-outline"
-            label={copy.darkMode}
-            last
-            toggle={{
-              value: preferences.darkMode,
-              onChange: (value) => updatePreference("darkMode", value),
-              disabled: !isLoaded,
-            }}
-          />
-        </SettingsSection>
-
-        <SettingsSection title={copy.support} theme={theme}>
+        <SettingsSection title={copy.support} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="help-circle-outline"
@@ -517,7 +470,7 @@ export default function SettingsScreen({
           />
         </SettingsSection>
 
-        <SettingsSection title={copy.privacySupport} theme={theme}>
+        <SettingsSection title={copy.privacySupport} theme={theme} fontStyle={fontStyle}>
           <SettingsRow
             {...shared}
             icon="trash-outline"
@@ -535,16 +488,8 @@ export default function SettingsScreen({
             {...shared}
             icon="text-outline"
             label={copy.textSize}
-            onPress={() => setDialog("textSize")}
-          />
-          <SettingsRow
-            {...shared}
-            icon="help-circle-outline"
-            label={copy.contacts}
             last
-            onPress={() =>
-              navigation.navigate("Records", { section: "contacts" })
-            }
+            onPress={() => setDialog("textSize")}
           />
         </SettingsSection>
 
@@ -569,7 +514,11 @@ export default function SettingsScreen({
         {!!storageError && (
           <Text
             accessibilityRole="alert"
-            style={[styles.storageError, { color: theme.danger }]}
+            style={[
+              styles.storageError,
+              fontStyle(13, { lineHeight: 19, min: 12 }),
+              { color: theme.danger },
+            ]}
           >
             {copy.storageError}
           </Text>
@@ -607,7 +556,8 @@ export default function SettingsScreen({
                 accessibilityRole="header"
                 style={[
                   styles.sheetTitle,
-                  { color: theme.text, fontSize: 18 * fontScale },
+                  fontStyle(18, { max: 21 }),
+                  { color: theme.text },
                 ]}
               >
                 {dialogTitle}
@@ -658,7 +608,8 @@ export default function SettingsScreen({
                     <Text
                       style={[
                         styles.optionLabel,
-                        { color: theme.text, fontSize: 15 * fontScale },
+                        fontStyle(15.5, { min: 14.5 }),
+                        { color: theme.text },
                       ]}
                     >
                       {label}
@@ -721,10 +672,10 @@ export default function SettingsScreen({
                             color: theme.text,
                             fontSize:
                               value === "small"
-                                ? 12
+                                ? 13
                                 : value === "large"
-                                  ? 17
-                                  : 14,
+                                  ? 17.5
+                                  : 15,
                           }}
                         >
                           {label}
@@ -735,7 +686,8 @@ export default function SettingsScreen({
                   <Text
                     style={[
                       styles.sample,
-                      { color: theme.text, fontSize: 18 * fontScale },
+                      fontStyle(18, { lineHeight: 27, min: 16 }),
+                      { color: theme.text },
                     ]}
                   >
                     {copy.sample}
@@ -749,13 +701,13 @@ export default function SettingsScreen({
                   {[
                     [copy.helpProfile, copy.helpProfileAnswer],
                     [copy.helpUpload, copy.helpUploadAnswer],
-                    [copy.helpContacts, copy.helpContactsAnswer],
                   ].map(([question, answer]) => (
                     <View key={question} style={styles.faq}>
                       <Text
                         style={[
                           styles.question,
-                          { color: theme.text, fontSize: 14 * fontScale },
+                          fontStyle(15, { lineHeight: 22, min: 14 }),
+                          { color: theme.text },
                         ]}
                       >
                         {question}
@@ -785,7 +737,7 @@ export default function SettingsScreen({
                       {logoutError && (
                         <Text
                           accessibilityRole="alert"
-                          style={[styles.bodyText, { color: theme.danger }]}
+                          style={[styles.bodyText, textStyle, { color: theme.danger }]}
                         >
                           {copy.logoutError}
                         </Text>

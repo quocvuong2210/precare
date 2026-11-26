@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ScreenHeader from '../components/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -24,6 +25,8 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { useAppSettings } from '../context/AppSettingsContext';
+import type { AppTheme } from '../theme/settings';
 import { colors } from '../theme/colors';
 import type { MainTabParamList } from '../navigation/MainTabs';
 import type { UploadStackParamList } from '../navigation/UploadNavigator';
@@ -105,9 +108,6 @@ export type MedicalAnalysisResult = {
   model_version?: string;
   overallSeverity: SeverityLevel;
   metrics: MedicalMetric[];
-  savedToProfile: boolean;
-};
-
 export type UploadItem = {
   id: string;
   fileId?: string;
