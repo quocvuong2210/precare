@@ -6,6 +6,7 @@ and persists results to `analysis_results` with explicit `rules_version`.
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
@@ -14,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.models.analysis_result import AnalysisResult
 from app.models.biometric_data import BiometricData
+from app.models.growth_reference import GrowthReference
+from app.services.growth_reference_seeder import seed_growth_references
 from app.services.growth_reference_service import evaluate_biometric_zscore
 
 RULES_VERSION = "hadlock-intergrowth-v1.0"
@@ -247,6 +250,9 @@ def evaluate_and_save_biometric_rules(
 
     ga_days = bio.gestational_age_days
 
+    if db.query(GrowthReference.id).filter(GrowthReference.is_deleted.is_(False)).first() is None:
+        seed_growth_references(db)
+
     bpd_z, bpd_p = _evaluate_metric_with_fallback(db, standard, "bpd", ga_days, bio.bpd)
     hc_z, hc_p = _evaluate_metric_with_fallback(db, standard, "hc", ga_days, bio.hc)
     ac_z, ac_p = _evaluate_metric_with_fallback(db, standard, "ac", ga_days, bio.ac)
@@ -257,12 +263,18 @@ def evaluate_and_save_biometric_rules(
     if prev_efw_p is None:
         prev_result = (
             db.query(AnalysisResult)
+            .join(BiometricData, AnalysisResult.biometric_data_id == BiometricData.id)
             .filter(
                 AnalysisResult.pregnancy_profile_id == bio.pregnancy_profile_id,
                 AnalysisResult.biometric_data_id != bio.id,
                 AnalysisResult.efw_percentile.isnot(None),
+                BiometricData.is_deleted.is_(False),
+                BiometricData.gestational_age_days < bio.gestational_age_days,
             )
-            .order_by(AnalysisResult.analyzed_at.desc())
+            .order_by(
+                BiometricData.gestational_age_days.desc(),
+                AnalysisResult.analyzed_at.desc(),
+            )
             .first()
         )
         if prev_result is not None and prev_result.efw_percentile is not None:
@@ -279,29 +291,59 @@ def evaluate_and_save_biometric_rules(
         previous_efw_percentile=prev_efw_p,
     )
 
-    record = AnalysisResult(
-        pregnancy_profile_id=bio.pregnancy_profile_id,
-        checkup_id=bio.checkup_id,
-        biometric_data_id=bio.id,
-        model_version=RULE_ONLY_MODEL_VERSION,
-        rules_version=RULES_VERSION,
-        bpd_zscore=bpd_z,
-        bpd_percentile=bpd_p,
-        hc_zscore=hc_z,
-        hc_percentile=hc_p,
-        ac_zscore=ac_z,
-        ac_percentile=ac_p,
-        fl_zscore=fl_z,
-        fl_percentile=fl_p,
-        efw_zscore=efw_z,
-        efw_percentile=efw_p,
-        anomaly_probability=Decimal(f"{summary.anomaly_probability:.4f}"),
-        warning_level=summary.warning_level,
-        explanation_doctor=summary.explanation_doctor,
-        explanation_patient=summary.explanation_patient,
-        disclaimer_text=MANDATORY_DISCLAIMER,
+    existing = (
+        db.query(AnalysisResult)
+        .filter(
+            AnalysisResult.biometric_data_id == bio.id,
+            AnalysisResult.rules_version == RULES_VERSION,
+            AnalysisResult.model_version == RULE_ONLY_MODEL_VERSION,
+        )
+        .first()
     )
-    db.add(record)
+
+    if existing is not None:
+        existing.bpd_zscore = bpd_z
+        existing.bpd_percentile = bpd_p
+        existing.hc_zscore = hc_z
+        existing.hc_percentile = hc_p
+        existing.ac_zscore = ac_z
+        existing.ac_percentile = ac_p
+        existing.fl_zscore = fl_z
+        existing.fl_percentile = fl_p
+        existing.efw_zscore = efw_z
+        existing.efw_percentile = efw_p
+        existing.anomaly_probability = Decimal(f"{summary.anomaly_probability:.4f}")
+        existing.warning_level = summary.warning_level
+        existing.explanation_doctor = summary.explanation_doctor
+        existing.explanation_patient = summary.explanation_patient
+        existing.disclaimer_text = MANDATORY_DISCLAIMER
+        existing.analyzed_at = datetime.now(timezone.utc)
+        record = existing
+    else:
+        record = AnalysisResult(
+            pregnancy_profile_id=bio.pregnancy_profile_id,
+            checkup_id=bio.checkup_id,
+            biometric_data_id=bio.id,
+            model_version=RULE_ONLY_MODEL_VERSION,
+            rules_version=RULES_VERSION,
+            bpd_zscore=bpd_z,
+            bpd_percentile=bpd_p,
+            hc_zscore=hc_z,
+            hc_percentile=hc_p,
+            ac_zscore=ac_z,
+            ac_percentile=ac_p,
+            fl_zscore=fl_z,
+            fl_percentile=fl_p,
+            efw_zscore=efw_z,
+            efw_percentile=efw_p,
+            anomaly_probability=Decimal(f"{summary.anomaly_probability:.4f}"),
+            warning_level=summary.warning_level,
+            explanation_doctor=summary.explanation_doctor,
+            explanation_patient=summary.explanation_patient,
+            disclaimer_text=MANDATORY_DISCLAIMER,
+        )
+        db.add(record)
+
     db.commit()
     db.refresh(record)
     return record, summary.flags

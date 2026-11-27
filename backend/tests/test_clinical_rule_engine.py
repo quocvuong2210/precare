@@ -238,3 +238,134 @@ def test_evaluate_and_save_persistence_and_trajectory(db_session):
             current_user=doctor,
         )
     assert exc_404.value.status_code == 404
+
+    # Idempotent upsert: re-evaluating bio2 updates existing row instead of duplicating
+    count_before = (
+        db_session.query(AnalysisResult)
+        .filter(AnalysisResult.biometric_data_id == bio2.id)
+        .count()
+    )
+    assert count_before == 1
+    res2_again = evaluate_biometric_rules(
+        payload=ClinicalRuleEvaluateRequest(biometric_data_id=bio2.id, standard="intergrowth_21st"),
+        db=db_session,
+        current_user=doctor,
+    )
+    assert res2_again.id == res2.id
+    count_after = (
+        db_session.query(AnalysisResult)
+        .filter(AnalysisResult.biometric_data_id == bio2.id)
+        .count()
+    )
+    assert count_after == 1
+
+    # Back-evaluating earlier visit (week 28) does NOT compare against later visit (week 32)
+    res1_reeval = evaluate_biometric_rules(
+        payload=ClinicalRuleEvaluateRequest(biometric_data_id=bio1.id, standard="intergrowth_21st"),
+        db=db_session,
+        current_user=doctor,
+    )
+    assert "TRAJECTORY_DROP_GT_20" not in res1_reeval.flags
+    assert res1_reeval.warning_level == "green"
+
+
+def test_autoseed_and_checkup_auto_evaluation():
+    from starlette.requests import Request
+    from app.api.checkup import create_checkup
+    from app.models.audit_log import AuditLog
+    from app.schemas.checkup import BiometricsInput, CreateCheckupRequest
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            User.__table__,
+            AuditLog.__table__,
+            PregnancyProfile.__table__,
+            Checkup.__table__,
+            UploadedFile.__table__,
+            BiometricData.__table__,
+            GrowthReference.__table__,
+            AnalysisResult.__table__,
+        ],
+    )
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = TestingSessionLocal()
+    try:
+        # Note: growth_references is intentionally EMPTY here to test auto-seeding
+        doctor = User(
+            id=uuid.uuid4(),
+            email="doc2@example.com",
+            password_hash="x",
+            full_name="BS. B",
+            role="doctor",
+            is_active=True,
+        )
+        patient = User(
+            id=uuid.uuid4(),
+            email="pat2@example.com",
+            password_hash="x",
+            full_name="Patient B",
+            role="pregnant_woman",
+            is_active=True,
+        )
+        db.add_all([doctor, patient])
+        db.flush()
+
+        profile = PregnancyProfile(
+            id=uuid.uuid4(),
+            patient_id=patient.id,
+            primary_doctor_id=doctor.id,
+            lmp=date(2026, 3, 1),
+            edd=date(2026, 12, 6),
+            status="active",
+        )
+        db.add(profile)
+        db.commit()
+
+        # Checkup at ~32w0d (224 days) with severe FGR EFW (1100g < 3rd percentile)
+        checkup_date = profile.edd - timedelta(days=280 - 224)
+        fake_request = Request(
+            scope={
+                "type": "http",
+                "method": "POST",
+                "path": "/api/v1/checkups",
+                "headers": [],
+                "client": ("127.0.0.1", 12345),
+            }
+        )
+        resp = create_checkup(
+            payload=CreateCheckupRequest(
+                pregnancy_profile_id=profile.id,
+                checkup_date=checkup_date,
+                biometrics=BiometricsInput(
+                    bpd=76.0,
+                    hc=280.0,
+                    ac=230.0,
+                    fl=56.0,
+                    efw=1100.0,
+                ),
+            ),
+            request=fake_request,
+            db=db,
+            current_user=doctor,
+        )
+        assert resp.success is True
+
+        # Verify growth_references was auto-seeded and AnalysisResult was auto-created as 'red'
+        assert db.query(GrowthReference).count() > 0
+        analyses = (
+            db.query(AnalysisResult)
+            .filter(AnalysisResult.pregnancy_profile_id == profile.id)
+            .all()
+        )
+        assert len(analyses) == 1
+        assert analyses[0].warning_level == "red"
+        assert float(analyses[0].efw_percentile) < 3.0
+    finally:
+        db.close()
+        engine.dispose()

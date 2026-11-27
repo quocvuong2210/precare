@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
@@ -10,6 +11,7 @@ from app.models.user import User
 from app.models.pregnancy_profile import PregnancyProfile
 from app.models.checkup import Checkup
 from app.models.biometric_data import BiometricData
+from app.services.clinical_rule_engine import evaluate_and_save_biometric_rules
 from app.schemas.checkup import (
     CreateCheckupRequest,
     CheckupResponse,
@@ -22,6 +24,7 @@ from app.schemas.checkup import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/pregnancy-profile/{pregnancy_profile_id}", response_model=CheckupHistoryResponse)
@@ -225,6 +228,16 @@ def create_checkup(
 
     db.commit()
     db.refresh(new_checkup)
+
+    if bio_response is not None:
+        try:
+            evaluate_and_save_biometric_rules(db=db, biometric_data_id=bio_response.id)
+        except Exception as exc:
+            logger.warning(
+                "Auto rule-engine evaluation failed for biometric_data_id=%s: %s",
+                bio_response.id,
+                exc,
+            )
 
     # 5. Ghi vết kiểm toán (Audit Trail)
     log_audit_event(
