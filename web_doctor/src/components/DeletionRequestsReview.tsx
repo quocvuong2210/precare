@@ -88,14 +88,14 @@ export const DeletionRequestsReview: React.FC = () => {
         <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-800">
             <ShieldCheck className="w-5 h-5 text-[#4D7D74]" />
-            <h2 className="text-sm font-bold">Danh sách yêu cầu xét duyệt</h2>
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+            <h2 className="text-base font-bold">Danh sách yêu cầu xét duyệt</h2>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
               {requests.length}
             </span>
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-sm font-medium self-start sm:self-auto">
             {(['pending', 'all', 'approved', 'rejected'] as const).map((filter) => (
               <button
                 key={filter}
@@ -118,14 +118,14 @@ export const DeletionRequestsReview: React.FC = () => {
           </div>
         </div>
         {isLoading ? (
-          <div className="py-12 text-center text-xs text-slate-400">Đang tải danh sách yêu cầu...</div>
+          <div className="py-12 text-center text-sm text-slate-400">Đang tải danh sách yêu cầu...</div>
         ) : requests.length === 0 ? (
-          <div className="py-12 text-center text-xs text-slate-400">Không có yêu cầu xóa nào ở trạng thái này.</div>
+          <div className="py-12 text-center text-sm text-slate-400">Không có yêu cầu xóa nào ở trạng thái này.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-100">
+                <tr className="bg-slate-50/80 text-xs text-slate-500 font-semibold border-b border-slate-100 uppercase tracking-wider">
                   <th className="py-3.5 px-4">Thai phụ yêu cầu</th>
                   <th className="py-3.5 px-4">Phạm vi xóa</th>
                   <th className="py-3.5 px-4">Lý do y khoa</th>
@@ -140,7 +140,7 @@ export const DeletionRequestsReview: React.FC = () => {
                     {/* Thai phụ */}
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="font-bold text-slate-800">{item.requester_name}</div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         {new Date(item.created_at).toLocaleString('vi-VN')}
                       </div>
                     </td>
@@ -148,11 +148,11 @@ export const DeletionRequestsReview: React.FC = () => {
                     {/* Phạm vi */}
                     <td className="py-4 px-4 whitespace-nowrap">
                       {item.target_type === 'full_profile' ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                           Toàn bộ thai kỳ
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                           Một lần khám
                         </span>
                       )}
@@ -166,11 +166,11 @@ export const DeletionRequestsReview: React.FC = () => {
                     {/* Quyền riêng tư NCKH */}
                     <td className="py-4 px-4 whitespace-nowrap">
                       {item.allow_anonymized_research ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200">
                           <Database className="w-3 h-3 text-teal-600" /> Cho phép ẩn danh AI
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                           <AlertCircle className="w-3 h-3 text-rose-500" /> Xóa sạch khỏi AI (Purge)
                         </span>
                       )}
@@ -179,15 +179,15 @@ export const DeletionRequestsReview: React.FC = () => {
                     {/* Trạng thái */}
                     <td className="py-4 px-4 whitespace-nowrap">
                       {item.status === 'pending' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                           <Clock className="w-3 h-3" /> Chờ xét duyệt
                         </span>
                       ) : item.status === 'approved' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
                           <CheckCircle2 className="w-3 h-3" /> Đã duyệt xóa
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
                           <XCircle className="w-3 h-3" /> Đã từ chối
                         </span>
                       )}
@@ -201,12 +201,12 @@ export const DeletionRequestsReview: React.FC = () => {
                             setSelectedRequest(item);
                             setReviewNotes('');
                           }}
-                          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#345C59] hover:bg-[#2A4B48] transition-colors shadow-xs"
+                          className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#345C59] hover:bg-[#2A4B48] transition-colors shadow-xs cursor-pointer"
                         >
                           Thẩm định
                         </button>
                       ) : (
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-xs text-slate-400">
                           Duyệt bởi: {item.reviewed_by_name || 'N/A'}
                         </span>
                       )}

@@ -3,6 +3,9 @@ import { Trash2 } from 'lucide-react';
 import { RequestDeletionModal } from '../components/RequestDeletionModal';
 import { VisitTimeline } from '../components/VisitTimeline';
 import { TrajectoryChart } from '../components/TrajectoryChart';
+import { ClinicalEvaluationPanel } from '../components/ClinicalEvaluationPanel';
+import { fetchProfileRuleEvaluationsApi } from '../services/clinicalRule.service';
+import { AnalysisResult } from '../types';
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupTimelineRecord, fetchCheckupHistory } from '../services/checkup.service';
 import {
@@ -150,6 +153,36 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 
   const [currentRecord, setCurrentRecord] = useState<PregnancyRecordItem | undefined>(undefined);
   const [activeDetailTab, setActiveDetailTab] = useState<'overview' | 'results' | 'growth'>('overview');
+  const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState<boolean>(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentRecord?.id) {
+      setLatestAnalysis(null);
+      return;
+    }
+    setIsLoadingAnalysis(true);
+    fetchProfileRuleEvaluationsApi(currentRecord.id)
+      .then((results) => {
+        if (!cancelled) {
+          setLatestAnalysis(results.length > 0 ? results[0] : null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLatestAnalysis(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAnalysis(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRecord?.id]);
   const [isUploadWizardOpen, setIsUploadWizardOpen] = useState(false);
   useEffect(() => {
     setCurrentRecord(undefined);
@@ -696,7 +729,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                 className="absolute -top-1 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 z-10"
                 style={{ left: `${Math.min(96, Math.max(4, progressPercent))}%` }}
               >
-                <div className="px-2.5 py-1 bg-[#275248] text-white text-[11px] font-bold rounded-lg shadow-sm whitespace-nowrap">
+                <div className="px-2.5 py-1 bg-[#275248] text-white text-xs font-bold rounded-lg shadow-sm whitespace-nowrap">
                   {targetDate === getTodayISO() ? 'Hôm nay' : 'Mốc khám'}: {currentGaFormatted}
                 </div>
                 <div className="w-2 h-1 bg-[#275248] [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
@@ -741,7 +774,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
             <div>
               <div className="text-xs font-bold text-slate-800">Quý 1 (0w - 13w6d)</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-xs text-slate-500 mt-0.5">
                 {currentTrimester === 1
                   ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
                   : currentTrimester != null && currentTrimester > 1
@@ -752,7 +785,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 
             <div>
               <div className="text-xs font-bold text-slate-800">Quý 2 (14w - 27w6d)</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-xs text-slate-500 mt-0.5">
                 {currentTrimester === 2
                   ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
                   : currentTrimester != null && currentTrimester > 2
@@ -765,7 +798,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 
             <div>
               <div className="text-xs font-bold text-slate-800">Quý 3 (28w - 40w)</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-xs text-slate-500 mt-0.5">
                 {currentTrimester === 3
                   ? `Giai đoạn hiện tại${currentGaWeeks != null ? ` (Tuần ${currentGaWeeks})` : ''}`
                   : currentTrimester != null && currentTrimester < 3
@@ -791,7 +824,20 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           pregnancyProfileId={currentRecord.id}
           patientName={patientInfo.fullName}
           onOpenUpload={() => setIsUploadWizardOpen(true)}
+          onAnalysisUpdated={(analysis) =>
+            setLatestAnalysis((prev) =>
+              !prev ||
+              prev.checkup_id === analysis.checkup_id ||
+              new Date(analysis.analyzed_at) >= new Date(prev.analyzed_at)
+                ? analysis
+                : prev,
+            )
+          }
         />
+      )}
+
+      {activeDetailTab === 'overview' && (
+        <ClinicalEvaluationPanel analysis={latestAnalysis} isLoading={isLoadingAnalysis} />
       )}
 
       {/* 5. KHỐI: DỮ LIỆU LÂM SÀNG ĐẦU VÀO (CHUẨN HÓA SCHEMA POSTGRESQL 16) */}
@@ -847,7 +893,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                 Chiều dài đầu mông (CRL)
               </span>
               {currentRecord?.crlMm ? (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
                   Chuẩn
                 </span>
               ) : null}
@@ -946,7 +992,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                     />
                     <div>
                       <div className="font-bold">{opt.label}</div>
-                      <div className="text-[11px] text-slate-500 font-normal">{opt.desc}</div>
+                      <div className="text-xs text-slate-500 font-normal">{opt.desc}</div>
                     </div>
                   </label>
                 ))}

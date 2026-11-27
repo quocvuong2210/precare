@@ -50,15 +50,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
         </div>
 
         {/* Card 3: Cảnh báo chờ xử lý */}
-        <div className="bg-[#FFF5F5] rounded-2xl p-5 border border-red-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between">
-            <span className="text-sm font-medium text-rose-600">Cảnh báo chờ xử lý</span>
-            <div className="w-10 h-10 rounded-xl bg-red-100/70 flex items-center justify-center text-rose-500">
+            <span className="text-sm font-medium text-slate-600">Cảnh báo chờ xử lý</span>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
               <AlertTriangle className="w-5 h-5" />
             </div>  
           </div>
           <div className="mt-4">
-            <div className="text-3xl font-bold text-rose-500 tracking-tight">0</div>
+            <div className="text-3xl font-bold text-rose-600 tracking-tight">0</div>
             <p className="text-xs font-normal text-rose-500/90 mt-2">Chưa có dữ liệu</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
         {/* Left Column: Lịch khám hôm nay (Width ~ 68%) */}
         <div className="lg:col-span-8 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
           <div className="flex items-center justify-between pb-5 border-b border-slate-100">
-            <h2 className="text-base font-bold text-slate-800">Lịch khám hôm nay</h2>
+            <h2 className="text-lg font-bold text-slate-800">Lịch khám hôm nay</h2>
             <button className="text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline">
               Xem tất cả
             </button>
@@ -144,18 +144,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
 
         {/* Right Column: Bảng phân loại nguy cơ (Width ~ 32%) */}
         <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-          <h2 className="text-base font-bold text-slate-800">Bảng phân loại nguy cơ</h2>
+          <h2 className="text-lg font-bold text-slate-800">Bảng phân loại nguy cơ</h2>
 
           <div className="space-y-3.5 pt-1">
             {/* 1. Nguy cơ cao */}
             <div className="bg-[#FEF2F2] border border-rose-200/70 rounded-xl p-4 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-rose-600 tracking-tight">
+                <span className="text-sm font-bold text-rose-600 tracking-tight">
                   NGUY CƠ CAO (CẤP BÁCH)
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
+              <p className="text-sm text-slate-600 leading-relaxed pl-4.5">
                 Chưa có dữ liệu cảnh báo từ CSDL.
               </p>
             </div>
@@ -164,11 +164,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             <div className="bg-[#FEFCE8] border border-amber-200/70 rounded-xl p-4 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-amber-600 tracking-tight">
+                <span className="text-sm font-bold text-amber-600 tracking-tight">
                   CẦN THEO DÕI SÁT
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
+              <p className="text-sm text-slate-600 leading-relaxed pl-4.5">
                 Chưa có dữ liệu theo dõi từ CSDL.
               </p>
             </div>
@@ -177,11 +177,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectPatient }) => {
             <div className="bg-[#F0FDF4] border border-emerald-200/70 rounded-xl p-4 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0"></span>
-                <span className="text-xs font-bold text-emerald-600 tracking-tight">
+                <span className="text-sm font-bold text-emerald-600 tracking-tight">
                   BÌNH THƯỜNG / KHỎE MẠNH
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed pl-4.5">
+              <p className="text-sm text-slate-600 leading-relaxed pl-4.5">
                 Chưa có dữ liệu đánh giá từ CSDL.
               </p>
             </div>

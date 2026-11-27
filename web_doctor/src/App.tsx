@@ -375,11 +375,6 @@ export const App: React.FC = () => {
                             ? 'Cài đặt hệ thống'
                             : 'Tổng quan hoạt động'}
               </h1>
-              {activeTab === 'results' && (
-                <p className="text-xs text-slate-500 mt-0.5 truncate">
-                  Tiếp nhận tài liệu, trích xuất OCR số hóa và đối chiếu kết quả siêu âm, xét nghiệm toàn khoa.
-                </p>
-              )}
               {activeTab === 'deletions' && (
                 <p className="text-xs text-slate-500 mt-0.5 truncate">
                   Quy trình phê duyệt hai bước (Two-Step Approval) tuân thủ bảo mật dữ liệu y tế và quyền riêng tư NCKH.

@@ -513,236 +513,279 @@ export const TestResults: React.FC<TestResultsProps> = ({
         </div>
       )}
 
-      {/* Page Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-slate-500">
-          Quản lý hàng đợi phiếu cận lâm sàng chờ trích xuất OCR và đối chiếu kết quả.
-        </div>
-        <button
-          type="button"
-          onClick={() => handleOpenNewUpload()}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white text-xs font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap shrink-0"
-        >
-          <FileUp className="w-4 h-4" />
-          <span>Tải phiếu mới</span>
-        </button>
-      </div>
-
-      {/* 4 KPI Metric Cards */}
+      {/* 4 KPI Metric Cards (Đồng bộ chuẩn thiết kế Hồ sơ Thai kỳ) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Tổng phiếu tiếp nhận</span>
-            <FileText className="w-4 h-4 text-slate-400" />
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600">Tổng phiếu tiếp nhận</span>
+            <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
+              <FileText className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">
-            {stats.total}{' '}
-            <span className="text-xs font-normal text-slate-500">tài liệu</span>
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              {String(stats.total).padStart(2, '0')}
+            </span>{' '}
+            <span className="text-sm font-normal text-slate-500">tài liệu</span>
           </div>
-          <div className="text-[11px] text-teal-600 font-medium mt-1">
-            Tuần này: 28 phiếu chụp &amp; xét nghiệm
+          <div className="text-xs text-slate-500 font-medium">
+            Toàn bộ phiếu chụp &amp; xét nghiệm
           </div>
         </div>
 
-        <div className="bg-[#FFFBEB] rounded-2xl p-4 border border-amber-300 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-amber-900 font-bold">
-            <span>Chờ bác sĩ duyệt OCR</span>
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600">Chờ bác sĩ duyệt OCR</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-amber-950 mt-2">
-            {stats.pending.toString().padStart(2, '0')}{' '}
-            <span className="text-xs font-normal text-amber-800">phiếu</span>
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-amber-600 tracking-tight">
+              {stats.pending.toString().padStart(2, '0')}
+            </span>{' '}
+            <span className="text-sm font-normal text-slate-500">phiếu</span>
           </div>
-          <div className="text-[11px] text-amber-800 font-medium mt-1">
+          <div className="text-xs text-amber-700 font-medium">
             Cần đối chiếu &amp; xác nhận chuyên môn
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Đã xác nhận &amp; lưu EMR</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600">Đã xác nhận &amp; lưu EMR</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">
-            {stats.verified.toString().padStart(2, '0')}{' '}
-            <span className="text-xs font-normal text-slate-500">hồ sơ</span>
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-emerald-700 tracking-tight">
+              {stats.verified.toString().padStart(2, '0')}
+            </span>{' '}
+            <span className="text-sm font-normal text-slate-500">hồ sơ</span>
           </div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-1">
+          <div className="text-xs text-slate-500 font-medium">
             Đã đồng bộ vào bệnh án điện tử
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Độ tin cậy AI trung bình</span>
-            <Sparkles className="w-4 h-4 text-teal-600" />
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600">Độ tin cậy AI trung bình</span>
+            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
+              <Sparkles className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-[#275248] mt-2">
-            {stats.avgConfidence}%
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-[#275248] tracking-tight">
+              {stats.avgConfidence}%
+            </span>
           </div>
-          <div className="text-[11px] text-slate-400 font-medium mt-1">
+          <div className="text-xs text-slate-500 font-medium">
             Động cơ PaddleOCR &amp; Hadlock IV
           </div>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Doctor Scope Toggle: Của tôi phụ trách | Tất cả toàn khoa */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+      {/* Main Worklist Card (Header Toolbar gắn liền Bảng dữ liệu - đồng bộ Hồ sơ Thai kỳ) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+                Hàng đợi Phiếu cận lâm sàng
+              </h2>
+              <p className="text-sm text-slate-500 mt-1 font-normal">
+                Lọc theo phạm vi phụ trách, trạng thái duyệt OCR hoặc tìm kiếm nhanh theo thai phụ.
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => setDoctorScope('mine')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
-                doctorScope === 'mine'
-                  ? 'bg-white text-[#275248] shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleOpenNewUpload()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#275248] hover:bg-[#1f423a] text-white text-sm font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
-              Của tôi phụ trách ({myPatientsCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setDoctorScope('all')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
-                doctorScope === 'all'
-                  ? 'bg-white text-[#275248] shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Tất cả toàn khoa ({worklist.length})
+              <FileUp className="w-4 h-4" />
+              <span>Tải phiếu mới</span>
             </button>
           </div>
 
-          {/* Status Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              statusFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Tất cả ({stats.total})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter('pending_review')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusFilter === 'pending_review'
-                ? 'bg-[#275248] text-white shadow-2xs font-bold'
-                : 'text-amber-800 hover:bg-amber-100/50'
-            }`}
-          >
-            <span>Chờ duyệt OCR</span>
-            <span
-              className={`px-1.5 py-0.2 rounded text-[10px] ${
-                statusFilter === 'pending_review'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-amber-200 text-amber-900'
-              }`}
-            >
-              {stats.pending}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter('verified')}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              statusFilter === 'verified'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Đã xác nhận ({stats.verified})
-          </button>
-        </div>
-        </div>
+          {/* Filter Row 1: Tìm kiếm + Loại tài liệu + Phạm vi bác sĩ */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên thai phụ, SĐT, loại phiếu..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#4D7D74] focus:ring-1 focus:ring-[#4D7D74]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
-        {/* Search & Document Type Dropdown */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Tìm theo tên thai phụ, SĐT, loại phiếu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#275248]"
-            />
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 outline-none focus:border-[#4D7D74] cursor-pointer shrink-0"
+              >
+                <option value="all">Tất cả loại tài liệu</option>
+                <option value="ultrasound_4d">Siêu âm thai 4D</option>
+                <option value="blood_test">Xét nghiệm máu</option>
+                <option value="comprehensive">Khám thai tổng quát</option>
+              </select>
+            </div>
+
+            {/* Doctor Scope Toggle: Của tôi phụ trách | Tất cả toàn khoa */}
+            <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-sm self-start lg:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setDoctorScope('mine')}
+                className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  doctorScope === 'mine'
+                    ? 'bg-white text-[#275248] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Của tôi phụ trách ({myPatientsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDoctorScope('all')}
+                className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  doctorScope === 'all'
+                    ? 'bg-white text-[#275248] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tất cả toàn khoa ({worklist.length})
+              </button>
+            </div>
           </div>
 
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 outline-none focus:border-[#275248] cursor-pointer"
-          >
-            <option value="all">Tất cả loại tài liệu</option>
-            <option value="ultrasound_4d">Siêu âm thai 4D</option>
-            <option value="blood_test">Xét nghiệm máu</option>
-            <option value="comprehensive">Khám thai tổng quát</option>
-          </select>
-        </div>
-      </div>
+          {/* Filter Row 2: Tab trạng thái & Bộ đếm kết quả */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100/80">
+            <div className="inline-flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tất cả ({stats.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('pending_review')}
+                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap ${
+                  statusFilter === 'pending_review'
+                    ? 'bg-[#275248] text-white shadow-2xs font-bold'
+                    : 'text-amber-800 hover:bg-amber-100/50'
+                }`}
+              >
+                <span>Chờ duyệt OCR</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-xs ${
+                    statusFilter === 'pending_review'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  {stats.pending}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('verified')}
+                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === 'verified'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Đã xác nhận ({stats.verified})
+              </button>
+            </div>
 
-      {/* Main Worklist Table (Using Shared DataTable & TableActionButton) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span>
+                Hiển thị <strong className="text-slate-800">{filteredList.length}</strong> phiếu phù hợp
+              </span>
+              {(searchQuery.trim() !== '' || typeFilter !== 'all' || statusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setTypeFilter('all');
+                    setStatusFilter('all');
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Đặt lại</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <DataTable<ParaclinicalWorklistItem>
           data={filteredList}
           rowKey={(item) => item.id}
+          minWidthClass="min-w-full"
           emptyMessage="Không tìm thấy phiếu cận lâm sàng nào phù hợp với bộ lọc."
           columns={[
             {
               key: 'patient',
               header: 'THAI PHỤ / MÃ BN',
-              widthClass: 'w-[22%]',
+              widthClass: 'w-[20%]',
               align: 'left',
               render: (item) => (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-teal-50 text-[#275248] font-bold text-xs flex items-center justify-center shrink-0 border border-teal-200">
-                    {item.patientName
-                      .split(' ')
-                      .map((w) => w[0])
-                      .slice(-2)
-                      .join('')}
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 text-sm truncate">
+                    {item.patientName}
                   </div>
-                  <div className="min-w-0">
-                    <div className="font-bold text-slate-900 truncate">
-                      {item.patientName}
-                    </div>
-                    <div className="text-[10px] text-slate-400 truncate">
-                      Tuổi thai: <strong>{item.gestationalAge}</strong> • {item.patientPhone}
-                    </div>
-                    {item.primaryDoctorName && item.primaryDoctorId !== currentDoctorId && (
-                      <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-600 max-w-full truncate">
-                        BS phụ trách: {item.primaryDoctorName}
-                      </div>
-                    )}
+                  <div className="text-xs text-slate-500 mt-0.5 truncate">
+                    Tuổi thai: <strong className="text-slate-700">{item.gestationalAge}</strong> • {item.patientPhone}
                   </div>
+                  {item.primaryDoctorName && item.primaryDoctorId !== currentDoctorId && (
+                    <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-xs font-semibold text-slate-600 max-w-full truncate">
+                      BS phụ trách: {item.primaryDoctorName}
+                    </div>
+                  )}
                 </div>
               ),
             },
             {
               key: 'document',
               header: 'LOẠI TÀI LIỆU CẬN LÂM SÀNG',
-              widthClass: 'w-[22%]',
+              widthClass: 'w-[20%]',
               align: 'left',
               render: (item) => (
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-800 truncate">
+                  <div className="font-semibold text-slate-800 text-sm truncate">
                     {item.documentTypeName}
                   </div>
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 min-w-0">
+                  <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 min-w-0">
                     <FileText className="w-3 h-3 text-slate-400 shrink-0" />
                     <span className="truncate" title={`${item.fileName} (${item.fileSize})`}>
                       {item.fileName} ({item.fileSize})
                     </span>
                   </div>
                   {item.hasWarning && (
-                    <div className="text-[10px] text-amber-700 font-medium flex items-center gap-1 mt-1">
+                    <div className="text-xs text-amber-700 font-medium flex items-center gap-1 mt-1">
                       <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
                       <span className="truncate">{item.warningSummary}</span>
                     </div>
@@ -753,12 +796,12 @@ export const TestResults: React.FC<TestResultsProps> = ({
             {
               key: 'received',
               header: 'NGÀY THỰC HIỆN',
-              widthClass: 'w-[14%]',
+              widthClass: 'w-[13%]',
               align: 'left',
               render: (item) => (
                 <div className="text-slate-600 min-w-0">
                   <div className="truncate">{item.receivedAt}</div>
-                  <div className="text-[10px] text-slate-400 truncate">
+                  <div className="text-xs text-slate-400 truncate">
                     BS: {item.doctorPerformer}
                   </div>
                 </div>
@@ -767,10 +810,10 @@ export const TestResults: React.FC<TestResultsProps> = ({
             {
               key: 'confidence',
               header: 'ĐỘ TIN CẬY AI',
-              widthClass: 'w-[11%]',
+              widthClass: 'w-[10%]',
               align: 'center',
               render: (item) => (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#275248] border border-teal-200/80 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-[#275248] border border-teal-200/80 whitespace-nowrap">
                   <Sparkles className="w-3 h-3 text-teal-600" />
                   {item.ocrConfidence}%
                 </span>
@@ -779,27 +822,27 @@ export const TestResults: React.FC<TestResultsProps> = ({
             {
               key: 'status',
               header: 'TRẠNG THÁI',
-              widthClass: 'w-[12%]',
+              widthClass: 'w-[13%]',
               align: 'center',
               render: (item) =>
                 item.status === 'failed' ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                     <AlertTriangle className="w-3 h-3 text-rose-600" />
                     OCR thất bại
                   </span>
                 ) : item.status === 'pending_review' ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
                     <Clock className="w-3 h-3 text-amber-600" />
                     Chờ duyệt OCR
                   </span>
                 ) : (
                   <div className="space-y-1">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       Đã xác nhận
                     </span>
                     {item.verifiedByName && (
-                      <div className="text-[10px] text-slate-500 truncate">
+                      <div className="text-xs text-slate-500 truncate">
                         Duyệt: <strong className="text-slate-700">{item.verifiedByName}</strong>
                         {item.verifiedAt && (
                           <> ({new Date(item.verifiedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })})</>
@@ -812,7 +855,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
             {
               key: 'actions',
               header: 'THAO TÁC',
-              widthClass: 'w-[19%]',
+              widthClass: 'w-[24%]',
               align: 'right',
               render: (item) =>
                 item.status === 'failed' ? (
@@ -890,7 +933,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
           <span>
             Hiển thị {filteredList.length} / {worklist.length} phiếu cận lâm sàng
           </span>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-xs text-slate-400">
             Hệ thống PreCare Digital Ingestion Pipeline • Port 8000
           </span>
         </div>
@@ -909,7 +952,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
                   <h3 className="text-sm font-bold text-slate-900">
                     Xóa phiếu khỏi hàng đợi chờ duyệt?
                   </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Tệp gốc và kết quả OCR chưa phê duyệt sẽ bị xóa vĩnh viễn.
                   </p>
                 </div>
@@ -926,7 +969,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
 
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700">
               <div className="font-semibold text-slate-900 truncate">{pendingDeleteItem.fileName}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="text-xs text-slate-500 mt-0.5">
                 Thai phụ: {pendingDeleteItem.patientName} • {pendingDeleteItem.documentTypeName}
               </div>
             </div>

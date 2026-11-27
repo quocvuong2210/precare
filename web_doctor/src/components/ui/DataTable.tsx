@@ -28,18 +28,18 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full table-fixed border-collapse text-xs ${minWidthClass}`}>
+      <table className={`w-full table-fixed border-collapse text-sm ${minWidthClass}`}>
         <colgroup>
           {columns.map((col) => (
             <col key={col.key} className={col.widthClass} />
           ))}
         </colgroup>
         <thead>
-          <tr className="bg-slate-50/90 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <tr className="bg-slate-50/90 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`py-3.5 px-4 whitespace-nowrap ${alignCls(col.align)}`}
+                className={`py-3.5 px-3 whitespace-nowrap ${alignCls(col.align)}`}
               >
                 {col.header}
               </th>
@@ -62,7 +62,7 @@ export function DataTable<T>({
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={`py-3.5 px-4 align-middle overflow-hidden ${alignCls(col.align)}`}
+                    className={`py-3.5 px-3 align-middle overflow-hidden ${alignCls(col.align)}`}
                   >
                     {col.render(item)}
                   </td>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   FileText,
@@ -14,6 +14,13 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { CheckupTimelineRecord } from '../services/checkup.service';
+import { evaluateBiometricRulesApi } from '../services/clinicalRule.service';
+import { AnalysisResult } from '../types';
+import {
+  ClinicalDisclaimerBanner,
+  ClinicalExplanationTable,
+  WarningLevelBadge,
+} from './ClinicalEvaluationPanel';
 import { DocumentViewer } from './ocr-workflow/DocumentViewer';
 import { DocumentExtractionData } from './ocr-workflow/mockOcrData';
 
@@ -22,6 +29,8 @@ interface CheckupDetailModalProps {
   onClose: () => void;
   patientName?: string;
   documentData?: DocumentExtractionData | null;
+  existingAnalysis?: AnalysisResult | null;
+  onEvaluationComplete?: (analysis: AnalysisResult) => void;
 }
 
 export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
@@ -29,10 +38,38 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
   onClose,
   patientName = 'Thai phụ',
   documentData = null,
+  existingAnalysis = null,
+  onEvaluationComplete,
 }) => {
   const [showOriginalDoc, setShowOriginalDoc] = useState(false);
+  const [ruleAnalysis, setRuleAnalysis] = useState<AnalysisResult | null>(existingAnalysis);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRuleAnalysis(existingAnalysis ?? null);
+    setEvalError(null);
+  }, [visit.id, existingAnalysis]);
 
   const biometric = visit.biometric_data;
+
+  const handleEvaluateRules = async () => {
+    if (!biometric?.id) return;
+    setIsEvaluating(true);
+    setEvalError(null);
+    try {
+      const res = await evaluateBiometricRulesApi({
+        biometric_data_id: biometric.id,
+        standard: 'intergrowth_21st',
+      });
+      setRuleAnalysis(res);
+      onEvaluationComplete?.(res);
+    } catch {
+      setEvalError('Không thể chạy đánh giá Rule Engine cho bản ghi này.');
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
   const bp =
     visit.vitals.blood_pressure_systolic != null &&
     visit.vitals.blood_pressure_diastolic != null
@@ -80,13 +117,21 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             ? `${findDocBiometric('BPD')?.value} mm`
             : null,
       range: 'Theo tuổi thai',
-      percentile: findDocBiometric('BPD')?.value ? findDocBiometric('BPD')?.percentile || '—' : '—',
+      percentile:
+        ruleAnalysis?.bpd_percentile != null
+          ? `${Number(ruleAnalysis.bpd_percentile).toFixed(1)}%`
+          : findDocBiometric('BPD')?.value
+            ? findDocBiometric('BPD')?.percentile || '—'
+            : '—',
     },
     {
       label: 'Chu vi vòng đầu (HC)',
       value: biometric?.hc != null ? `${biometric.hc} mm` : null,
       range: 'Theo tuổi thai',
-      percentile: '—',
+      percentile:
+        ruleAnalysis?.hc_percentile != null
+          ? `${Number(ruleAnalysis.hc_percentile).toFixed(1)}%`
+          : '—',
     },
     {
       label: 'Chiều dài xương đùi (FL)',
@@ -97,7 +142,12 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             ? `${findDocBiometric('FL')?.value} mm`
             : null,
       range: 'Theo tuổi thai',
-      percentile: findDocBiometric('FL')?.value ? findDocBiometric('FL')?.percentile || '—' : '—',
+      percentile:
+        ruleAnalysis?.fl_percentile != null
+          ? `${Number(ruleAnalysis.fl_percentile).toFixed(1)}%`
+          : findDocBiometric('FL')?.value
+            ? findDocBiometric('FL')?.percentile || '—'
+            : '—',
     },
     {
       label: 'Chu vi vòng bụng (AC)',
@@ -108,7 +158,12 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             ? `${findDocBiometric('AC')?.value} mm`
             : null,
       range: 'Theo tuổi thai',
-      percentile: findDocBiometric('AC')?.value ? findDocBiometric('AC')?.percentile || '—' : '—',
+      percentile:
+        ruleAnalysis?.ac_percentile != null
+          ? `${Number(ruleAnalysis.ac_percentile).toFixed(1)}%`
+          : findDocBiometric('AC')?.value
+            ? findDocBiometric('AC')?.percentile || '—'
+            : '—',
     },
     {
       label: 'Cân nặng ước tính (EFW)',
@@ -119,7 +174,12 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
             ? `${findDocBiometric('EFW')?.value.toLocaleString('vi-VN')} g`
             : null,
       range: 'Theo tuổi thai',
-      percentile: findDocBiometric('EFW')?.value ? findDocBiometric('EFW')?.percentile || '—' : '—',
+      percentile:
+        ruleAnalysis?.efw_percentile != null
+          ? `${Number(ruleAnalysis.efw_percentile).toFixed(1)}%`
+          : findDocBiometric('EFW')?.value
+            ? findDocBiometric('EFW')?.percentile || '—'
+            : '—',
     },
     {
       label: 'Chỉ số ối (AFI)',
@@ -396,6 +456,42 @@ export const CheckupDetailModal: React.FC<CheckupDetailModalProps> = ({
               </p>
             )}
           </div>
+        </div>
+
+        {/* V. Đánh giá Rule Engine & Disclaimer cố định */}
+        <div className="px-6 py-3 border-t border-slate-100 bg-white space-y-2.5 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4 text-[#275248]" />
+              <span>Đánh giá Rule Engine 3 mức</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {ruleAnalysis && (
+                <WarningLevelBadge level={ruleAnalysis.warning_level} size="sm" />
+              )}
+              {biometric?.id && (
+                <button
+                  type="button"
+                  disabled={isEvaluating}
+                  onClick={handleEvaluateRules}
+                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#E6F4F1] text-[#275248] hover:bg-[#d5ece7] border border-teal-200 disabled:opacity-50 cursor-pointer"
+                >
+                  {isEvaluating
+                    ? 'Đang đánh giá...'
+                    : ruleAnalysis
+                      ? 'Đánh giá lại Rule Engine'
+                      : 'Chạy đánh giá Rule Engine'}
+                </button>
+              )}
+            </div>
+          </div>
+          {evalError && <p className="text-xs text-red-600">{evalError}</p>}
+          {ruleAnalysis && (
+            <div className="max-h-56 overflow-y-auto">
+              <ClinicalExplanationTable analysis={ruleAnalysis} />
+            </div>
+          )}
+          <ClinicalDisclaimerBanner disclaimerText={ruleAnalysis?.disclaimer_text} />
         </div>
 
         {/* Footer Actions */}

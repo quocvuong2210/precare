@@ -28,11 +28,11 @@ export const TableActionButton: React.FC<TableActionButtonProps> = ({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-[172px] h-9 px-3 rounded-xl text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses} ${className}`}
+      className={`min-w-[144px] h-10 px-3.5 rounded-xl text-sm inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses} ${className}`}
     >
       {Icon && (
         <Icon
-          className={`w-3.5 h-3.5 shrink-0 ${
+          className={`w-4 h-4 shrink-0 ${
             variant === 'primary' ? 'text-white' : 'text-slate-500'
           }`}
         />

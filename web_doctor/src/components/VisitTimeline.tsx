@@ -21,6 +21,9 @@ import {
   fetchCheckupHistory,
 } from '../services/checkup.service';
 import { CheckupDetailModal } from './CheckupDetailModal';
+import { WarningLevelBadge } from './ClinicalEvaluationPanel';
+import { fetchProfileRuleEvaluationsApi } from '../services/clinicalRule.service';
+import { AnalysisResult } from '../types';
 import {
   ingestService,
   isValidUuid,
@@ -72,6 +75,7 @@ export interface VisitTimelineProps {
   patientName?: string;
   onOpenUpload?: () => void;
   newlyAddedVisits?: CheckupTimelineRecord[];
+  onAnalysisUpdated?: (analysis: AnalysisResult) => void;
 }
 
 export const VisitTimeline: React.FC<VisitTimelineProps> = ({
@@ -79,8 +83,10 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
   patientName,
   onOpenUpload,
   newlyAddedVisits = [],
+  onAnalysisUpdated,
 }) => {
   const [visits, setVisits] = useState<CheckupTimelineRecord[]>([]);
+  const [analysisByCheckupId, setAnalysisByCheckupId] = useState<Record<string, AnalysisResult>>({});
   const [selectedVisitForDetail, setSelectedVisitForDetail] = useState<CheckupTimelineRecord | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileSummary[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
@@ -101,7 +107,18 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      setVisits(await fetchCheckupHistory(pregnancyProfileId));
+      const [history, analyses] = await Promise.all([
+        fetchCheckupHistory(pregnancyProfileId),
+        fetchProfileRuleEvaluationsApi(pregnancyProfileId).catch(() => [] as AnalysisResult[]),
+      ]);
+      setVisits(history);
+      const map: Record<string, AnalysisResult> = {};
+      for (const item of analyses) {
+        if (!map[item.checkup_id]) {
+          map[item.checkup_id] = item;
+        }
+      }
+      setAnalysisByCheckupId(map);
     } catch (err: any) {
       setError(getErrorMessage(err));
       setVisits([]);
@@ -287,6 +304,7 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
         <div className="px-4 py-3 sm:px-6 sm:py-4">
           {sortedVisits.map((visit, index) => {
             const biometric = visit.biometric_data;
+            const visitAnalysis = analysisByCheckupId[visit.id] ?? null;
             const pressureStatus = pressureLabels[
               (visit.vitals.blood_pressure_status || 'normal') as BloodPressureStatus
             ];
@@ -311,17 +329,20 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
                     <span className="text-xs font-semibold text-slate-700">{formatDate(visit.checkup_date)}</span>
                     <span className="hidden text-slate-300 sm:inline">·</span>
                     <span className="inline-flex items-center gap-1 text-xs text-slate-600"><Stethoscope className="h-3 w-3 text-slate-400" /> BS. {visit.doctor.full_name}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">Quý {visit.gestational_age.trimester}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Quý {visit.gestational_age.trimester}</span>
+                    {visitAnalysis && (
+                      <WarningLevelBadge level={visitAnalysis.warning_level} size="sm" />
+                    )}
                   </div>
 
-                  <div className="mt-2.5 space-y-1.5 text-xs leading-5 text-slate-600">
+                  <div className="mt-2.5 space-y-1.5 text-sm leading-6 text-slate-600">
                     <p className="flex flex-wrap items-center gap-x-1.5">
                       <HeartPulse className="h-3.5 w-3.5 text-rose-500" />
                       <strong className="font-semibold text-slate-700">Mẹ:</strong>
                       <span>{formatNumber(visit.vitals.weight_kg, 'kg')}</span>
                       <span className="text-slate-300">|</span>
                       <span>HA: {bp}</span>
-                      {pressureStatus ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pressureStatus.className}`}>{pressureStatus.label}</span> : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px]">{visit.vitals.blood_pressure_status}</span>}
+                      {pressureStatus ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${pressureStatus.className}`}>{pressureStatus.label}</span> : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{visit.vitals.blood_pressure_status}</span>}
                     </p>
 
                     {biometric ? (
@@ -333,7 +354,7 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
                         <span>AC {formatNumber(biometric.ac, 'mm')}</span><span className="text-slate-300">|</span>
                         <span>FL {formatNumber(biometric.fl, 'mm')}</span><span className="text-slate-300">|</span>
                         <span>EFW {formatNumber(biometric.efw, 'g')}</span>
-                        <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                        <span className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                           {verified ? 'Đã xác thực' : 'Chờ duyệt'}
                         </span>
                       </p>
@@ -345,7 +366,7 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400 font-mono">
+                    <span className="text-xs text-slate-400 font-mono">
                       Mã hồ sơ: {visit.id.slice(0, 14)}
                     </span>
                     <button
@@ -365,7 +386,7 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
       )}
 
       {!isLoading && !error && sortedVisits.length > 0 && (
-        <footer className="border-t border-slate-100 bg-slate-50/70 px-5 py-2.5 text-center text-[10px] text-slate-500">
+        <footer className="border-t border-slate-100 bg-slate-50/70 px-5 py-2.5 text-center text-xs text-slate-500">
           {sortedVisits.length} lần khám · Sắp xếp mới nhất trước
         </footer>
       )}
@@ -403,6 +424,11 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
           visit={selectedVisitForDetail}
           onClose={() => setSelectedVisitForDetail(null)}
           patientName={patientName}
+          existingAnalysis={analysisByCheckupId[selectedVisitForDetail.id] ?? null}
+          onEvaluationComplete={(res) => {
+            setAnalysisByCheckupId((prev) => ({ ...prev, [res.checkup_id]: res }));
+            onAnalysisUpdated?.(res);
+          }}
         />
       )}
 
@@ -460,11 +486,11 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
                       <span className="text-xs font-bold text-slate-800 truncate">
                         {file.file_name || 'Tai_lieu_kham.pdf'}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${statusBadge.cls}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${statusBadge.cls}`}>
                         {statusBadge.text}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-2">
+                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2">
                       <span>{file.file_size_bytes ? formatFileSize(file.file_size_bytes) : '—'}</span>
                       <span>•</span>
                       <span>{formatDateTime(file.created_at)}</span>
@@ -510,7 +536,7 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
                 <h3 className="text-sm font-bold text-slate-900">
                   Xem tài liệu gốc: {previewDocData.fileName}
                 </h3>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Thai phụ: {patientName || '—'} • Độ tin cậy trích xuất: {previewDocData.ocrConfidence}%
                 </p>
               </div>

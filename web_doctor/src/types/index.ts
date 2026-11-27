@@ -107,4 +107,66 @@ export interface AnalysisResult {
   explanation_patient: string;
   disclaimer_text: string;
   analyzed_at: string;
+  flags?: string[];
+}
+
+export type GrowthStandard = 'intergrowth_21st' | 'hadlock';
+export type BiometricMetric = 'crl' | 'bpd' | 'hc' | 'ac' | 'fl' | 'efw';
+export type BiometricUnit = 'mm' | 'g';
+export type PercentileClassification =
+  | 'below_p3'
+  | 'p3_to_p10'
+  | 'normal'
+  | 'above_p90'
+  | 'above_p97';
+
+export interface GrowthReferenceItemResponse {
+  standard: GrowthStandard;
+  metric: BiometricMetric;
+  ga_days: number;
+  unit: BiometricUnit;
+  l_value: number;
+  m_value: number;
+  s_value: number;
+  p3: number;
+  p10: number;
+  p50: number;
+  p90: number;
+  p97: number;
+  version: string;
+}
+
+export interface GrowthReferenceCurveResponse {
+  standard: GrowthStandard;
+  metric: BiometricMetric;
+  unit: BiometricUnit;
+  version: string;
+  points: GrowthReferenceItemResponse[];
+}
+
+export interface ZScoreEvaluateRequest {
+  standard?: GrowthStandard;
+  metric: BiometricMetric;
+  ga_days: number;
+  value: number;
+}
+
+export interface ZScoreEvaluateResponse {
+  standard: GrowthStandard;
+  metric: BiometricMetric;
+  ga_days: number;
+  unit: BiometricUnit;
+  value: number;
+  z_score: number;
+  percentile: number;
+  classification: PercentileClassification;
+  reference: GrowthReferenceItemResponse;
+}
+
+export interface ClinicalRuleEvaluateRequest {
+  biometric_data_id: string;
+  standard?: GrowthStandard;
+  nt_mm?: number;
+  afi_cm?: number;
+  previous_efw_percentile?: number;
 }
