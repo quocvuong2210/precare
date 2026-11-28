@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
     error_message TEXT,                                       -- Lưu thông báo lỗi nếu quá trình OCR/Extract thất bại
     ocr_raw_payload JSONB,                                    -- Kết quả bóc tách thô (sẽ do Celery worker ghi)
     uploaded_by UUID REFERENCES users(id),                    -- Người tải lên (Bác sĩ hoặc Thai phụ)
+    verified_by UUID REFERENCES users(id),                    -- Bác sĩ xác thực tài liệu
+    verified_at TIMESTAMP WITH TIME ZONE,                     -- Thời điểm xác thực tài liệu
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
