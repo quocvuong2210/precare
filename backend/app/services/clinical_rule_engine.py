@@ -222,6 +222,38 @@ def _evaluate_metric_with_fallback(
     return Decimal(f"{res['z_score']:.2f}"), Decimal(f"{res['percentile']:.2f}")
 
 
+def get_causal_previous_efw_percentile(
+    db: Session,
+    pregnancy_profile_id: UUID,
+    current_biometric_id: UUID,
+    current_ga_days: int,
+) -> Optional[float]:
+    """
+    Strictly causal predecessor lookup: returns the EFW percentile from the most
+    recent non-deleted BiometricData visit with `gestational_age_days < current_ga_days`.
+    Prevents future data leakage when historical records are backfilled out of order.
+    """
+    prev_result = (
+        db.query(AnalysisResult)
+        .join(BiometricData, AnalysisResult.biometric_data_id == BiometricData.id)
+        .filter(
+            AnalysisResult.pregnancy_profile_id == pregnancy_profile_id,
+            AnalysisResult.biometric_data_id != current_biometric_id,
+            AnalysisResult.efw_percentile.isnot(None),
+            BiometricData.is_deleted.is_(False),
+            BiometricData.gestational_age_days < current_ga_days,
+        )
+        .order_by(
+            BiometricData.gestational_age_days.desc(),
+            AnalysisResult.analyzed_at.desc(),
+        )
+        .first()
+    )
+    if prev_result is not None and prev_result.efw_percentile is not None:
+        return float(prev_result.efw_percentile)
+    return None
+
+
 def evaluate_and_save_biometric_rules(
     db: Session,
     biometric_data_id: UUID,
@@ -254,19 +286,13 @@ def evaluate_and_save_biometric_rules(
     efw_z, efw_p = _evaluate_metric_with_fallback(db, standard, "efw", ga_days, bio.efw)
 
     prev_efw_p = previous_efw_percentile
-    if prev_efw_p is None:
-        prev_result = (
-            db.query(AnalysisResult)
-            .filter(
-                AnalysisResult.pregnancy_profile_id == bio.pregnancy_profile_id,
-                AnalysisResult.biometric_data_id != bio.id,
-                AnalysisResult.efw_percentile.isnot(None),
-            )
-            .order_by(AnalysisResult.analyzed_at.desc())
-            .first()
-        )
-        if prev_result is not None and prev_result.efw_percentile is not None:
-            prev_efw_p = float(prev_result.efw_percentile)
+    if prev_efw_p is None:
+        prev_efw_p = get_causal_previous_efw_percentile(
+            db=db,
+            pregnancy_profile_id=bio.pregnancy_profile_id,
+            current_biometric_id=bio.id,
+            current_ga_days=ga_days,
+        )
 
     summary = evaluate_rules_3_level(
         bpd_percentile=float(bpd_p) if bpd_p is not None else None,
