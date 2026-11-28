@@ -18,6 +18,7 @@ from app.api.ingest import router as ingest_router
 from app.api.growth_reference import router as growth_reference_router
 from app.api.clinical_rule import router as clinical_rule_router
 from app.api.internal_analysis import router as internal_analysis_router
+from app.api.records import router as records_router
   
 
 # Initialize database tables
@@ -63,6 +64,10 @@ app.include_router(clinical_rule_router, prefix="/api/v1/clinical-rules", tags=[
 
 # Internal Analysis Service Integration Routes
 app.include_router(internal_analysis_router, prefix="/api/v1/internal/analysis", tags=["Internal Analysis Service"])
+
+# Pregnancy Growth Trajectory Routes (PRC-74)
+app.include_router(records_router, prefix="/api/records", tags=["Records Trajectory"])
+app.include_router(records_router, prefix="/api/v1/records", tags=["Records Trajectory"])
 
 
 @app.get("/", tags=["System"])
