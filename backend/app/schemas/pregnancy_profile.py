@@ -24,6 +24,15 @@ class GestationalAgeDetail(BaseModel):
 # 2. Preview / Calculate Engine Models
 # ==========================================
 
+def _validate_override_edd(override_edd: Optional[date], today: date) -> None:
+    if override_edd is None:
+        return
+    if override_edd < today:
+        raise ValueError("Ngày dự sinh (EDD) không được nhỏ hơn ngày hiện tại.")
+    if (override_edd - today).days > 294:
+        raise ValueError("Ngày dự sinh (EDD) không được vượt quá 42 tuần kể từ hôm nay.")
+
+
 class CalculateGestationalAgeRequest(BaseModel):
     target_date: Optional[date] = Field(default_factory=date.today, description="Ngày cần tính tuổi thai")
     lmp: Optional[date] = Field(None, description="Ngày đầu kỳ kinh cuối")
@@ -51,6 +60,8 @@ class CalculateGestationalAgeRequest(BaseModel):
         if not any([self.lmp, self.q1_ultrasound_date, self.override_edd]):
             raise ValueError("Cần cung cấp ít nhất một phương pháp: LMP, Siêu âm Quý 1 hoặc EDD chỉ định.")
             
+        _validate_override_edd(self.override_edd, today)
+
         return self
 
 
@@ -132,6 +143,8 @@ class CreatePregnancyProfileRequest(BaseModel):
         elif self.calculation_method == "direct_edd" and not self.override_edd:
             raise ValueError("Vui lòng cung cấp ngày dự sinh (override_edd) khi chọn phương pháp chỉ định trực tiếp.")
 
+        _validate_override_edd(self.override_edd, today)
+
         return self
 
 
@@ -159,6 +172,8 @@ class UpdatePregnancyProfileRequest(BaseModel):
                 raise ValueError("Ngày siêu âm phải nhỏ hơn hoặc bằng ngày hôm nay.")
             if self.lmp and self.q1_ultrasound_date < self.lmp:
                 raise ValueError("Ngày siêu âm không thể diễn ra trước ngày kinh cuối.")
+
+        _validate_override_edd(self.override_edd, today)
 
         return self
 
