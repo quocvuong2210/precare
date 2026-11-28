@@ -702,6 +702,7 @@ def list_worklist_queue(
                 file_type=r.file_type,
                 file_size_bytes=r.file_size_bytes,
                 status=r.status,
+                extraction_method=payload.get("extraction_method") if isinstance(payload, dict) else None,
                 ocr_confidence=avg_conf,
                 uploaded_by_name=r.uploader.full_name if r.uploader else None,
                 verified_by_name=r.verifier.full_name if r.verifier else None,

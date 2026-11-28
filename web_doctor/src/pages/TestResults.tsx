@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { UploadVerificationWizard } from '../components/ocr-workflow';
 import { CheckupDetailModal } from '../components/CheckupDetailModal';
+import { getExtractionBadgeInfo, isFastPathExtraction } from '../lib/extractionDisplay';
 import { CheckupTimelineRecord, fetchCheckupHistory } from '../services/checkup.service';
 import { DocumentExtractionData, formatFileSize } from '../components/ocr-workflow/mockOcrData';
 import {
@@ -52,6 +53,7 @@ export interface ParaclinicalWorklistItem {
   fileSize: string;
   receivedAt: string;
   doctorPerformer: string;
+  extractionMethod?: string;
   ocrConfidence: number;
   status: 'pending_review' | 'verified' | 'failed';
   primaryDoctorId?: string | null;
@@ -201,6 +203,7 @@ export const TestResults: React.FC<TestResultsProps> = ({
           doctorPerformer: item.uploaded_by_name || 'Hệ thống tiếp nhận',
           verifiedByName: item.verified_by_name,
           verifiedAt: item.verified_at,
+          extractionMethod: item.extraction_method || undefined,
           ocrConfidence: item.ocr_confidence ?? (item.status === 'failed' ? 0 : 98.0),
           status:
             item.status === 'verified'
@@ -297,7 +300,8 @@ export const TestResults: React.FC<TestResultsProps> = ({
     const avgConfidence = (
       worklist.reduce((acc, i) => acc + i.ocrConfidence, 0) / (total || 1)
     ).toFixed(1);
-    return { total, pending, verified, avgConfidence };
+    const fastPathCount = worklist.filter((i) => isFastPathExtraction(i.extractionMethod)).length;
+    return { total, pending, verified, fastPathCount, avgConfidence };
   }, [worklist]);
 
   // Filtered list
@@ -574,14 +578,14 @@ export const TestResults: React.FC<TestResultsProps> = ({
 
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Độ tin cậy AI trung bình</span>
+            <span>Chất lượng trích xuất</span>
             <Sparkles className="w-4 h-4 text-teal-600" />
           </div>
           <div className="text-2xl font-black text-[#275248] mt-2">
-            {stats.avgConfidence}%
+            {stats.fastPathCount > 0 ? `${stats.fastPathCount} PDF gốc` : `${stats.avgConfidence}%`}
           </div>
           <div className="text-[11px] text-slate-400 font-medium mt-1">
-            Động cơ PaddleOCR &amp; Hadlock IV
+            PDF Fast Path &amp; OCR TB {stats.avgConfidence}%
           </div>
         </div>
       </div>
@@ -766,13 +770,24 @@ export const TestResults: React.FC<TestResultsProps> = ({
             },
             {
               key: 'confidence',
-              header: 'ĐỘ TIN CẬY AI',
+              header: 'NGUỒN & ĐỘ TIN CẬY',
               widthClass: 'w-[11%]',
               align: 'center',
               render: (item) => (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-[#275248] border border-teal-200/80 whitespace-nowrap">
-                  <Sparkles className="w-3 h-3 text-teal-600" />
-                  {item.ocrConfidence}%
+                <span
+                  title={getExtractionBadgeInfo(item.extractionMethod, item.ocrConfidence, item.status).label}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${
+                    (() => {
+                      const b = getExtractionBadgeInfo(item.extractionMethod, item.ocrConfidence, item.status);
+                      if (b.mode === 'failed' || b.tone === 'low') return 'bg-rose-50 text-rose-700 border-rose-200';
+                      if (b.mode === 'fast_path') return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                      if (b.tone === 'warning') return 'bg-amber-50 text-amber-800 border-amber-200';
+                      return 'bg-teal-50 text-[#275248] border-teal-200/80';
+                    })()
+                  }`}
+                >
+
+                  {getExtractionBadgeInfo(item.extractionMethod, item.ocrConfidence, item.status).shortLabel}
                 </span>
               ),
             },

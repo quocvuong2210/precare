@@ -250,6 +250,7 @@ export interface WorklistQueueItem {
   file_type: string;
   file_size_bytes: number | null;
   status: IngestFileStatus | string;
+  extraction_method?: 'pdf_text_layer_fast_path' | 'ocr_pipeline_slow_path' | 'paddleocr_slow_path' | string | null;
   ocr_confidence: number | null;
   uploaded_by_name: string | null;
   verified_by_name?: string | null;
