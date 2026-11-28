@@ -29,6 +29,7 @@ from app.services.clinical_rule_engine import (
     RULES_VERSION,
     _evaluate_metric_with_fallback,
     evaluate_rules_3_level,
+    get_causal_previous_efw_percentile,
 )
 
 logger = logging.getLogger(__name__)
@@ -214,18 +215,12 @@ def fuse_and_save_analysis_result(
 
     prev_efw_p = previous_efw_percentile
     if prev_efw_p is None:
-        prev_result = (
-            db.query(AnalysisResult)
-            .filter(
-                AnalysisResult.pregnancy_profile_id == bio.pregnancy_profile_id,
-                AnalysisResult.biometric_data_id != bio.id,
-                AnalysisResult.efw_percentile.isnot(None),
-            )
-            .order_by(AnalysisResult.analyzed_at.desc())
-            .first()
+        prev_efw_p = get_causal_previous_efw_percentile(
+            db=db,
+            pregnancy_profile_id=bio.pregnancy_profile_id,
+            current_biometric_id=bio.id,
+            current_ga_days=ga_days,
         )
-        if prev_result is not None and prev_result.efw_percentile is not None:
-            prev_efw_p = float(prev_result.efw_percentile)
 
     rule_summary = evaluate_rules_3_level(
         bpd_percentile=float(bpd_p) if bpd_p is not None else None,
