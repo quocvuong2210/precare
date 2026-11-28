@@ -20,3 +20,6 @@ dist/
 build/
 
 layout-ex/
+
+# Personal notes (local only, never pushed to GitHub)
+personal_notes/
