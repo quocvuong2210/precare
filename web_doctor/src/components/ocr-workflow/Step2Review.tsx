@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { DocumentExtractionData, UploadFileItem } from './mockOcrData';
 import { DocumentViewer } from './DocumentViewer';
+import {
+  getConfidenceTone,
+  getExtractionBadgeInfo,
+  isFastPathExtraction,
+} from '../../lib/extractionDisplay';
 
 interface Step2ReviewProps {
   files: UploadFileItem[];
@@ -162,12 +167,27 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
               <Edit3 className="w-3.5 h-3.5 text-rose-600" />
               Chế độ nhập tay (OCR thất bại)
             </span>
-          ) : (
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#275248] border border-teal-200/80 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              Độ tin cậy OCR: {extractionData.ocrConfidence}%
-            </span>
-          )}
+          ) : (() => {
+            const badge = getExtractionBadgeInfo(
+              extractionData.extractionMethod,
+              extractionData.ocrConfidence
+            );
+            const pillClass =
+              badge.mode === 'fast_path'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : badge.tone === 'low'
+                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                : badge.tone === 'warning'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-teal-50 text-[#275248] border-teal-200/80';
+            return (
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-bold border ${pillClass}`}
+              >
+                {badge.label}
+              </span>
+            );
+          })()}
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
             <Edit3 className="w-3.5 h-3.5 text-amber-600" />
             {extractionData.isManualEntry ? 'Chờ bác sĩ nhập liệu' : 'Chờ bác sĩ đối chiếu'}
@@ -719,9 +739,30 @@ export const Step2Review: React.FC<Step2ReviewProps> = ({
                               </span>
                             </td>
                             <td className="py-3 px-2 text-center">
-                              <span className="text-[10px] font-bold text-emerald-700">
-                                {metric.confidence}%
-                              </span>
+                              {isFastPathExtraction(extractionData.extractionMethod) ? (
+                                metric.value <= 0 ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    Thiếu giá trị
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-700">
+                                    PDF Gốc
+                                  </span>
+                                )
+                              ) : (() => {
+                                const tone = getConfidenceTone(metric.confidence);
+                                const toneClass =
+                                  tone === 'low'
+                                    ? 'px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200'
+                                    : tone === 'warning'
+                                    ? 'px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200'
+                                    : 'text-emerald-700';
+                                return (
+                                  <span className={`text-[10px] font-bold ${toneClass}`}>
+                                    {metric.confidence}%
+                                  </span>
+                                );
+                              })()}
                             </td>
                           </tr>
                         ))}

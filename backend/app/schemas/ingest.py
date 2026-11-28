@@ -167,6 +167,7 @@ class WorklistQueueItem(BaseModel):
     file_type: str
     file_size_bytes: Optional[int] = None
     status: str
+    extraction_method: Optional[str] = None
     ocr_confidence: Optional[float] = None
     uploaded_by_name: Optional[str] = None
     verified_by_name: Optional[str] = None

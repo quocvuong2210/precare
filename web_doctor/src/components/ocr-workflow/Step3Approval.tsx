@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { DocumentExtractionData } from './mockOcrData';
 import { DocumentViewer } from './DocumentViewer';
+import { getExtractionBadgeInfo } from '../../lib/extractionDisplay';
 
 interface Step3ApprovalProps {
   extractionData: DocumentExtractionData;
@@ -68,8 +69,8 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#275248] border border-teal-200/80 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            Độ tin cậy OCR: {extractionData.ocrConfidence}%
+
+            {getExtractionBadgeInfo(extractionData.extractionMethod, extractionData.ocrConfidence).label}
           </span>
         </div>
       </div>
@@ -132,7 +133,7 @@ export const Step3Approval: React.FC<Step3ApprovalProps> = ({
                 {extractionData.fileName}
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-[#275248] border border-teal-200">
-                Độ tin cậy AI: {extractionData.ocrConfidence}%
+                {getExtractionBadgeInfo(extractionData.extractionMethod, extractionData.ocrConfidence).label}
               </span>
             </div>
             <div className="text-xs text-slate-500 mt-0.5 truncate">
