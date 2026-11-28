@@ -410,6 +410,21 @@ export function validateClinicalInputs(params: PregnancyCalculationParams): Vali
     }
   }
 
+  if (params.overrideEdd) {
+    const eddDate = parseDateOnly(params.overrideEdd);
+    if (diffDays(eddDate, today) < 0) {
+      errors.push({
+        field: 'overrideEdd',
+        message: 'Ngày dự sinh (EDD) không được nhỏ hơn ngày hiện tại.',
+      });
+    } else if (diffDays(eddDate, today) > 294) {
+      errors.push({
+        field: 'overrideEdd',
+        message: 'Ngày dự sinh (EDD) không được vượt quá 42 tuần kể từ hôm nay.',
+      });
+    }
+  }
+
   const hasMethod =
     Boolean(params.lmp) ||
     Boolean(params.q1UltrasoundDate && (params.q1GestationalWeeks || params.crlMm)) ||
