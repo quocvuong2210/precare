@@ -57,6 +57,7 @@ $$\text{API Router (app/api/)} \longrightarrow \text{Domain Service (app/service
 ## 5. Error Handling & API Response Standards
 - Raise domain-specific exceptions in `app/services/` and map them centrally to standardized JSON responses in `app/core/exceptions.py`.
 - Use standard HTTP status codes: `200 OK` for reads, `201 Created` for resource creation, `202 Accepted` when a background Celery digitization job is queued, and `422 Unprocessable Entity` for schema/medical range validation errors.
+- **API Contract Enforcement (`docs/API_Contract_Interface/`):** Whenever a new API endpoint is created and has not yet been pushed to the remote repository, you **MUST** create (or update) its corresponding contract file in `docs/API_Contract_Interface/` (following `API_Contract_STORY-<X.Y>_<Module>.md`) before pushing.
 - **Logging & Security:** Use structured logging (`logger.info(..., extra={"record_id": str(record_id)})`). Obey zero-PII rules: **never log patient names, phone numbers, or national IDs.**
 
 ---

@@ -62,7 +62,7 @@ AI agents MUST strictly adhere to these medical abbreviations, units, and storag
 - *Example:* `feat(be): add Hadlock IV EFW calculation and percentile lookup service`
 
 ### Pull Request & Code Review Checklist
-1. **Contract Sync:** Any change to FastAPI Pydantic schemas must be reflected in Frontend TypeScript interfaces within the same PR or linked immediately.
+1. **Contract Sync & Mandatory API Contract Documentation:** Any new API endpoint or change to FastAPI Pydantic schemas MUST have its API contract created/updated in `docs/API_Contract_Interface/` (format `API_Contract_STORY-<X.Y>_<Ten_Module>.md`) **before pushing** to the repository, and must be reflected in Frontend/Mobile TypeScript interfaces within the same PR or linked immediately.
 2. **Database Schema Updates:** Any schema change must update both the SQLAlchemy models (`backend/app/models/`) and `init-db/01-init.sql` (until the Alembic migration pipeline is formally initialized for production/staging).
 3. **Self-Contained Context:** If a PR introduces a new architectural pattern, shared utility, or domain rule, update the relevant `AGENTS.md` file in the same PR.
 
@@ -192,7 +192,7 @@ Microservice độc lập chịu trách nhiệm tính toán sinh trắc sản kh
 
 #### 5. Cơ sở dữ liệu & Hạ tầng điều phối (`init-db/`, `docker-compose.yml`, `docs/`)
 - **Khởi tạo dữ liệu (`init-db/`):** File `01-init.sql` là nguồn DDL chính (Single Source of Truth) định nghĩa bảng và seed dữ liệu ban đầu cho PostgreSQL. Mọi sửa đổi schema phải được cập nhật đồng thời tại đây và trong `backend/app/models/`.
-- **Tài liệu hợp đồng API (`docs/API_Contract_Interface/`):** Mọi sự thay đổi về endpoint hay payload DTO giữa Backend và Frontend/Mobile phải được cập nhật tương ứng vào tài liệu contract tại đây.
+- **Tài liệu hợp đồng API (`docs/API_Contract_Interface/`):** **Quy tắc bắt buộc:** Mỗi khi có API mới (endpoint mới hoặc payload DTO mới) mà chưa được push lên hệ thống, lập trình viên và AI agent **bắt buộc** phải tạo (hoặc cập nhật) tài liệu API Contract tương ứng tại `docs/API_Contract_Interface/` trước khi commit/push. Mọi sự thay đổi về endpoint hay payload DTO giữa Backend và Frontend/Mobile phải được phản ánh đầy đủ tại đây.
 - **Điều phối Container (`docker-compose.yml`):** Cấu hình toàn bộ mạng lưới microservices cục bộ (`db`, `redis`, `minio`, `analysis_service`, `backend`, `celery_worker`, `web_doctor`).
 
 ---
